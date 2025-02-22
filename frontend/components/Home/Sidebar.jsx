@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
-import { Button } from '../../../src/components/ui/button'
-import { cn } from '../../../src/lib/utils'
+import { Button } from 'utils/components/ui/button'
+import { cn } from 'utils/lib/utils'
 import { Compass, Heart, Home, Library, Menu } from 'lucide-react'
 
 const Sidebar = () => {
@@ -21,7 +21,7 @@ const Sidebar = () => {
                 </Button>
 
                 {/* Sidebar Header */}
-                {isOpen && <h1 className="text-xl font-bold mb-4">AudioScape</h1>}
+                {isOpen && <h1 className="text-2xl font-bold mb-4">AudioScape</h1>}
             </div>
 
 
