@@ -27,7 +27,7 @@ const UserMenu = () => {
       {user ? (
         <DropdownMenu>
           <DropdownMenuTrigger>
-            <Avatar className="cursor-pointer hover:opacity-80 transition-opacity duration-200">
+            <Avatar className="w-10 h-10 cursor-pointer hover:opacity-80 transition-opacity duration-200">
               <AvatarImage src={user.photoURL} alt="User Profile" />
               <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-black dark:text-white">
                 {user.displayName?.charAt(0) || "U"}
@@ -42,7 +42,7 @@ const UserMenu = () => {
           >
             {/* Profile Header */}
             <div className="flex items-center px-4 py-3 space-x-3">
-              <Avatar className="w-10 h-10">
+              <Avatar className="w-12 h-12">
                 <AvatarImage src={user.photoURL} alt="User Profile" />
                 <AvatarFallback className="bg-gray-500 text-white">
                   {user.displayName?.charAt(0) || "U"}
