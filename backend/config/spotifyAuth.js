@@ -1,37 +1,35 @@
+const axios = require("axios");
 require("dotenv").config();
-const axios = require("axios")
+let spotifyAccessToken = null;
+let tokenExpirationTime = 0;
 
-let accessToken = "";
-let tokenExpiresAt = 0;
+const getSpotifyAccessToken = async () => {
+  const currentTime = Date.now();
 
-//function to get or refresh the access token
-const getAccessToken = async () => {
-    const now = Date.now();
-    if (accessToken && now < tokenExpiresAt) {
-        return accessToken; // return existing token if still valid
-    }
+  if (spotifyAccessToken && currentTime < tokenExpirationTime) {
+    return spotifyAccessToken; // Return cached token if still valid
+  }
 
-    try {
-        const response = await axios.post("https://accounts.spotify.com/api/token",
-            new URLSearchParams({ grant_type: "client_credentials" }),
-            {
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                    Authorization: `Basic ${Buffer.from(
-                        `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
-                    ).toString("base64")}`
-                }
-            }
-        );
+  try {
+    const response = await axios.post(
+      "https://accounts.spotify.com/api/token",
+      new URLSearchParams({
+        grant_type: "client_credentials",
+        client_id: process.env.SPOTIFY_CLIENT_ID,
+        client_secret: process.env.SPOTIFY_CLIENT_SECRET
+      }).toString(),
+      { headers: { "Content-Type": "application/x-www-form-urlencoded" } }
+    );
 
-        accessToken = response.data.access_token;
-        tokenExpiresAt = now + response.data.expires_in * 1000; //store expiration time
-        return accessToken;
-    }
-    catch(error){
-        console.error("Error fetching access token:", error);
-        return null;
-    }
-}
+    spotifyAccessToken = response.data.access_token;
+    tokenExpirationTime = currentTime + 3600* 1000; // expire in 1 hr
 
-module.exports = {getAccessToken};
+    console.log("Token generated successfully")
+    return spotifyAccessToken;
+  } catch (error) {
+    console.error("Error fetching Spotify token:", error.message);
+    throw new Error("Failed to get Spotify access token.");
+  }
+};
+
+module.exports = { getSpotifyAccessToken };

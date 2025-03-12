@@ -5,6 +5,7 @@ import HeroSection from "../components/Home/HeroSection"; // Import HeroSection
 import { Sun, Moon } from "lucide-react";
 import UserMenu from "../components/Auth/UserMenu";
 import { useTheme } from "../ThemeProvider";
+import TrendingTracks from "../components/Home/TrendingTracks";
 
 const HomePage = () => {
   const { theme, setTheme } = useTheme();
@@ -36,6 +37,7 @@ const HomePage = () => {
         </div>
 
         {/* Add Recommended Songs, Favorites, Playlists Below */}
+        <TrendingTracks />
       </div>
     </div>
   );

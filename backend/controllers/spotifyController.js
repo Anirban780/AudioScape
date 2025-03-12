@@ -1,4 +1,4 @@
-const { searchTrack, getTrackDetails, getRecommendedTracks } = require("../utils/spotifyService");
+const { searchTrack, getTrackDetails, getRecommendedTracks } = require("../services/spotifyService");
 
 const searchTrackController = async (req, res) => {
     try {

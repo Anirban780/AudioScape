@@ -1,11 +1,11 @@
 const axios = require("axios");
-const { getAccessToken } = require("../config/spotifyAuth");
+const { getSpotifyAccessToken } = require("../config/spotifyAuth");
 
 //search for a track
 const searchTrack = async(query) => {
     if(!query)  throw new Error("Query parameter is required");
 
-    const token = await getAccessToken();
+    const token = await getSpotifyAccessToken();
     const response = await axios.get(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track`,
         {
             headers: {
@@ -41,4 +41,28 @@ const getRecommendedTracks = async (seedTrackId) => {
 };
 
 
-module.exports = { searchTrack, getTrackDetails, getRecommendedTracks };
+const getTrendingTracks = async() => {
+    const token = await getAccessToken();
+
+    const response = await axios.get(`https://api.spotify.com/v1/browse/new-releases`,
+        {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        });
+
+    return response.data.albums.items.map(album => ({
+        id: album.id,
+        name: album.name,
+        artist: album.artists.map(a => a.name).join(", "),
+        albumArt: album.images[0]?.url || "",
+    }))
+}
+
+
+module.exports = { 
+    searchTrack, 
+    getTrackDetails, 
+    getRecommendedTracks, 
+    getTrendingTracks
+};

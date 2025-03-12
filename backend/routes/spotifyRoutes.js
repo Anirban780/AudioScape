@@ -1,6 +1,6 @@
 const express = require("express")
-const { searchTrack, getTrackDetails } = require("../services/spotifyService")
-
+const { searchTrack, getTrackDetails, getTrendingTracks } = require("../services/spotifyService")
+const { searchTrackController, trackDetailsController, recommendedTracksController } = require("../controllers/spotifyController")
 const router = express.Router();
 
 //route to search for a track
@@ -30,6 +30,18 @@ router.get("/track/:id", async(req, res) => {
 router.get("/search", searchTrackController);
 router.get("/track/:id", trackDetailsController);
 router.get("/recommendations", recommendedTracksController);
+
+
+router.get("/trending", async(req, res) => {
+    try {
+        const tracks = await getTrendingTracks()
+        res.join(tracks);
+    }
+    catch(error){
+        console.error("Error fetching Spotify trending tracks:", error.response?.data || error.message);
+        res.status(500).json({ error: "Failed to fetch trending tracks" });
+    }
+})
 
 
 module.exports= router;

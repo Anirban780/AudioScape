@@ -20,7 +20,7 @@ const UserMenu = () => {
         <DropdownMenu>
           <DropdownMenuTrigger>
             <Avatar className="w-10 h-10 cursor-pointer hover:opacity-80 transition-opacity duration-200">
-              <AvatarImage src={user.photoURL} alt="User Profile" />
+              <AvatarImage src={`${user.photoURL}?sz=200`} alt="User Profile" />
               <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-black dark:text-white">
                 {user.displayName?.charAt(0) || "U"}
               </AvatarFallback>
