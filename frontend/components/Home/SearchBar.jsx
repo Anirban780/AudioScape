@@ -82,7 +82,7 @@ const SearchBar = () => {
         <div
           ref={dropdownRef}
           tabIndex={-1} // Allows focus shifting inside the dropdown
-          className={`absolute left-0 w-full mt-2 p-2 rounded-md shadow-lg max-h-60 overflow-y-auto transition-opacity duration-300 
+          className={`absolute left-0 w-full mt-2 p-2 rounded-md shadow-lg max-h-60 overflow-y-auto transition-opacity duration-300 z-10
           ${theme === "dark" ? "bg-gray-900 text-white" : "bg-white text-black"}`}
         >
           {loading ? (

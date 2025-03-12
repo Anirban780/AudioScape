@@ -1,29 +1,21 @@
-import { onAuthStateChanged } from 'firebase/auth';
-import React, { useEffect, useState } from 'react'
-import { auth, logout, signInWithGoogle } from '../../firebase/firebaseConfig';
+import React from "react";
+import { useAuth } from "../../context/AuthContext"; // Use AuthContext for state
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from 'utils/components/ui/dropdown-menu';
-
-import { Avatar, AvatarFallback, AvatarImage } from 'utils/components/ui/avatar';
-import { Button } from 'utils/components/ui/button';
+} from "@/components/ui/dropdown-menu";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Settings, History, HelpCircle, LogOut, User } from "lucide-react";
 
 const UserMenu = () => {
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    })
-  }, []);
+  const { user, signInWithGoogle, logout } = useAuth(); // Access user and auth functions
 
   return (
-    <div className='flex items-center space-x-4'>
+    <div className="flex items-center space-x-4">
       {user ? (
         <DropdownMenu>
           <DropdownMenuTrigger>
@@ -37,44 +29,46 @@ const UserMenu = () => {
 
           <DropdownMenuContent
             align="end"
-            className="mt-2 w-56 rounded-lg border border-gray-200 bg-white shadow-lg 
+            className="mt-2 min-w-max max-w-sm rounded-lg border border-gray-200 bg-white shadow-lg 
                      dark:border-gray-700 dark:bg-gray-900"
           >
             {/* Profile Header */}
             <div className="flex items-center px-4 py-3 space-x-3">
-              <Avatar className="w-12 h-12">
+              <Avatar className="w-12 h-12 flex-shrink-0">
                 <AvatarImage src={user.photoURL} alt="User Profile" />
                 <AvatarFallback className="bg-gray-500 text-white">
                   {user.displayName?.charAt(0) || "U"}
                 </AvatarFallback>
               </Avatar>
-              <div>
-                <p className="font-medium text-gray-800 dark:text-white">
+              <div className="min-w-0">
+                <p className="font-medium text-gray-800 dark:text-white truncate max-w-[12rem]">
                   {user.displayName}
                 </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">{user.email}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 break-words max-w-[12rem]">
+                  {user.email}
+                </p>
               </div>
             </div>
 
             <DropdownMenuSeparator className="my-1 border-gray-200 dark:border-gray-700" />
 
             {/* Menu Items */}
-            <DropdownMenuItem className="px-4 py-2 flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition rounded-md cursor-pointer">
+            <DropdownMenuItem className="menu-item">
               <User size={18} />
               Profile
             </DropdownMenuItem>
 
-            <DropdownMenuItem className="px-4 py-2 flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition rounded-md cursor-pointer">
+            <DropdownMenuItem className="menu-item">
               <Settings size={18} />
               Settings
             </DropdownMenuItem>
 
-            <DropdownMenuItem className="px-4 py-2 flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition rounded-md cursor-pointer">
+            <DropdownMenuItem className="menu-item">
               <History size={18} />
               History
             </DropdownMenuItem>
 
-            <DropdownMenuItem className="px-4 py-2 flex items-center gap-2 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 transition rounded-md cursor-pointer">
+            <DropdownMenuItem className="menu-item">
               <HelpCircle size={18} />
               Help & Feedback
             </DropdownMenuItem>
@@ -84,7 +78,8 @@ const UserMenu = () => {
             {/* Logout */}
             <DropdownMenuItem
               onClick={logout}
-              className="px-4 py-2 flex items-center gap-2 text-red-600 hover:bg-red-100 dark:text-red-400 dark:hover:bg-red-900 rounded-md transition cursor-pointer"
+              className="px-4 py-2 flex items-center gap-2 text-red-600 hover:bg-red-100 
+                         dark:text-red-400 dark:hover:bg-red-900 rounded-md transition cursor-pointer"
             >
               <LogOut size={18} />
               Logout
@@ -101,10 +96,9 @@ const UserMenu = () => {
         >
           Login
         </Button>
-
       )}
     </div>
-  )
-}
+  );
+};
 
-export default UserMenu
+export default UserMenu;

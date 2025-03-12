@@ -26,4 +26,10 @@ router.get("/track/:id", async(req, res) => {
     }
 });
 
+
+router.get("/search", searchTrackController);
+router.get("/track/:id", trackDetailsController);
+router.get("/recommendations", recommendedTracksController);
+
+
 module.exports= router;
