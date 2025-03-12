@@ -26,4 +26,19 @@ const getTrackDetails = async(id) => {
     return response.data;
 }
 
-module.exports = { searchTrack, getTrackDetails };
+const getRecommendedTracks = async (seedTrackId) => {
+    const token = await getAccessToken();
+    
+    const response = await axios.get(`https://api.spotify.com/v1/recommendations`, {
+        params: {
+            seed_tracks: seedTrackId, // Use a track the user played as a seed
+            limit: 10,
+        },
+        headers: { Authorization: `Bearer ${token}` }
+    });
+
+    return response.data.tracks; // Return recommended tracks
+};
+
+
+module.exports = { searchTrack, getTrackDetails, getRecommendedTracks };
