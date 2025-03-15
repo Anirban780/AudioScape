@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const getSpotifyAccessToken = require("../config/spotifyAuth");
+const { getSpotifyAccessToken } = require("../config/spotifyAuth");
 
 router.get("/token", async (req, res) => {
   try {

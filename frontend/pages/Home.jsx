@@ -1,17 +1,21 @@
 import React from "react";
 import Sidebar from "../components/Home/Sidebar";
 import SearchBar from "../components/Home/SearchBar";
-import HeroSection from "../components/Home/HeroSection"; // Import HeroSection
+import HeroSection from "../components/Home/HeroSection"; 
 import { Sun, Moon } from "lucide-react";
 import UserMenu from "../components/Auth/UserMenu";
 import { useTheme } from "../ThemeProvider";
-import TrendingTracks from "../components/Home/TrendingTracks";
+
 
 const HomePage = () => {
   const { theme, setTheme } = useTheme();
 
   return (
-    <div className={`h-screen flex transition-colors duration-300 ${theme === "dark" ? "bg-slate-900 text-white" : "bg-gray-100 text-black"}`}>
+    <div
+      className={`h-screen flex transition-colors duration-300 ${
+        theme === "dark" ? "bg-slate-900 text-white" : "bg-gray-100 text-black"
+      }`}
+    >
       {/* Sidebar */}
       <Sidebar />
 
@@ -25,7 +29,11 @@ const HomePage = () => {
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             className="p-2 mx-2 rounded-full bg-gray-200 dark:bg-gray-500 transition-all"
           >
-            {theme === "dark" ? <Sun size={20} className="text-yellow-400" /> : <Moon size={20} className="text-gray-900" />}
+            {theme === "dark" ? (
+              <Sun size={20} className="text-yellow-400" />
+            ) : (
+              <Moon size={20} className="text-gray-900" />
+            )}
           </button>
 
           <UserMenu />
@@ -36,8 +44,7 @@ const HomePage = () => {
           <HeroSection />
         </div>
 
-        {/* Add Recommended Songs, Favorites, Playlists Below */}
-        <TrendingTracks />
+       
       </div>
     </div>
   );

@@ -26,43 +26,8 @@ const getTrackDetails = async(id) => {
     return response.data;
 }
 
-const getRecommendedTracks = async (seedTrackId) => {
-    const token = await getAccessToken();
-    
-    const response = await axios.get(`https://api.spotify.com/v1/recommendations`, {
-        params: {
-            seed_tracks: seedTrackId, // Use a track the user played as a seed
-            limit: 10,
-        },
-        headers: { Authorization: `Bearer ${token}` }
-    });
-
-    return response.data.tracks; // Return recommended tracks
-};
-
-
-const getTrendingTracks = async() => {
-    const token = await getAccessToken();
-
-    const response = await axios.get(`https://api.spotify.com/v1/browse/new-releases`,
-        {
-            headers: {
-                Authorization: `Bearer ${token}`
-            }
-        });
-
-    return response.data.albums.items.map(album => ({
-        id: album.id,
-        name: album.name,
-        artist: album.artists.map(a => a.name).join(", "),
-        albumArt: album.images[0]?.url || "",
-    }))
-}
-
 
 module.exports = { 
     searchTrack, 
     getTrackDetails, 
-    getRecommendedTracks, 
-    getTrendingTracks
-};
+}
