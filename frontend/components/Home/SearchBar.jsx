@@ -4,7 +4,7 @@ import { Input } from "utils/components/ui/input";
 import { useTheme } from "../../ThemeProvider";
 import axios from "axios";
 import placeholder from '../../assets/placeholder.jpg';
-
+import logo from "../../assets/Audioscape_logo.jpg"
 const SearchBar = ({ onSelectTrack }) => {
   const { theme } = useTheme();
   const [query, setQuery] = useState("");
@@ -68,7 +68,7 @@ const SearchBar = ({ onSelectTrack }) => {
         id: track.videoId,
         name: response.data.title,
         artist: response.data.channelTitle, // YouTube channel = Artist
-        thumbNail: response.data.thumbNail || placeholder,
+        thumbnail: response.data.thumbnail || placeholder,
       });
 
       setIsFocused(false);
@@ -81,11 +81,13 @@ const SearchBar = ({ onSelectTrack }) => {
 
   return (
     <div className="relative w-full max-w-lg mx-auto my-auto">
+      
       {/* Search Input */}
       <div
         className={`flex items-center rounded-md p-2 transition-colors duration-300 
         ${theme === "dark" ? "bg-gray-800 text-white" : "bg-gray-200 text-black"}`}
       >
+       
         <Search size={20} className={theme === "dark" ? "text-gray-400" : "text-gray-600"} />
         <Input
           type="text"

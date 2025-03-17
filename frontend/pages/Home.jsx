@@ -4,7 +4,6 @@ import SearchBar from "../components/Home/SearchBar";
 import { Sun, Moon } from "lucide-react";
 import UserMenu from "../components/Auth/UserMenu";
 import { useTheme } from "../ThemeProvider";
-import CurrentTrack from "../components/Home/CurrentTrack";
 import MusicPlayer from "../components/Home/MusicPlayer";
 
 const HomePage = () => {
@@ -12,54 +11,46 @@ const HomePage = () => {
   const [currentTrack, setCurrentTrack] = useState(null);
 
   return (
-    <div
-      className={`h-screen flex transition-colors duration-300 ${theme === "dark" ? "bg-slate-900 text-white" : "bg-gray-100 text-black"
-        }`}
-    >
+    <div className={`h-screen flex transition-all duration-300 ${theme === "dark" ? "bg-slate-900 text-white" : "bg-gray-100 text-black"}`}>
+      
       {/* Sidebar */}
       <Sidebar />
 
       {/* Main Content */}
-      <div className="flex flex-col flex-1 overflow-auto p-6">
-
+      <div className="flex flex-col flex-1 overflow-auto p-4 md:p-6 space-y-4">
+        
         {/* Top Navbar */}
-        <div className="flex justify-between items-center">
-          <SearchBar onSelectTrack={setCurrentTrack} />
-
+        <div className="flex justify-between items-center w-full">
+          
+          {/* Search Bar */}
+          <div className="w-full max-w-lg mx-auto">
+            <SearchBar onSelectTrack={setCurrentTrack} />
+          </div>
+          
+          {/* Theme Toggle Button */}
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="p-2 mx-2 rounded-full bg-gray-200 dark:bg-gray-500 transition-all"
+            className="p-2 mx-4 rounded-full bg-gray-300 dark:bg-gray-700 transition-all"
           >
             {theme === "dark" ? (
               <Sun size={20} className="text-yellow-400" />
             ) : (
               <Moon size={20} className="text-gray-900" />
             )}
-
           </button>
 
+          {/* User Menu */}
           <UserMenu />
-
         </div>
 
         {/* Track Info & Music Player */}
         {currentTrack && (
-          <div className="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-
-            <h1 className="text-2xl font-bold mb-4">Now Playing</h1>
-            <div className="flex flex-col md:flex-row items-center">
-
-              {/* Track Info */}
-              <div className="flex-1">
-                <CurrentTrack track={currentTrack} />
-              </div>
-
-              {/* Music Player */}
-              <div className="flex-1">
-                <MusicPlayer track={currentTrack} />
-              </div>
-
-            </div>
+          <div className="w-full max-w-4xl mx-auto bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 flex flex-col items-center">
+            
+            <h1 className="text-xl md:text-2xl font-bold mb-4">Now Playing</h1>
+            
+            {/* Music Player */}
+            <MusicPlayer track={currentTrack} />
           </div>
         )}
         
