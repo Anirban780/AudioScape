@@ -77,12 +77,12 @@ const HeroSection = () => {
       ))}
 
       {/* Dark Overlay for contrast */}
-      <div className="absolute inset-0 bg-black/50 z-[2]"></div>
+      <div className="absolute inset-0 bg-black/40 z-[2]"></div>
 
       {/* Hero Content */}
       <div className="relative z-10 px-6">
         <h1 
-          className="text-5xl md:text-7xl font-extrabold mb-6 drop-shadow-lg transition-opacity duration-700 ease-in-out"
+          className="text-5xl md:text-5xl font-extrabold mb-6 drop-shadow-lg transition-opacity duration-700 ease-in-out"
           style={{ opacity: isTransitioning ? 0 : 1 }}
         >
           {banners[currentIndex].headline}

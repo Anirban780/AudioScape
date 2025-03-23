@@ -1,5 +1,5 @@
-import React from "react";
-import { useAuth } from "../../context/AuthContext"; // Use AuthContext for state
+import React, { useEffect, useState } from "react";
+import { useAuth } from "../../context/AuthContext";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +12,30 @@ import { Button } from "@/components/ui/button";
 import { Settings, History, HelpCircle, LogOut, User } from "lucide-react";
 
 const UserMenu = () => {
-  const { user, signInWithGoogle, logout } = useAuth(); // Access user and auth functions
+  const { user, signInWithGoogle, logout } = useAuth();
+  const [avatarUrl, setAvatarUrl] = useState("");
+
+  // Debugging: Log user info
+  useEffect(() => {
+    console.log("User object:", user);
+  }, [user]);
+
+  // Fetch and update avatar URL reliably
+  useEffect(() => {
+    if (user && user.photoURL) {
+      const url = user.photoURL.includes("?")
+        ? `${user.photoURL}&sz=200`
+        : `${user.photoURL}?sz=200`;
+
+      const img = new Image();
+      img.src = url;
+      img.onload = () => setAvatarUrl(url); // Set after it's loaded
+
+      setAvatarUrl(url); // Set immediately, but will update once loaded
+    } else {
+      setAvatarUrl("");
+    }
+  }, [user]);
 
   return (
     <div className="flex items-center space-x-4">
@@ -20,10 +43,13 @@ const UserMenu = () => {
         <DropdownMenu>
           <DropdownMenuTrigger>
             <Avatar className="w-10 h-10 cursor-pointer hover:opacity-80 transition-opacity duration-200">
-              <AvatarImage src={`${user.photoURL}?sz=200`} alt="User Profile" />
-              <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-black dark:text-white">
-                {user.displayName?.charAt(0) || "U"}
-              </AvatarFallback>
+              {avatarUrl ? (
+                <AvatarImage src={avatarUrl} alt="User Profile" />
+              ) : (
+                <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-black dark:text-white">
+                  {user.displayName?.charAt(0) || "U"}
+                </AvatarFallback>
+              )}
             </Avatar>
           </DropdownMenuTrigger>
 
@@ -32,10 +58,9 @@ const UserMenu = () => {
             className="mt-2 min-w-max max-w-sm rounded-lg border border-gray-200 bg-white shadow-lg 
                      dark:border-gray-700 dark:bg-gray-900"
           >
-            {/* Profile Header */}
             <div className="flex items-center px-4 py-3 space-x-3">
               <Avatar className="w-12 h-12 flex-shrink-0">
-                <AvatarImage src={user.photoURL} alt="User Profile" />
+                <AvatarImage src={avatarUrl} alt="User Profile" />
                 <AvatarFallback className="bg-gray-500 text-white">
                   {user.displayName?.charAt(0) || "U"}
                 </AvatarFallback>
@@ -52,30 +77,28 @@ const UserMenu = () => {
 
             <DropdownMenuSeparator className="my-1 border-gray-200 dark:border-gray-700" />
 
-            {/* Menu Items */}
-            <DropdownMenuItem className="menu-item">
+            <DropdownMenuItem className="menu-item ml-2">
               <User size={18} />
               Profile
             </DropdownMenuItem>
 
-            <DropdownMenuItem className="menu-item">
+            <DropdownMenuItem className="menu-item ml-2">
               <Settings size={18} />
               Settings
             </DropdownMenuItem>
 
-            <DropdownMenuItem className="menu-item">
+            <DropdownMenuItem className="menu-item ml-2">
               <History size={18} />
               History
             </DropdownMenuItem>
 
-            <DropdownMenuItem className="menu-item">
+            <DropdownMenuItem className="menu-item ml-2">
               <HelpCircle size={18} />
               Help & Feedback
             </DropdownMenuItem>
 
             <DropdownMenuSeparator className="my-1 border-gray-200 dark:border-gray-700" />
 
-            {/* Logout */}
             <DropdownMenuItem
               onClick={logout}
               className="px-4 py-2 flex items-center gap-2 text-red-600 hover:bg-red-100 

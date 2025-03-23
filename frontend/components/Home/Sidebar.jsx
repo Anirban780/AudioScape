@@ -1,51 +1,66 @@
-import React, { useState } from 'react'
-import { Button } from 'utils/components/ui/button'
-import { cn } from 'utils/lib/utils'
-import { Compass, Heart, Home, Library, Menu } from 'lucide-react'
+// src/components/Sidebar.jsx
+import React, { useState } from 'react';
+import { cn } from 'utils/lib/utils'; // Utility for combining class names
+import { Home, Compass, Library, Heart, Menu, Sun, Moon } from 'lucide-react'; // Added Sun/Moon for theme toggle
+import { Link } from 'react-router-dom';
+import { Button } from 'utils/components/ui/button';
+import { useTheme } from '../../ThemeProvider'; // Adjust path to ThemeProvider
 
 const Sidebar = () => {
-    const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(true);
+  const { theme, setTheme } = useTheme(); // Access theme context
 
-    return (
-        <div
-            className={cn("h-screen bg-slate-600 text-white p-4 transition-all duration-500 ease-in-out"
-                , isOpen ? "w-60" : "w-20")}
-        >
-            <div className='flex items-center gap-4'>
-                {/*sidebar toggle button*/}
-                <Button variant='ghost' size='icon'
-                    onClick={() => setIsOpen(!isOpen)}
-                    className='mb-4'
-                >
-                    <Menu size={28} />
-                </Button>
+  const toggleSidebar = () => setIsOpen((prev) => !prev);
 
-                {/* Sidebar Header */}
-                {isOpen && <h1 className="text-2xl font-bold mb-4">AudioScape</h1>}
-            </div>
+  // Toggle between light, dark, and system themes
+  const toggleTheme = () => {
+    if (theme === 'light') setTheme('dark');
+    else if (theme === 'dark') setTheme('system');
+    else setTheme('light');
+  };
 
+  const MenuItem = ({ icon: Icon, text, to }) => (
+    <li>
+      <Link
+        to={to}
+        className={cn(
+          'flex items-center gap-4 cursor-pointer transition-colors duration-300 py-2 px-1 rounded-md',
+          'hover:bg-primary/20',
+          !isOpen && 'justify-center px-0'
+        )}
+      >
+        <Icon size={24} />
+        {isOpen && <span>{text}</span>}
+      </Link>
+    </li>
+  );
 
-            {/* Menu Items*/}
-            <ul className={cn("space-y-4 mx-2", !isOpen && "flex flex-col items-center pr-2 space-y-5 ")}>
-                <li className='flex items-center gap-4 cursor-pointer hover:text-gray-400 transition-all ease-in-out duration-500'>
-                    <Home size={24} />
-                    {isOpen && <span>Home</span>}
-                </li>
-                <li className='flex items-center gap-4 cursor-pointer hover:text-gray-400 transition-all ease-in-out duration-500'>
-                    <Compass size={24} />
-                    {isOpen && <span>Explore</span>}
-                </li>
-                <li className='flex items-center gap-4  cursor-pointer hover:text-gray-400 transition-all ease-in-out duration-500'>
-                    <Library size={24} />
-                    {isOpen && <span>Library</span>}
-                </li>
-                <li className='flex items-center gap-4 cursor-pointer hover:text-gray-400 transition-all ease-in-out duration-500'>
-                    <Heart size={24} />
-                    {isOpen && <span>Liked Songs</span>}
-                </li>
-            </ul>
-        </div>
-    )
-}
+  return (
+    <div
+      className={cn(
+        'h-screen p-4 transition-all duration-300 ease-in-out border-r border-border',
+        isOpen ? 'w-60' : 'w-20',
+        // Apply theme-based background and text colors
+        theme === 'dark' || (theme === 'system' && window.matchMedia("(prefers-color-scheme: dark)").matches)
+          ? 'bg-gray-900 text-white'
+          : 'bg-slate-200 text-foreground'
+      )}
+    >
+      <div className="flex items-center gap-4 mb-6 ml-1">
+        <Button variant="ghost" size="icon" onClick={toggleSidebar}>
+          <Menu size={28} />
+        </Button>
+        {isOpen && <h1 className="text-2xl font-bold">AudioScape</h1>}
+      </div>
+      <ul className={cn('space-y-2', isOpen && 'px-4', !isOpen && 'flex flex-col items-center')}>
+        <MenuItem icon={Home} text="Home" to="/home" />
+        <MenuItem icon={Compass} text="Explore" to="/explore" />
+        <MenuItem icon={Library} text="Library" to="/library" />
+        <MenuItem icon={Heart} text="Liked Songs" to="/liked-songs" />
+      </ul>
+      
+    </div>
+  );
+};
 
-export default Sidebar
+export default Sidebar;

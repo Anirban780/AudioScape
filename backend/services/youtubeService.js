@@ -4,31 +4,30 @@ const { API_KEY } = require("../config/youtubeAuth")
 const getMusicCategoryId = async () => {
     const url = `https://www.googleapis.com/youtube/v3/videoCategories?part=snippet&regionCode=US&key=${API_KEY}`;
     const response = await axios.get(url);
-    // Find the music category (you can also add more logic if needed)
     const musicCategory = response.data.items.find(item => item.snippet.title.toLowerCase() === 'music');
     return musicCategory ? musicCategory.id : null;
 };
 
-const searchTrack = async (query) => {
+const searchTrack = async (query, pageToken = "") => {
     const musicCategoryId = await getMusicCategoryId();
+    if (!musicCategoryId) throw new Error("Music category not found");
 
-    if (!musicCategoryId) {
-        throw new Error('Music category not found');
-    }
+    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(query)}&maxResults=10&videoCategoryId=${musicCategoryId}&key=${API_KEY}&pageToken=${pageToken}`;
 
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(query)}&maxResults=10&videoCategoryId=${musicCategoryId}&key=${API_KEY}`;
-  
     try {
         const response = await axios.get(url);
-        return response.data.items.map(item => ({
-            videoId: item.id.videoId,
-            title: item.snippet.title,
-            thumbNail: item.snippet.thumbnails.default.url,
-            channelTitle: item.snippet.channelTitle,
-        }));
+        return {
+            tracks: response.data.items.map(item => ({
+                videoId: item.id.videoId,
+                title: item.snippet.title,
+                thumbNail: item.snippet.thumbnails.default.url,
+                channelTitle: item.snippet.channelTitle,
+            })),
+            nextPageToken: response.data.nextPageToken || null,
+        };
     } catch (error) {
-        console.error('Error fetching YouTube search results:', error);
-        throw new Error('Failed to search for tracks');
+        console.error("Error fetching YouTube search results:", error);
+        throw new Error("Failed to search for tracks");
     }
 };
 
@@ -43,13 +42,12 @@ const getTrackDetails = async(videoId) => {
     const track = response.data.items[0];
     return {
         videoId: track.id,
-        title: track.snippet.title,
-        description: track.snippet.description,
-        thumbnail: track.snippet.thumbnails.high.url,
-        channelTitle: track.snippet.channelTitle,
+        title: track.snippet.title || 'Unknown Title',
+        thumbNail: track.snippet.thumbnails.high.url,
+        channelTitle: track.snippet.channelTitle || 'Unknown Artist',
+        duration: track.contentDetails?.duration || 'PTOS'
     }
 
-    
 }
 
 module.exports = { searchTrack, getTrackDetails }
