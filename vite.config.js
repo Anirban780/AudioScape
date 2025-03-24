@@ -15,4 +15,10 @@ export default defineConfig({
       "utils": path.resolve(__dirname, "./utils"),
     },
   },
+  build: {
+    outDir: "dist", // Ensure Vercel serves the correct folder
+  },
+  server: {
+    host: true,
+  },
 })
