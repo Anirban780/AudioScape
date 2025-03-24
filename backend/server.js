@@ -14,7 +14,9 @@ app.use(express.json());
 app.use("/youtube", trackRoutes);
 app.use('/api/songs', firestoreRoutes);
 
-
+app.get("/", (req, res) => {
+    res.send("Audioscape Server is running successfully!");
+});
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
