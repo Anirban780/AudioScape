@@ -1,5 +1,9 @@
 const axios = require("axios")
+const https = require("https");
 const { API_KEY } = require("../config/youtubeAuth")
+
+const agent = new https.Agent({ rejectUnauthorized: true });
+
 
 const getMusicCategoryId = async () => {
     const url = `https://www.googleapis.com/youtube/v3/videoCategories?part=snippet&regionCode=US&key=${API_KEY}`;
@@ -35,7 +39,14 @@ const searchTrack = async (query, pageToken = "") => {
 const getTrackDetails = async(videoId) => {
     const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoId}&key=${API_KEY}`;
 
-    const response = await axios.get(url);
+    const response = await axios.get(url, {
+        params: { 
+            q: "test", 
+            key: process.env.YOUTUBE_API_KEY 
+          },
+        httpsAgent: agent,
+    });
+    
     if(!response.data.items.length)
         return null
 

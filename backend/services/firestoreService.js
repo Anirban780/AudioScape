@@ -44,7 +44,7 @@ const saveSongListen = async (videoId, userId) => {
         };
 
         await listensRef.add(songData);
-        console.log("Song listen saved successfully:", songDetails.name);
+        console.log("Song listen saved successfully:", songDetails.title);
         return { success: true, message: "Song listen saved" };
     } catch (error) {
         console.error("Error saving song listen:", error);
