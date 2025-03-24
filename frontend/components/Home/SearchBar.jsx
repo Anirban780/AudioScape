@@ -5,7 +5,7 @@ import { useTheme } from "../../ThemeProvider";
 import axios from "axios";
 import placeholder from '../../assets/placeholder.jpg';
 
-const BASE_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_PROD_BACKEND_URL
+const BASE_URL = import.meta.env.VITE_PROD_BACKEND_URL || import.meta.env.VITE_BACKEND_URL
 
 
 const SearchBar = ({ onSelectTrack }) => {
