@@ -2,51 +2,54 @@ const { db, admin } = require("../config/firebase");
 const { getTrackDetails } = require('./youtubeService');
 const { Timestamp } = require('firebase-admin/firestore');
 
-//save track when played
+// Save track when played
 const saveSongListen = async (videoId, userId) => {
-    if (!userId) throw new Error("User not logged in");
+    if (!userId) {
+        console.error("User not logged in");
+        return { success: false, error: "User not logged in" };
+    }
 
     const songDetails = await getTrackDetails(videoId);
-    if (!songDetails) throw new Error("Song details not found");
+    if (!songDetails) {
+        console.error("Song details not found for videoId:", videoId);
+        return { success: false, error: "Song details not found" };
+    }
 
     const userRef = db.collection('users').doc(userId);
     const listensRef = userRef.collection('song_listens');
-
-    const songData = {
-        id: songDetails.videoId,
-        name: songDetails.title,
-        artist: songDetails.channelTitle,
-        duration: songDetails.duration,
-        thumbnail: songDetails.thumbNail,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
+    const cutoff = Timestamp.fromDate(new Date(Date.now() - 60 * 60 * 1000)); // 1-hour limit
 
     try {
-        await db.runTransaction(async (transaction) => {
-            const cutoff = Timestamp.fromDate(new Date(Date.now() - 60 * 60 * 1000));
-            const snapshot = await transaction.get(
-                listensRef
-                    .where("id", "==", videoId)
-                    .where("createdAt", ">=", cutoff)
-                    .orderBy("createdAt", "desc")
-                    .limit(1)
-            );
-    
-            if (!snapshot.empty) {
-                console.log("Duplicate listen detected. Skipping...");
-                return;
-            }
-    
-            const docRef = listensRef.doc();
-            transaction.set(docRef, songData);
-            console.log("Song listen saved successfully", songDetails.name);
-        });
-        console.log("Transaction completed successfully"); // Confirm transaction completion
+        // Check if the song has already been played within the last hour
+        const snapshot = await listensRef
+            .where("id", "==", videoId)
+            .where("createdAt", ">=", cutoff)
+            .orderBy("createdAt", "desc")
+            .limit(1)
+            .get();
+
+        if (!snapshot.empty) {
+            console.log("Duplicate listen detected. Skipping...");
+            return { success: false, message: "Duplicate listen detected" };
+        }
+
+        // Save the new listen
+        const songData = {
+            id: songDetails.videoId,
+            name: songDetails.title,
+            artist: songDetails.channelTitle,
+            duration: songDetails.duration,
+            thumbnail: songDetails.thumbNail,
+            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        };
+
+        await listensRef.add(songData);
+        console.log("Song listen saved successfully:", songDetails.name);
+        return { success: true, message: "Song listen saved" };
     } catch (error) {
-        console.error("Transaction failed:", error); // Log full error details
-        throw error; // Re-throw to handle upstream if needed
+        console.error("Error saving song listen:", error);
+        return { success: false, error: error.message };
     }
 };
-
 
 module.exports = { saveSongListen };

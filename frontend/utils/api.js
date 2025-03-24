@@ -17,7 +17,7 @@ export async function saveSongListen(videoId) {
                 'Authorization': `Bearer ${token}`,
             },
             body: JSON.stringify({ videoId }),
-            credentials: "include",
+            
         });
 
         if (!response.ok) {

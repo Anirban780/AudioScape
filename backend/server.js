@@ -21,8 +21,6 @@ app.use(cors({
         }
     },
     credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS' ],
-    allowedHeaders: ["Content-Type", "Authorization"],
 }));
 
 
@@ -34,6 +32,7 @@ app.use('/api/songs', firestoreRoutes);
 app.get("/", (req, res) => {
     res.send("Audioscape Server is running successfully!");
 });
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
