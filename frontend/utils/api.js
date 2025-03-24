@@ -1,6 +1,6 @@
 import { auth } from '../firebase/firebaseConfig';
 
-const BASE_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_PROD_BACKEND_URL
+const BASE_URL = import.meta.env.VITE_PROD_BACKEND_URL || import.meta.env.VITE_BACKEND_URL
 
 export async function saveSongListen(videoId) {
     if (!auth.currentUser) {
