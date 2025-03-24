@@ -1,5 +1,7 @@
 import { auth } from '../firebase/firebaseConfig';
 
+const BASE_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_PROD_BACKEND_URL
+
 export async function saveSongListen(videoId) {
     if (!auth.currentUser) {
         throw new Error('User not logged in');
@@ -8,7 +10,7 @@ export async function saveSongListen(videoId) {
     try {
         const token = await auth.currentUser.getIdToken();
 
-        const response = await fetch('http://localhost:5000/api/songs/save', {
+        const response = await fetch(`${BASE_URL}/api/songs/save`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -18,11 +20,11 @@ export async function saveSongListen(videoId) {
         });
 
         if (!response.ok) {
-            throw new Error('Failed to save song listen');
+            throw new Error(`Failed to save song listen: ${response.statusText}`);
         }
+
         console.log('Song saved to database successfully');
-    }
-    catch (error) {
+    } catch (error) {
         console.error('Error saving song/track:', error);
     }
 }

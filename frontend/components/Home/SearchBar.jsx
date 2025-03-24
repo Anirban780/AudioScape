@@ -5,6 +5,8 @@ import { useTheme } from "../../ThemeProvider";
 import axios from "axios";
 import placeholder from '../../assets/placeholder.jpg';
 
+const BASE_URL = import.meta.env.VITE_BACKEND_URL || import.meta.env.VITE_PROD_BACKEND_URL
+
 
 const SearchBar = ({ onSelectTrack }) => {
   const { theme } = useTheme();
@@ -26,7 +28,7 @@ const SearchBar = ({ onSelectTrack }) => {
     setLoading(true);
     try {
       const response = await axios.get(
-        `http://localhost:5000/youtube/search?query=${searchQuery}`
+        `${BASE_URL}/youtube/search?query=${searchQuery}`
       );
 
       setResults((prev) => (nextPage ? [...prev, ...response.data.tracks] : response.data.tracks));
@@ -85,7 +87,7 @@ const SearchBar = ({ onSelectTrack }) => {
 
     try {
       const response = await axios.get(
-        `http://localhost:5000/youtube/track/${track.videoId}`,
+        `${BASE_URL}/youtube/track/${track.videoId}`,
         { timeout: 5000 } // Add timeout of 5 sec to avoid hanging
       );
 

@@ -42,8 +42,8 @@ const Sidebar = () => {
         isOpen ? 'w-60' : 'w-20',
         // Apply theme-based background and text colors
         theme === 'dark' || (theme === 'system' && window.matchMedia("(prefers-color-scheme: dark)").matches)
-          ? 'bg-gray-900 text-white'
-          : 'bg-slate-200 text-foreground'
+          ? 'bg-gray-900 text-white border-white/40'
+          : 'bg-slate-200 text-foreground border-gray-900/50'
       )}
     >
       <div className="flex items-center gap-4 mb-6 ml-1">

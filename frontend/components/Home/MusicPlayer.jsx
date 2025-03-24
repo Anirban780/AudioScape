@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import YouTube from "react-youtube";
-import { Pause, Play, SkipBack, SkipForward, Volume2, VolumeX } from "lucide-react";
+import { Pause, Play, SkipBack, SkipForward, Volume2 } from "lucide-react";
 import placeholder from "../../assets/placeholder.jpg";
 import { saveSongListen } from "../../utils/api";
 
@@ -15,8 +15,8 @@ const MusicPlayer = ({ track }) => {
     const [isPlayerReady, setIsPlayerReady] = useState(false);
     const progressRef = useRef(null);
     const volumeRef = useRef(null);
-    const rafRef = useRef(null);
 
+    // Handle player ready event
     const onPlayerReady = useCallback((event) => {
         const ytPlayer = event.target;
         setPlayer(ytPlayer);
@@ -25,27 +25,7 @@ const MusicPlayer = ({ track }) => {
         ytPlayer.pauseVideo();
     }, [volume]);
 
-    const updateProgress = useCallback(() => {
-        if (player && !isDraggingProgress && player.getPlayerState() === 1) {
-            const currentTime = player.getCurrentTime() || 0;
-            setProgress(currentTime);
-            rafRef.current = requestAnimationFrame(updateProgress);
-        }
-    }, [player, isDraggingProgress]);
-
-    const startProgressTracking = useCallback(() => {
-        if (player && !rafRef.current) {
-            rafRef.current = requestAnimationFrame(updateProgress);
-        }
-    }, [player, updateProgress]);
-
-    const stopProgressTracking = useCallback(() => {
-        if (rafRef.current) {
-            cancelAnimationFrame(rafRef.current);
-            rafRef.current = null;
-        }
-    }, []);
-
+    // Cue video when track changes
     useEffect(() => {
         if (player && track?.id && isPlayerReady) {
             const timer = setTimeout(() => {
@@ -57,34 +37,55 @@ const MusicPlayer = ({ track }) => {
         }
     }, [track, player, isPlayerReady]);
 
+    // Load saved volume from localStorage
     useEffect(() => {
         const savedVolume = localStorage.getItem('musicPlayerVolume');
         if (savedVolume) setVolume(parseInt(savedVolume, 10));
     }, []);
 
+    // Save volume to localStorage
     useEffect(() => {
         localStorage.setItem('musicPlayerVolume', volume.toString());
     }, [volume]);
 
-    useEffect(() => () => stopProgressTracking(), [stopProgressTracking]);
+    // Update progress continuously while playing
+    useEffect(() => {
+        let intervalId;
+        if (isPlaying && player && duration > 0) {
+            intervalId = setInterval(() => {
+                const currentTime = player.getCurrentTime() || 0;
+                setProgress(currentTime);
+            }, 100); // Update every 100ms
+        }
+        return () => clearInterval(intervalId);
+    }, [isPlaying, player, duration]);
 
+    // Toggle play/pause with immediate state update
     const togglePlayPause = () => {
-        if (!player || !isPlayerReady) return;
-        isPlaying ? player.pauseVideo() : player.playVideo();
+        if (!player || !isPlayerReady) {
+            console.log('Player not ready');
+            return;
+        }
+        if (isPlaying) {
+            player.pauseVideo();
+            setIsPlaying(false);
+        } else {
+            player.playVideo();
+            setIsPlaying(true);
+        }
     };
 
+    // Handle progress slider interaction
     const handleProgressInteraction = useCallback((clientX, isEnd = false) => {
         if (!progressRef.current || !player || !isPlayerReady) return;
         const rect = progressRef.current.getBoundingClientRect();
         const pos = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
         const newTime = pos * duration;
         setProgress(newTime);
-        if (isEnd && player) {
-            player.seekTo(newTime, true);
-            if (player.getPlayerState() === 1) startProgressTracking();
-        }
-    }, [player, duration, isPlayerReady, startProgressTracking]);
+        if (isEnd) player.seekTo(newTime, true);
+    }, [player, duration, isPlayerReady]);
 
+    // Handle volume slider interaction
     const handleVolumeChange = useCallback((clientX) => {
         if (!volumeRef.current || !player || !isPlayerReady) return;
         const rect = volumeRef.current.getBoundingClientRect();
@@ -94,16 +95,14 @@ const MusicPlayer = ({ track }) => {
         setVolume(newVolume);
     }, [player, isPlayerReady]);
 
+    // Mouse event handlers for progress slider
     const handleMouseDown = useCallback((e) => {
         setIsDraggingProgress(true);
-        stopProgressTracking();
         handleProgressInteraction(e.clientX);
     }, [handleProgressInteraction]);
 
     const handleMouseMove = useCallback((e) => {
-        if (isDraggingProgress) {
-            handleProgressInteraction(e.clientX);
-        }
+        if (isDraggingProgress) handleProgressInteraction(e.clientX);
     }, [isDraggingProgress, handleProgressInteraction]);
 
     const handleMouseUp = useCallback((e) => {
@@ -113,45 +112,23 @@ const MusicPlayer = ({ track }) => {
         }
     }, [isDraggingProgress, handleProgressInteraction]);
 
-    const handleTouchStart = useCallback((e) => {
-        setIsDraggingProgress(true);
-        stopProgressTracking();
-        handleProgressInteraction(e.touches[0].clientX);
-    }, [handleProgressInteraction]);
-
-    const handleTouchMove = useCallback((e) => {
-        if (isDraggingProgress) {
-            e.preventDefault();
-            handleProgressInteraction(e.touches[0].clientX);
-        }
-    }, [isDraggingProgress, handleProgressInteraction]);
-
-    const handleTouchEnd = useCallback((e) => {
-        if (isDraggingProgress) {
-            handleProgressInteraction(e.changedTouches[0].clientX, true);
-            setIsDraggingProgress(false);
-        }
-    }, [isDraggingProgress, handleProgressInteraction]);
-
     useEffect(() => {
         document.addEventListener('mousemove', handleMouseMove);
         document.addEventListener('mouseup', handleMouseUp);
-        document.addEventListener('touchmove', handleTouchMove, { passive: false });
-        document.addEventListener('touchend', handleTouchEnd);
         return () => {
             document.removeEventListener('mousemove', handleMouseMove);
             document.removeEventListener('mouseup', handleMouseUp);
-            document.removeEventListener('touchmove', handleTouchMove);
-            document.removeEventListener('touchend', handleTouchEnd);
         };
-    }, [handleMouseMove, handleMouseUp, handleTouchMove, handleTouchEnd]);
+    }, [handleMouseMove, handleMouseUp]);
 
+    // Format time for display
     const formatTime = (seconds) => {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
     };
 
+    // YouTube player options
     const opts = {
         height: "0",
         width: "0",
@@ -189,7 +166,6 @@ const MusicPlayer = ({ track }) => {
                             ref={progressRef}
                             className="relative h-1 bg-gray-800 rounded-full cursor-pointer group"
                             onMouseDown={handleMouseDown}
-                            onTouchStart={handleTouchStart}
                         >
                             <div
                                 className="absolute h-full bg-green-500 rounded-full transition-all duration-150 ease-out"
@@ -263,15 +239,13 @@ const MusicPlayer = ({ track }) => {
                     onReady={onPlayerReady}
                     onStateChange={(event) => {
                         const state = event.data;
-                        setIsPlaying(state === 1);
-                        if (state === 1) {
+                        if (state === 1) { // Playing
+                            setIsPlaying(true);
+                            setDuration(event.target.getDuration());
                             saveSongListen(track.id).catch(console.error);
-                            startProgressTracking();
-                            console.log(track.id);
-                        } else {
-                            stopProgressTracking();
-                        }
-                        if (state === 5) {
+                        } else if (state === 2) { // Paused
+                            setIsPlaying(false);
+                        } else if (state === 5) { // Cued
                             setDuration(event.target.getDuration());
                         }
                     }}
