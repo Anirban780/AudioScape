@@ -1,7 +1,5 @@
 # Audioscape
 
-![Audioscape Logo](https://your-logo-url.com)
-
 ## 🎵 Overview
 Audioscape is a feature-rich music streaming web application built using the **MERN stack**. It allows users to search, play, and manage music using the **YouTube Data API**, while also storing their listening history in **Firestore**. The project features a **custom music player** and **AWS S3 integration** for user-uploaded tracks.
 
