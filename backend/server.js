@@ -30,10 +30,7 @@ app.use(express.json());
 app.use("/youtube", trackRoutes);
 app.use('/api/songs', firestoreRoutes);
 
-<<<<<<< HEAD
 
-=======
->>>>>>> 2c7220ba3fe22bbf68b66cb049f5edac547f04e6
 app.get("/", (req, res) => {
     res.send("Audioscape Server is running successfully!");
 });
