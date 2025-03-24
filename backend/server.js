@@ -7,8 +7,8 @@ const firestoreRoutes = require("./routes/firestoreRoutes")
 const app = express();
 
 const allowedOrigins = [
+    process.env.PROD_FRONTEND_URL,
     process.env.FRONTEND_URL,
-    process.env.PROD_FRONTEND_URL
 ];
 
 // Configure CORS
@@ -20,7 +20,8 @@ app.use(cors({
             callback(new Error("Not allowed by CORS"));
         }
     },
-    credentials: true
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS' ]
 }));
 
 
