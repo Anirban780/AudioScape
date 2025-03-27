@@ -22,6 +22,7 @@ const MusicPlayer = ({ track }) => {
         setPlayer(ytPlayer);
         setIsPlayerReady(true);
         ytPlayer.setVolume(volume);
+        ytPlayer.setPlaybackQuality("small"); // Forces 144p resolution
         ytPlayer.pauseVideo();
     }, [volume]);
 
@@ -140,6 +141,9 @@ const MusicPlayer = ({ track }) => {
             showinfo: 0,
             enablejsapi: 1,
             playsinline: 1,
+            iv_load_policy: 3, 
+            fs: 0, 
+            disablekb: 1, 
         },
     };
 
@@ -243,6 +247,7 @@ const MusicPlayer = ({ track }) => {
                             setIsPlaying(true);
                             setDuration(event.target.getDuration());
                             saveSongListen(track.id).catch(console.error);
+                            event.target.setPlaybackQuality("small"); // Ensure 144p while playing
                         } else if (state === 2) { // Paused
                             setIsPlaying(false);
                         } else if (state === 5) { // Cued
