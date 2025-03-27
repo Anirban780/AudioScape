@@ -1,7 +1,7 @@
 # Audioscape
 
 ## 🎵 Overview
-Audioscape is a feature-rich music streaming web application built using the **MERN stack**. It allows users to search, play, and manage music using the **YouTube Data API**, while also storing their listening history in **Firestore**. The project features a **custom music player** and **AWS S3 integration** for user-uploaded tracks.
+Audioscape is a feature-rich music streaming web application built using the **MERN stack**. It allows users to search, play, and manage music using the **YouTube Data API**, while also storing their listening history in **Firestore**.
 
 ## 🚀 Features
 - 🎧 **Search & Play Music** via YouTube Data API
@@ -21,7 +21,7 @@ Audioscape is a feature-rich music streaming web application built using the **M
 ## 📜 Installation & Setup
 ### 1️⃣ Clone the Repository
 ```sh
-git clone https://github.com/yourusername/audioscape.git
+git clone https://github.com/Anirban780/audioscape.git
 cd audioscape
 ```
 ### 2️⃣ Install Dependencies
@@ -36,6 +36,7 @@ REACT_APP_FIREBASE_AUTH_DOMAIN=your-firebase-auth-domain
 REACT_APP_YOUTUBE_API_KEY=your-youtube-api-key
 REACT_APP_AWS_S3_BUCKET=your-s3-bucket-name
 BACKEND_URL=http://localhost:5000
+etc.
 ```
 ### 4️⃣ Start the Development Server
 #### Frontend:
@@ -66,4 +67,4 @@ Contributions are welcome! Feel free to fork the repo, create a feature branch, 
 This project is licensed under the MIT License.
 
 ## 📞 Contact
-For support or queries, reach out via [your-email@example.com](mailto:your-email@example.com).
+For support or queries, reach out via [fairytailanirbans@gmail.com](mailto:fairytailanirbans@gmail.com).
