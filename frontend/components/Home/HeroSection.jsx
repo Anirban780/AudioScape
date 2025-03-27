@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
-import banner1 from "../../assets/banner1.jpg";
-import banner2 from "../../assets/banner2.jpg";
-import banner3 from "../../assets/banner3.jpg";
-import banner4 from "../../assets/banner4.jpg";
-import banner5 from "../../assets/banner5.jpg";
+import banner1 from "../../assets/banner_1.webp";
+import banner2 from "../../assets/banner_2.webp";
+import banner3 from "../../assets/banner_3.webp";
+import banner4 from "../../assets/banner_4.webp";
+import banner5 from "../../assets/banner_5.webp";
 
 // Background images & headlines
 const banners = [
   {
-    image: banner1, // Replace with actual paths
+    image: banner1, 
     headline: "Discover the Sound of Your Soul",
   },
   {
