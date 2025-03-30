@@ -44,4 +44,4 @@ const logout = async () => {
     }
 };
 
-export { auth, signInWithGoogle, logout };
+export { db, auth, signInWithGoogle, logout };

@@ -138,7 +138,7 @@ const SearchBar = ({ onSelectTrack }) => {
       {isFocused && results.length > 0 && (
         <div
           ref={dropdownRef}
-          className={`absolute left-0 w-full mt-2 p-2 rounded-md shadow-lg max-h-60 overflow-y-auto transition-opacity duration-300 z-100
+          className={`absolute left-0 w-full mt-2 p-2 rounded-md shadow-lg max-h-80 overflow-y-auto transition-opacity duration-300 z-100
           ${theme === "dark" ? "bg-gray-900 text-white" : "bg-white text-black"}`}
         >
           {results.map((track, index) => (

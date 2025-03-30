@@ -246,7 +246,11 @@ const MusicPlayer = ({ track }) => {
                         if (state === 1) { // Playing
                             setIsPlaying(true);
                             setDuration(event.target.getDuration());
-                            saveSongListen(track.id).catch(console.error);
+
+                            if (track?.id) {
+                                saveSongListen(track.id).catch((err) => console.error("Error saving song listen:", err));
+                            }
+                            
                             event.target.setPlaybackQuality("small"); // Ensure 144p while playing
                         } else if (state === 2) { // Paused
                             setIsPlaying(false);

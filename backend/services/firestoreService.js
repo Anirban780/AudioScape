@@ -1,6 +1,5 @@
 const { db, admin } = require("../config/firebase");
 const { getTrackDetails } = require('./youtubeService');
-const { Timestamp } = require('firebase-admin/firestore');
 
 // Save track when played
 const saveSongListen = async (videoId, userId) => {
@@ -16,40 +15,45 @@ const saveSongListen = async (videoId, userId) => {
     }
 
     const userRef = db.collection('users').doc(userId);
-    const listensRef = userRef.collection('song_listens');
-    const cutoff = Timestamp.fromDate(new Date(Date.now() - 60 * 60 * 1000)); // 1-hour limit
+    const listensRef = userRef.collection('music_history');
+    const now = admin.firestore.FieldValue.serverTimestamp();
 
     try {
-        // Check if the song has already been played within the last hour
-        const snapshot = await listensRef
+        // Check if the song already exists in the user's history
+        const existingSongQuery = await listensRef
             .where("id", "==", videoId)
-            .where("createdAt", ">=", cutoff)
-            .orderBy("createdAt", "desc")
             .limit(1)
-            .get();
+            .get()
 
-        if (!snapshot.empty) {
-            console.log("Duplicate listen detected. Skipping...");
-            return { success: false, message: "Duplicate listen detected" };
+        if(!existingSongQuery.empty) {
+            // Update lastPlayedAt timestamp
+            const songDoc = existingSongQuery.docs[0].ref;
+            await songDoc.update({ lastPlayedAt: now });
+            console.log(`Updated lastPlayedAt for ${songDetails.title}`);
+            return { success: true, message: "Song listen updated" };
         }
 
-        // Save the new listen
+
+        //  If song is not in history, add it
         const songData = {
             id: songDetails.videoId,
             name: songDetails.title,
             artist: songDetails.channelTitle,
             duration: songDetails.duration,
             thumbnail: songDetails.thumbNail,
-            createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            lastPlayedAt: now,
         };
 
         await listensRef.add(songData);
-        console.log("Song listen saved successfully:", songDetails.title);
+        console.log(`Added new song to history: ${songDetails.title}`);
         return { success: true, message: "Song listen saved" };
+        
     } catch (error) {
         console.error("Error saving song listen:", error);
         return { success: false, error: error.message };
     }
 };
+
+
 
 module.exports = { saveSongListen };

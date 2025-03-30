@@ -6,10 +6,13 @@ import UserMenu from "../components/Auth/UserMenu";
 import { useTheme } from "../ThemeProvider";
 import MusicPlayer from "../components/Home/MusicPlayer";
 import HeroSection from "../components/Home/HeroSection";
+import RecentlyPlayed from "../components/Home/RecentlyPlayed"; // Import the component
+import { useAuth } from "../context/AuthContext"; // Import authentication
 
 const HomePage = () => {
   const { theme, setTheme } = useTheme();
   const [currentTrack, setCurrentTrack] = useState(null);
+  const { user } = useAuth(); // Get user info
 
   return (
     <div className={`h-screen flex transition-all duration-300 ${theme === "dark" ? "bg-slate-900 text-white" : "bg-gray-100 text-black"}`}>
@@ -22,7 +25,6 @@ const HomePage = () => {
 
         {/* Top Navbar */}
         <div className="flex justify-between items-center w-full">
-
           {/* Search Bar */}
           <div className="w-full max-w-lg mx-auto">
             <SearchBar onSelectTrack={setCurrentTrack} />
@@ -65,6 +67,9 @@ const HomePage = () => {
             <HeroSection />
           )}
         </div>
+
+        {/* Recently Played Section */}
+        {user && <RecentlyPlayed userId={user.uid} />}
       </div>
     </div>
   );

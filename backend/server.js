@@ -33,6 +33,11 @@ app.get("/", (req, res) => {
     res.send("Audioscape Server is running successfully!");
 });
 
+app.get("/healthcheck", (req, res) => {
+    res.status(200).json({ status: "Backend is running" });
+});
+
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
