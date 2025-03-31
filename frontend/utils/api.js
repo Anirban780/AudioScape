@@ -69,7 +69,7 @@ export async function fetchLastPlayed(userId) {
     const lastPlayedQuery = query(
         userRef,
         orderBy("lastPlayedAt", "desc"),
-        limit(10)
+        limit(50)
     );
 
     try {
