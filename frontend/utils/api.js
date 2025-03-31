@@ -83,3 +83,34 @@ export async function fetchLastPlayed(userId) {
         return [];
     }
 }
+
+
+export async function saveLikeSong(videoId) {
+    if (!auth.currentUser) {
+        console.error("⚠️ Error: User not logged in");
+        return;
+    }
+
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const API_URL = await getBackendURL();
+
+        const response = await fetch(`${API_URL}/api/songs/like`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({ videoId }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to like song: ${response.status} ${response.statusText}`);
+        }
+
+        console.log("Song liked/disliked successfully");
+    }
+    catch (error) {
+        console.error("Error liking/disliking song:", error);``
+    }
+}

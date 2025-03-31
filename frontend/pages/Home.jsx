@@ -69,7 +69,7 @@ const HomePage = () => {
         </div>
 
         {/* Recently Played Section */}
-        {user && <RecentlyPlayed userId={user.uid} />}
+        {user && <RecentlyPlayed userId={user.uid} setTrack={setCurrentTrack} />}
       </div>
     </div>
   );

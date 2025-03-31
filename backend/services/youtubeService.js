@@ -45,7 +45,9 @@ const getTrackDetails = async(videoId) => {
         title: track.snippet.title || 'Unknown Title',
         thumbNail: track.snippet.thumbnails.high.url,
         channelTitle: track.snippet.channelTitle || 'Unknown Artist',
-        duration: track.contentDetails?.duration || 'PTOS'
+        duration: track.contentDetails?.duration || 'PTOS',
+        genre: track.snippet.tags || [],
+        channelId: track.snippet.channelId,
     }
 
 }

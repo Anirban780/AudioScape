@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import YouTube from "react-youtube";
-import { Pause, Play, SkipBack, SkipForward, Volume2 } from "lucide-react";
+import { Pause, Play, SkipBack, SkipForward, ThumbsUp, Volume2 } from "lucide-react";
 import placeholder from "../../assets/placeholder.jpg";
-import { saveSongListen } from "../../utils/api";
+import { saveSongListen, saveLikeSong } from "../../utils/api";
 
 const MusicPlayer = ({ track }) => {
     const [player, setPlayer] = useState(null);
@@ -13,6 +13,7 @@ const MusicPlayer = ({ track }) => {
     const [isDraggingProgress, setIsDraggingProgress] = useState(false);
     const [isDraggingVolume, setIsDraggingVolume] = useState(false);
     const [isPlayerReady, setIsPlayerReady] = useState(false);
+    const [isLiked, setIsLiked] = useState(false);
     const progressRef = useRef(null);
     const volumeRef = useRef(null);
 
@@ -129,6 +130,18 @@ const MusicPlayer = ({ track }) => {
         return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
     };
 
+    // update like/dislike status for current song
+    const handleLike = async () => {
+        if (!player || !isPlayerReady || !track?.id) return;
+        
+        setIsLiked((prev) => !prev);
+        try {
+            await saveLikeSong(track.id); // Save to Firestore (optional)
+        } catch (err) {
+            console.error("Error saving like:", err);
+        }
+    };
+
     // YouTube player options
     const opts = {
         height: "0",
@@ -141,9 +154,9 @@ const MusicPlayer = ({ track }) => {
             showinfo: 0,
             enablejsapi: 1,
             playsinline: 1,
-            iv_load_policy: 3, 
-            fs: 0, 
-            disablekb: 1, 
+            iv_load_policy: 3,
+            fs: 0,
+            disablekb: 1,
         },
     };
 
@@ -192,6 +205,23 @@ const MusicPlayer = ({ track }) => {
                     </div>
 
                     <div className="flex items-center justify-center gap-4">
+                        <button 
+                            onClick={handleLike} 
+                            className={`relative p-2 rounded-full transition-all duration-200 
+                                ${isLiked 
+                                    ? "text-white bg-opacity-20" 
+                                    : "text-gray-500 hover:text-white hover:scale-105 active:scale-95"} 
+                                flex items-center justify-center outline-none`}
+                        >
+                            
+                            <ThumbsUp 
+                                size={22} 
+                                fill="none"
+                                strokeWidth={isLiked ? 2.5 : 2}
+                                stroke="currentColor"
+                            />
+                        </button>
+
                         <button className="p-2 hover:text-green-500 transition-colors">
                             <SkipBack size={20} />
                         </button>
@@ -250,7 +280,7 @@ const MusicPlayer = ({ track }) => {
                             if (track?.id) {
                                 saveSongListen(track.id).catch((err) => console.error("Error saving song listen:", err));
                             }
-                            
+
                             event.target.setPlaybackQuality("small"); // Ensure 144p while playing
                         } else if (state === 2) { // Paused
                             setIsPlaying(false);

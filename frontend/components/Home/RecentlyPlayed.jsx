@@ -5,10 +5,9 @@ import placeholder from "../../assets/placeholder.jpg";
 import { Button } from "../../../utils/components/ui/button";
 import { ChevronRight } from "lucide-react";
 
-const RecentlyPlayed = ({ userId }) => {
+const RecentlyPlayed = ({ userId, setTrack }) => {
   const { theme } = useTheme();
   const [recentlyPlayed, setRecentlyPlayed] = useState([]);
-  const [visibleSongs, setVisibleSongs] = useState(10);
   const [showButton, setShowButton] = useState(false);
   const scrollRef = useRef(null);
 
@@ -18,7 +17,7 @@ const RecentlyPlayed = ({ userId }) => {
     }
   }, [userId]);
 
-  //check if scrolled to the end
+  // Check if scrolled to the end
   const handleScroll = () => {
     if (scrollRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
@@ -26,13 +25,10 @@ const RecentlyPlayed = ({ userId }) => {
     }
   };
 
-  // scroll right when button is clicked
+  // Scroll right when button is clicked
   const handleScrollRight = () => {
     if (scrollRef.current) {
-      scrollRef.current.scrollBy({
-        left: 300,
-        behavior: "smooth"
-      });
+      scrollRef.current.scrollBy({ left: 300, behavior: "smooth" });
     }
   };
 
@@ -40,7 +36,6 @@ const RecentlyPlayed = ({ userId }) => {
 
   return (
     <div className="w-full max-w-6xl mx-auto px-6 py-6 ml-4 relative">
-      {/* Ensures alignment with dashboard */}
       <h2 className="text-2xl font-semibold mb-6">Recently Played</h2>
 
       <div
@@ -49,11 +44,13 @@ const RecentlyPlayed = ({ userId }) => {
         className="flex space-x-4 overflow-x-auto scrollbar-hide scroll-smooth"
         style={{ scrollSnapType: "x mandatory", paddingBottom: "10px" }}
       >
-        {recentlyPlayed.slice(0, visibleSongs).map((song) => (
+        {recentlyPlayed.map((song) => (
           <div
             key={song.id}
+            onClick={() => setTrack(song)} // Update track on click
+
             className={`
-              group relative rounded-lg overflow-hidden
+              group relative rounded-lg overflow-hidden cursor-pointer
               ${theme === "dark" ? "bg-gray-800 hover:bg-gray-700" : "bg-white hover:bg-gray-50"}
               shadow-md hover:shadow-lg 
               transition-all duration-300
@@ -81,13 +78,12 @@ const RecentlyPlayed = ({ userId }) => {
         ))}
       </div>
 
-      {/*Right scroll button */}
       {showButton && (
         <Button
           onClick={handleScrollRight}
-          className='absolute right-0 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 shadow-md rounded-full p-2'
+          className="absolute right-0 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 shadow-md rounded-full p-2"
         >
-          <ChevronRight size={20} className="text-white"/>
+          <ChevronRight size={20} className="text-white" />
         </Button>
       )}
     </div>
