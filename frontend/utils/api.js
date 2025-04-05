@@ -7,7 +7,7 @@ const PROD_API_URL = import.meta.env.VITE_PROD_BACKEND_URL || import.meta.env.VI
 /**
  * Dynamically determines whether to use the local or production backend.
  */
-async function getBackendURL() {
+export async function getBackendURL() {
     try {
         const response = await fetch(`${LOCAL_API_URL}/healthcheck`, { method: "GET" });
         if (response.ok) {

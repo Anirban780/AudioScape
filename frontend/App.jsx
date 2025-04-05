@@ -6,6 +6,7 @@ import NotFound from "./pages/NotFound";
 import { ThemeProvider } from "./ThemeProvider";
 import Loader from "./components/Home/Loader";
 import { useState, useEffect } from "react";
+import ExplorePage from "./pages/ExplorePage";
 
 function AppContent() {
   const { user } = useAuth();
@@ -24,6 +25,7 @@ function AppContent() {
       <Routes>
         <Route path="/" element={user ? <Navigate to="/home" /> : <LandingPage />} />
         <Route path="/home" element={user ? <Home /> : <Navigate to="/" />} />
+        <Route path="/explore" element={ <ExplorePage /> }  />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
