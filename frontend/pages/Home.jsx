@@ -7,7 +7,7 @@ import { useTheme } from "../ThemeProvider";
 import HeroSection from "../components/Home/HeroSection";
 import RecentlyPlayed from "../components/Home/RecentlyPlayed"; // Import the component
 import { useAuth } from "../context/AuthContext"; // Import authentication
-import PlayerContainer from "../components/Player/PLayerContainer";
+import PlayerContainer from "../components/Player/PlayerContainer";
 
 const HomePage = () => {
   const { theme, setTheme } = useTheme();
