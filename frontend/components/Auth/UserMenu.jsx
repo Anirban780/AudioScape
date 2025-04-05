@@ -43,13 +43,14 @@ const UserMenu = () => {
         <DropdownMenu>
           <DropdownMenuTrigger>
             <Avatar className="w-10 h-10 cursor-pointer hover:opacity-80 transition-opacity duration-200">
-              {avatarUrl ? (
-                <AvatarImage src={avatarUrl} alt="User Profile" />
-              ) : (
-                <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-black dark:text-white">
-                  {user.displayName?.charAt(0) || "U"}
-                </AvatarFallback>
-              )}
+              <AvatarImage
+                src={avatarUrl}
+                alt="User Profile"
+                onError={() => setAvatarUrl("")}
+              />
+              <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-black dark:text-white">
+                {user.displayName?.charAt(0) || "U"}
+              </AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>
 

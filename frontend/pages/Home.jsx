@@ -4,10 +4,10 @@ import SearchBar from "../components/Home/SearchBar";
 import { Sun, Moon, X } from "lucide-react";
 import UserMenu from "../components/Auth/UserMenu";
 import { useTheme } from "../ThemeProvider";
-import MusicPlayer from "../components/Home/MusicPlayer";
 import HeroSection from "../components/Home/HeroSection";
 import RecentlyPlayed from "../components/Home/RecentlyPlayed"; // Import the component
 import { useAuth } from "../context/AuthContext"; // Import authentication
+import PlayerContainer from "../components/Player/PLayerContainer";
 
 const HomePage = () => {
   const { theme, setTheme } = useTheme();
@@ -61,7 +61,7 @@ const HomePage = () => {
               </button>
 
               {/* Music Player */}
-              <MusicPlayer track={currentTrack} />
+              <PlayerContainer initialTrack={currentTrack} />
             </>
           ) : (
             <HeroSection />
