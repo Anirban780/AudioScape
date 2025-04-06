@@ -36,9 +36,8 @@ const PlayerContainer = ({ initialTrack }) => {
       <YouTubePlayer
         trackId={track?.id}
         onReady={onPlayerReady}
-        setIsPlaying={() => { }} // no longer needed
-        setDuration={() => { }}  // no longer needed
       />
+      
       {isFullScreen ? (
         <FullScreenPlayer
           track={track}
