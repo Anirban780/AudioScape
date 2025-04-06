@@ -26,7 +26,7 @@ export async function getBackendURL() {
  */
 export async function saveSongListen(videoId) {
     if (!auth.currentUser) {
-        console.error("⚠️ Error: User not logged in");
+        console.error("Error: User not logged in");
         return;
     }
 

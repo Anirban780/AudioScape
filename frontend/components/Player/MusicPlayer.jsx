@@ -1,47 +1,55 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import ProgressBar from "./ProgressBar";
 import PlayerControls from "./PlayerControls";
 import VolumeBar from "./VolumeBar";
 import placeholder from "../../assets/placeholder.jpg";
 import { Maximize2 } from "lucide-react";
+import usePlayerStore from "../../store/usePlayerStore"
 
 const MusicPlayer = ({ track, player, isPlayerReady, toggleFullScreen }) => {
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [volume, setVolume] = useState(50);
-  const [progress, setProgress] = useState(0);
-  const [duration, setDuration] = useState(0);
-  const [isLiked, setIsLiked] = useState(false);
+  const {
+    isPlaying,
+    setIsPlaying,
+    progress,
+    setProgress,
+    duration,
+    setDuration,
+    volume,
+    setVolume,
+    isLiked,
+    setIsLiked,
+  } = usePlayerStore();
 
   const progressRef = useRef(null);
   const volumeRef = useRef(null);
 
-  const togglePlayPause = () => {
-    if (!player || !isPlayerReady) return;
-    if (isPlaying) {
-      player.pauseVideo();
-    } else {
-      player.playVideo();
-    }
-    setIsPlaying((prev) => !prev);
-  };
-
-  const handleLike = async () => {
-    setIsLiked((prev) => !prev);
-    // await saveLikeSong(track.id); // Define this function to store like
-  };
-
   useEffect(() => {
     const interval = setInterval(() => {
       if (player && isPlayerReady) {
-        const current = player.getCurrentTime();
-        const total = player.getDuration();
-        setProgress(current);
-        setDuration(total);
+        const current = player.getCurrentTime?.();
+        const dur = player.getDuration?.();
+
+        if (!isNaN(current)) setProgress(current);
+        if (!isNaN(dur)) setDuration(dur);
       }
     }, 1000);
-
     return () => clearInterval(interval);
   }, [player, isPlayerReady]);
+
+
+
+  const togglePlayPause = () => {
+    if (!player || !isPlayerReady) return;
+    if (isPlaying) {
+      player.pauseVideo?.();
+    } else {
+      player.playVideo?.();
+    }
+    setIsPlaying(!isPlaying);
+  };
+
+
+  const handleLike = () => setIsLiked(!isLiked);
 
   return (
     <div className="text-white">
@@ -50,12 +58,11 @@ const MusicPlayer = ({ track, player, isPlayerReady, toggleFullScreen }) => {
           <div className="relative group">
             <img
               src={track?.thumbnail || placeholder}
-              alt={track?.name}
+              alt={track?.name || "Track"}
               className="w-32 h-32 sm:w-40 sm:h-40 rounded-lg object-cover transition-transform duration-300 group-hover:scale-105 shadow-lg"
+              onError={(e) => (e.currentTarget.src = placeholder)}
             />
-            <div className="absolute inset-0 bg-black/20 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
           </div>
-
           <div className="flex-1 w-full space-y-4">
             <div className="flex justify-between items-center">
               <div className="text-center sm:text-left">
@@ -74,7 +81,6 @@ const MusicPlayer = ({ track, player, isPlayerReady, toggleFullScreen }) => {
                 <Maximize2 size={18} />
               </button>
             </div>
-
             <ProgressBar
               progress={progress}
               duration={duration}
@@ -83,14 +89,12 @@ const MusicPlayer = ({ track, player, isPlayerReady, toggleFullScreen }) => {
               ref={progressRef}
               setProgress={setProgress}
             />
-
             <PlayerControls
               isPlaying={isPlaying}
               togglePlayPause={togglePlayPause}
               handleLike={handleLike}
               isLiked={isLiked}
             />
-
             <VolumeBar
               volume={volume}
               setVolume={setVolume}

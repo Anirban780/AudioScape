@@ -6,7 +6,6 @@ import axios from "axios";
 import placeholder from '../../assets/placeholder.jpg';
 import { getBackendURL } from "../../utils/api";
 
-
 const SearchBar = ({ onSelectTrack }) => {
   const { theme } = useTheme();
   const [query, setQuery] = useState("");
@@ -144,7 +143,7 @@ const SearchBar = ({ onSelectTrack }) => {
         >
           {results.map((track, index) => (
             <div
-              key={track.videoId || index}
+              key={`${track.videoId}-${index}`}
               className="flex items-center p-2 hover:bg-gray-300 dark:hover:bg-gray-700 cursor-pointer"
               onMouseDown={() => handleTrackSelect(track)}
             >

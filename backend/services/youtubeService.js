@@ -16,13 +16,22 @@ const searchTrack = async (query, pageToken = "") => {
 
     try {
         const response = await axios.get(url);
+        const seenVideoIds = new Set();
+
+        const filteredTracks = response.data.items
+            .filter(item => item.id.videoId && !seenVideoIds.has(item.id.videoId))
+            .map(item => {
+                seenVideoIds.add(item.id.videoId);
+                return {
+                    videoId: item.id.videoId,
+                    title: item.snippet.title,
+                    thumbNail: item.snippet.thumbnails.default.url,
+                    channelTitle: item.snippet.channelTitle,
+                };
+            });
+
         return {
-            tracks: response.data.items.map(item => ({
-                videoId: item.id.videoId,
-                title: item.snippet.title,
-                thumbNail: item.snippet.thumbnails.default.url,
-                channelTitle: item.snippet.channelTitle,
-            })),
+            tracks: filteredTracks,
             nextPageToken: response.data.nextPageToken || null,
         };
     } catch (error) {
@@ -43,11 +52,11 @@ const getTrackDetails = async(videoId) => {
     return {
         videoId: track.id,
         title: track.snippet.title || 'Unknown Title',
-        thumbNail: track.snippet.thumbnails.high.url,
+        thumbNail: track.snippet.thumbnails.medium.url,
         channelTitle: track.snippet.channelTitle || 'Unknown Artist',
         duration: track.contentDetails?.duration || 'PTOS',
         genre: track.snippet.tags || [],
-        channelId: track.snippet.channelId,
+        channelId: track.snippet.channelId || "Unknown"
     }
 
 }

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 
-const formatTime = (seconds) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+const formatTime = (time) => {
+    const minutes = Math.floor((time || 0) / 60);
+    const seconds = Math.floor((time || 0) % 60).toString().padStart(2, "0");
+    return `${minutes}:${seconds}`;
 };
 
 const ProgressBar = React.forwardRef(({ progress, duration, player, isReady, setProgress }, ref) => {

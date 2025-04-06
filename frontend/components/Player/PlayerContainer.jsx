@@ -1,7 +1,7 @@
-import React, { useState, useRef, useCallback } from "react";
-import YouTube from "react-youtube";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import MusicPlayer from "./MusicPlayer";
 import FullScreenPlayer from "./FullScreenPlayer";
+import YouTubePlayer from "./YouTubePlayer";
 
 const PlayerContainer = ({ initialTrack }) => {
   const [track, setTrack] = useState(initialTrack);
@@ -9,37 +9,36 @@ const PlayerContainer = ({ initialTrack }) => {
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
 
-  const playerRef = useRef(null);
+  useEffect(() => {
+    setTrack(initialTrack);
+  }, [initialTrack]);
 
   const onPlayerReady = useCallback((event) => {
     const ytPlayer = event.target;
-    playerRef.current = ytPlayer;
     setPlayer(ytPlayer);
     setIsPlayerReady(true);
-    ytPlayer.pauseVideo();
-  }, []);
+    if (track?.id) {
+      ytPlayer.cueVideoById({ videoId: track.id });
+    }
+  }, [track?.id]);
 
-  const opts = {
-    height: "0",
-    width: "0",
-    playerVars: {
-      autoplay: 0,
-    },
-  };
+  useEffect(() => {
+    if (isPlayerReady && player && track?.id) {
+      player.stopVideo();
+      player.loadVideoById({ videoId: track.id });
+    }
+  }, [track?.id, player, isPlayerReady]);
 
-  const toggleFullScreen = () => {
-    setIsFullScreen((prev) => !prev);
-  };
+  const toggleFullScreen = () => setIsFullScreen((prev) => !prev);
 
   return (
     <>
-      <YouTube
-        videoId={track?.id}
-        opts={opts}
+      <YouTubePlayer
+        trackId={track?.id}
         onReady={onPlayerReady}
-        className="hidden"
+        setIsPlaying={() => { }} // no longer needed
+        setDuration={() => { }}  // no longer needed
       />
-
       {isFullScreen ? (
         <FullScreenPlayer
           track={track}
