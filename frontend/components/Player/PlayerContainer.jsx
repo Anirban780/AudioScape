@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import MusicPlayer from "./MusicPlayer";
 import FullScreenPlayer from "./FullScreenPlayer";
-import YouTubePlayer from "./YouTubePlayer";
+import YouTubePlayer from "./YoutubePlayer";
 
 const PlayerContainer = ({ initialTrack }) => {
   const [track, setTrack] = useState(initialTrack);
