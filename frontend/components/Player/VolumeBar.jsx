@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Volume2 } from "lucide-react";
 
 const VolumeBar = React.forwardRef(({ volume, setVolume, player, isReady }, ref) => {
@@ -13,8 +13,39 @@ const VolumeBar = React.forwardRef(({ volume, setVolume, player, isReady }, ref)
         setVolume(newVolume);
     };
 
+    useEffect(() => {
+        if (player && isReady) {
+            player.setVolume(volume);
+        }
+    }, [player, isReady]);
+
+    useEffect(() => {
+        const handleMouseMove = (e) => isDragging && handleChange(e.clientX);
+        const handleMouseUp = () => setIsDragging(false);
+        const handleTouchMove = (e) => {
+            if (isDragging && e.touches.length > 0) {
+                handleChange(e.touches[0].clientX);
+            }
+        };
+        const handleTouchEnd = () => setIsDragging(false);
+
+        if (isDragging) {
+            window.addEventListener("mousemove", handleMouseMove);
+            window.addEventListener("mouseup", handleMouseUp);
+            window.addEventListener("touchmove", handleTouchMove);
+            window.addEventListener("touchend", handleTouchEnd);
+        }
+
+        return () => {
+            window.removeEventListener("mousemove", handleMouseMove);
+            window.removeEventListener("mouseup", handleMouseUp);
+            window.removeEventListener("touchmove", handleTouchMove);
+            window.removeEventListener("touchend", handleTouchEnd);
+        };
+    }, [isDragging]);
+
     return (
-        <div className="flex items-center gap-3 max-w-xs mx-auto">
+        <div className="flex items-center gap-3 max-w-xs mx-auto touch-none">
             <Volume2 size={16} className="text-gray-400" />
             <div
                 ref={ref}
@@ -23,12 +54,19 @@ const VolumeBar = React.forwardRef(({ volume, setVolume, player, isReady }, ref)
                     setIsDragging(true);
                     handleChange(e.clientX);
                 }}
-                onMouseMove={(e) => isDragging && handleChange(e.clientX)}
-                onMouseUp={() => setIsDragging(false)}
+                onTouchStart={(e) => {
+                    if (e.touches.length > 0) {
+                        setIsDragging(true);
+                        handleChange(e.touches[0].clientX);
+                    }
+                }}
             >
-                <div className="absolute h-full bg-green-500 rounded-full" style={{ width: `${volume}%` }} />
                 <div
-                    className="absolute w-3 h-3 bg-white rounded-full -top-1 shadow-md group-hover:scale-125 transition"
+                    className="absolute h-full bg-green-500 rounded-full transition-all duration-75"
+                    style={{ width: `${volume}%` }}
+                />
+                <div
+                    className="absolute w-3 h-3 bg-white rounded-full -top-1 shadow-md group-hover:scale-125 transition-transform duration-150 ease-in-out"
                     style={{ left: `${volume}%`, transform: 'translateX(-50%)' }}
                 />
             </div>

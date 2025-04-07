@@ -63,7 +63,7 @@ const ExplorePage = () => {
 
   return (
     <div className={`h-screen flex transition-all duration-300 ${theme === "dark" ? "bg-slate-900 text-white" : "bg-gray-100 text-black"}`}>
-      
+
       {/* Sidebar */}
       <Sidebar />
 
@@ -72,7 +72,7 @@ const ExplorePage = () => {
 
         {/* Navbar Section */}
         <div className="flex justify-between items-center w-full">
-          
+
           {/* Search Bar */}
           <div className="w-full max-w-lg mx-auto">
             <SearchBar onSelectTrack={setCurrentTrack} />
@@ -93,44 +93,46 @@ const ExplorePage = () => {
           {/* User Menu */}
           <UserMenu />
         </div>
+        <div className='lg:mx-8'>
+          {/* Explore Title */}
+          <h1 className="text-3xl font-bold mb-4">Explore Music</h1>
 
-        {/* Explore Title */}
-        <h1 className="text-3xl font-bold mb-4">Explore Music</h1>
+          {/* Explore Sections */}
+          {exploreFeed.map((section) => (
+            <div key={section.title} className="mb-10">
+              <h2 className="text-xl font-semibold mb-3 capitalize">{section.title}</h2>
 
-        {/* Explore Sections */}
-        {exploreFeed.map((section) => (
-          <div key={section.title} className="mb-10">
-            <h2 className="text-xl font-semibold mb-3 capitalize">{section.title}</h2>
-
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-              {section.tracks
-                .slice(0, visibleTracks[section.title] || 5)
-                .map((track) => (
-                  <MusicCard
-                    key={track.id}
-                    id={track.id}
-                    name={track.name}
-                    artist={track.artist}
-                    image={track.thumbnail}
-                    onClick={() => console.log("Clicked:", track.name)}
-                  />
-                ))}
-            </div>
-
-            {/* Load More */}
-            {visibleTracks[section.title] < section.tracks.length && (
-              <div className="mt-4 flex justify-end mr-12">
-                <button
-                  onClick={() => handleLoadMore(section.title)}
-                  className="bg-blue-600 text-white px-4 py-2  rounded hover:bg-blue-700 transition-all dark:bg-blue-500 dark:hover:bg-blue-600"
-                >
-                  Load More
-                </button>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+                {section.tracks
+                  .slice(0, visibleTracks[section.title] || 5)
+                  .map((track) => (
+                    <MusicCard
+                      key={track.id}
+                      id={track.id}
+                      name={track.name}
+                      artist={track.artist}
+                      image={track.thumbnail}
+                      onClick={() => console.log("Clicked:", track.name)}
+                    />
+                  ))}
               </div>
-            )}
-          </div>
-        ))}
+
+              {/* Load More */}
+              {visibleTracks[section.title] < section.tracks.length && (
+                <div className="mt-4 flex justify-end mr-12">
+                  <button
+                    onClick={() => handleLoadMore(section.title)}
+                    className="bg-blue-600 text-white px-4 py-2  rounded hover:bg-blue-700 transition-all dark:bg-blue-500 dark:hover:bg-blue-600"
+                  >
+                    Load More
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
+
     </div>
   );
 };

@@ -7,18 +7,12 @@ import { Button } from 'utils/components/ui/button';
 import { useTheme } from '../../ThemeProvider'; // Adjust path to ThemeProvider
 
 const Sidebar = () => {
-  const [isOpen, setIsOpen] = useState(true);
-  const { theme, setTheme } = useTheme(); // Access theme context
+  const [isOpen, setIsOpen] = useState(false);
+  const { theme } = useTheme(); // Access theme context
 
   const toggleSidebar = () => setIsOpen((prev) => !prev);
 
-  // Toggle between light, dark, and system themes
-  const toggleTheme = () => {
-    if (theme === 'light') setTheme('dark');
-    else if (theme === 'dark') setTheme('system');
-    else setTheme('light');
-  };
-
+  
   const MenuItem = ({ icon: Icon, text, to }) => (
     <li>
       <Link

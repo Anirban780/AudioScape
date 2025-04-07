@@ -6,7 +6,7 @@ const usePlayerStore = create((set) => ({
     isFullScreen: false,
     progress: 0,
     duration: 0,
-    volume: 50,
+    volume: 80,
     isLiked: false,
     player: null,
     isPlayerReady: false,

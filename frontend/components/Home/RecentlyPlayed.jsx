@@ -3,15 +3,15 @@ import { fetchLastPlayed } from "../../utils/api";
 import { useTheme } from "../../ThemeProvider";
 import placeholder from "../../assets/placeholder.jpg";
 import { Button } from "../../../utils/components/ui/button";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, ChevronLeft } from "lucide-react";
 import MusicCard from "../Cards/MusicCard";
-
 
 const RecentlyPlayed = ({ userId, setTrack }) => {
   const { theme } = useTheme();
   const [recentlyPlayed, setRecentlyPlayed] = useState([]);
   const [visibleSongs, setVisibleSongs] = useState(8);
-  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [showScrollRight, setShowScrollRight] = useState(false);
+  const [showScrollLeft, setShowScrollLeft] = useState(false);
   const scrollRef = useRef(null);
 
   useEffect(() => {
@@ -23,13 +23,20 @@ const RecentlyPlayed = ({ userId, setTrack }) => {
   const handleScroll = () => {
     if (scrollRef.current) {
       const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-      setShowScrollButton(scrollLeft + clientWidth < scrollWidth - 10);
+      setShowScrollLeft(scrollLeft > 10);
+      setShowScrollRight(scrollLeft + clientWidth < scrollWidth - 10);
     }
   };
 
   const handleScrollRight = () => {
     if (scrollRef.current) {
       scrollRef.current.scrollBy({ left: 300, behavior: "smooth" });
+    }
+  };
+
+  const handleScrollLeft = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollBy({ left: -300, behavior: "smooth" });
     }
   };
 
@@ -42,19 +49,14 @@ const RecentlyPlayed = ({ userId, setTrack }) => {
   return (
     <div className="w-full max-w-6xl mx-auto px-6 py-6 ml-4 relative">
       <h2 className="text-2xl font-semibold mb-6">Recently Played</h2>
-
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="flex space-x-4 overflow-x-auto scrollbar-hide scroll-smooth"
+        className="grid grid-flow-col auto-cols-[minmax(200px,1fr)] gap-5 overflow-x-auto scrollbar-hide scroll-smooth"
         style={{ scrollSnapType: "x mandatory", paddingBottom: "10px" }}
       >
         {recentlyPlayed.slice(0, visibleSongs).map((song) => (
-          <div
-            key={song.id}
-            style={{ scrollSnapAlign: "start" }}
-            className="min-w-[180px] max-w-[200px]"
-          >
+          <div key={song.id} style={{ scrollSnapAlign: "start" }}>
             <MusicCard
               id={song.id}
               name={song.name}
@@ -64,11 +66,10 @@ const RecentlyPlayed = ({ userId, setTrack }) => {
             />
           </div>
         ))}
-
         {visibleSongs < recentlyPlayed.length && (
           <div
             onClick={handleLoadMore}
-            className="flex flex-col items-center justify-center cursor-pointer group rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700 min-w-[80px] max-w-[140px] mx-2 transition-all duration-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+            className="flex flex-col items-center justify-center cursor-pointer group rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700 w-[140px] mx-2 transition-all duration-300 hover:bg-gray-300 dark:hover:bg-gray-600"
             style={{ scrollSnapAlign: "start" }}
           >
             <ChevronRight
@@ -82,10 +83,19 @@ const RecentlyPlayed = ({ userId, setTrack }) => {
         )}
       </div>
 
-      {showScrollButton && (
+      {showScrollLeft && (
+        <Button
+          onClick={handleScrollLeft}
+          className="absolute left-0 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 shadow-md rounded-full p-2 z-10"
+        >
+          <ChevronLeft size={20} className="text-white" />
+        </Button>
+      )}
+
+      {showScrollRight && (
         <Button
           onClick={handleScrollRight}
-          className="absolute right-0 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 shadow-md rounded-full p-2"
+          className="absolute right-0 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 shadow-md rounded-full p-2 z-10"
         >
           <ChevronRight size={20} className="text-white" />
         </Button>
