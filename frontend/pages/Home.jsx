@@ -8,7 +8,7 @@ import HeroSection from "../components/Home/HeroSection";
 import RecentlyPlayed from "../components/Home/RecentlyPlayed";
 import { useAuth } from "../context/AuthContext";
 import PlayerContainer from "../components/Player/PlayerContainer";
-import ResponsiveLayout from "../RespponsiveLayout"; // Import layout
+import ResponsiveLayout from "../ResponsiveLayout"; // Import layout
 
 const HomePage = () => {
   const { theme, setTheme } = useTheme();
