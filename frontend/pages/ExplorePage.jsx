@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { getPersonalizedExploreKeywords } from '../utils/keywords';
 import { fetchYoutubeMusic } from '../utils/youtube';
 import MusicCard from '../components/Cards/MusicCard';
-import { Sun, Moon } from 'lucide-react';
+import { Sun, Moon, Menu } from 'lucide-react';
 
 const curatedGenres = [
   "lofi music", "pop hits", "indie rock", "anime music", "k-pop", "electronic", "jazz chill", "hip hop",
@@ -19,6 +19,7 @@ const ExplorePage = () => {
   const [exploreFeed, setExploreFeed] = useState([]);
   const [cache, setCache] = useState({});
   const [visibleTracks, setVisibleTracks] = useState({});
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentTrack, setCurrentTrack] = useState(null);
 
   useEffect(() => {
@@ -64,14 +65,33 @@ const ExplorePage = () => {
   return (
     <div className={`h-screen flex transition-all duration-300 ${theme === "dark" ? "bg-slate-900 text-white" : "bg-gray-100 text-black"}`}>
 
-      {/* Sidebar */}
-      <Sidebar />
+      <div className="hidden md:flex">
+        <Sidebar />
+      </div>
+
+      {/* Sidebar - Mobile Drawer */}
+      {isSidebarOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          {/* Sidebar */}
+          <div className="w-60 h-full bg-white dark:bg-gray-900  shadow-md relative z-50">
+
+            <Sidebar isOpen={true} onToggle={() => setIsSidebarOpen(false)} />
+          </div>
+
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="flex flex-col flex-1 overflow-auto p-4 md:p-6 space-y-6">
 
         {/* Navbar Section */}
         <div className="flex justify-between items-center w-full">
+          <button
+            onClick={() => setIsSidebarOpen(true)}
+            className="md:hidden p-2 rounded bg-gray-200 dark:bg-gray-700"
+          >
+            <Menu size={20} />
+          </button>
 
           {/* Search Bar */}
           <div className="w-full max-w-lg mx-auto">
