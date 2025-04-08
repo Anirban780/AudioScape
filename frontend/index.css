@@ -122,3 +122,20 @@
 .scrollbar-custom::-webkit-scrollbar-thumb:hover {
   background: #555;
 }
+
+html {
+  font-size: 100%; /* base */
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 90%;
+  }
+}
+
+@media (max-width: 480px) {
+  html {
+    font-size: 85%;
+  }
+}
+

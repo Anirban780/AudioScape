@@ -1,18 +1,25 @@
-// src/components/Sidebar.jsx
 import React, { useState } from 'react';
-import { cn } from 'utils/lib/utils'; // Utility for combining class names
-import { Home, Compass, Library, Heart, Menu, Sun, Moon } from 'lucide-react'; // Added Sun/Moon for theme toggle
+import { cn } from 'utils/lib/utils';
+import { Home, Compass, Library, Heart, Menu } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from 'utils/components/ui/button';
-import { useTheme } from '../../ThemeProvider'; // Adjust path to ThemeProvider
+import { useTheme } from '../../ThemeProvider';
 
-const Sidebar = () => {
-  const [isOpen, setIsOpen] = useState(false);
-  const { theme } = useTheme(); // Access theme context
+const Sidebar = ({ isOpen: externalOpen, onToggle }) => {
+  const isControlled = typeof externalOpen === 'boolean';
+  const [internalOpen, setInternalOpen] = useState(false);
+  const isOpen = isControlled ? externalOpen : internalOpen;
 
-  const toggleSidebar = () => setIsOpen((prev) => !prev);
+  const { theme } = useTheme();
 
-  
+  const toggleSidebar = () => {
+    if (isControlled && onToggle) {
+      onToggle(!externalOpen);
+    } else {
+      setInternalOpen((prev) => !prev);
+    }
+  };
+
   const MenuItem = ({ icon: Icon, text, to }) => (
     <li>
       <Link
@@ -34,7 +41,6 @@ const Sidebar = () => {
       className={cn(
         'h-screen p-4 transition-all duration-300 ease-in-out border-r border-border',
         isOpen ? 'w-60' : 'w-20',
-        // Apply theme-based background and text colors
         theme === 'dark' || (theme === 'system' && window.matchMedia("(prefers-color-scheme: dark)").matches)
           ? 'bg-gray-900 text-white border-white/40'
           : 'bg-slate-200 text-foreground border-gray-900/50'
@@ -52,7 +58,6 @@ const Sidebar = () => {
         <MenuItem icon={Library} text="Library" to="/library" />
         <MenuItem icon={Heart} text="Liked Songs" to="/liked-songs" />
       </ul>
-      
     </div>
   );
 };

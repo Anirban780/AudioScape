@@ -109,14 +109,13 @@ const SearchBar = ({ onSelectTrack }) => {
   };
 
   return (
-    <div className="relative w-full max-w-lg mx-auto my-auto">
+    <div className="relative w-full max-w-lg mx-auto px-2 sm:px-4">
 
       {/* Search Input */}
       <div
         className={`flex items-center rounded-md p-2 transition-colors duration-300 
-        ${theme === "dark" ? "bg-gray-800 text-white" : "bg-gray-200 text-black"}`}
+      ${theme === "dark" ? "bg-gray-800 text-white" : "bg-gray-200 text-black"}`}
       >
-
         <Search size={20} className={theme === "dark" ? "text-gray-400" : "text-gray-600"} />
         <Input
           type="text"
@@ -129,28 +128,28 @@ const SearchBar = ({ onSelectTrack }) => {
               setIsFocused(false);
             }
           }}
-          className={`ml-2 outline-none w-full transition-colors duration-300 
-          ${theme === "dark" ? "bg-gray-700 text-white placeholder-gray-400" : "bg-gray-200 text-black placeholder-gray-600"}`}
+          className={`ml-2 outline-none w-full transition-colors duration-300 text-sm sm:text-base
+        ${theme === "dark" ? "bg-gray-700 text-white placeholder-gray-400" : "bg-gray-200 text-black placeholder-gray-600"}`}
         />
       </div>
 
-      {/* Search Results Dropdown */}
+      {/* Dropdown */}
       {isFocused && results.length > 0 && (
         <div
           ref={dropdownRef}
-          className={`absolute left-0 w-full mt-2 p-2 rounded-md shadow-lg max-h-80 overflow-y-auto transition-opacity duration-300 z-100
-          ${theme === "dark" ? "bg-gray-900 text-white" : "bg-white text-black"}`}
+          className={`absolute left-0 w-full mt-2 p-2 rounded-md shadow-lg max-h-80 overflow-y-auto transition-opacity duration-300 z-50
+        ${theme === "dark" ? "bg-gray-900 text-white" : "bg-white text-black"}`}
         >
           {results.map((track, index) => (
             <div
               key={`${track.videoId}-${index}`}
-              className="flex items-center p-2 hover:bg-gray-300 dark:hover:bg-gray-700 cursor-pointer"
+              className="flex items-center p-2 hover:bg-gray-300 dark:hover:bg-gray-700 cursor-pointer rounded"
               onMouseDown={() => handleTrackSelect(track)}
             >
-              <img src={track.thumbNail || placeholder} alt="Thumbnail" className="w-10 h-10 rounded-md mr-3" />
-              <div>
-                <p className="font-semibold">{track.title}</p>
-                <p className="text-sm text-gray-500">{track.channelTitle}</p>
+              <img src={track.thumbNail || placeholder} alt="Thumbnail" className="w-10 h-10 sm:w-12 sm:h-12 rounded-md mr-3 flex-shrink-0" />
+              <div className="flex flex-col">
+                <p className="font-semibold text-sm sm:text-base line-clamp-1">{track.title}</p>
+                <p className="text-xs sm:text-sm text-gray-500 line-clamp-1">{track.channelTitle}</p>
               </div>
             </div>
           ))}
@@ -159,6 +158,7 @@ const SearchBar = ({ onSelectTrack }) => {
         </div>
       )}
     </div>
+
   );
 };
 

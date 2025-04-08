@@ -55,8 +55,8 @@ const HeroSection = () => {
   }, []);
 
   return (
-    <div className="relative h-[70vh] overflow-hidden rounded-lg shadow-2xl text-white">
-      {/* Backgrounds */}
+    <div className="relative h-[60vh] sm:h-[70vh] overflow-hidden rounded-lg shadow-2xl text-white">
+      {/* Background Images */}
       {banners.map((banner, index) => (
         <div
           key={index}
@@ -69,28 +69,29 @@ const HeroSection = () => {
         />
       ))}
 
-      {/* Dark overlay */}
+      {/* Overlay */}
       <div className="absolute inset-0 bg-black/40 z-[2]" />
 
       {/* Content */}
-      <div className="relative z-10 h-full w-full flex flex-col justify-center items-center px-6 text-white text-center">
+      <div className="relative z-10 h-full w-full flex flex-col justify-center items-center px-4 sm:px-6 text-center">
         <h1
-          className="text-4xl md:text-5xl font-extrabold mb-6 drop-shadow-lg transition-opacity duration-700 ease-in-out"
+          className="text-2xl sm:text-4xl md:text-5xl font-extrabold mb-4 sm:mb-6 drop-shadow-lg transition-opacity duration-700 ease-in-out"
           style={{ opacity: isTransitioning ? 0 : 1 }}
         >
           {banners[currentIndex].headline}
         </h1>
         <p
-          className="text-lg md:text-2xl max-w-xl text-gray-300 mb-10 font-light tracking-wide transition-opacity duration-700 ease-in-out delay-100"
+          className="text-sm sm:text-lg md:text-2xl max-w-md sm:max-w-xl text-gray-300 mb-6 sm:mb-10 font-light tracking-wide transition-opacity duration-700 ease-in-out delay-100"
           style={{ opacity: isTransitioning ? 0 : 1 }}
         >
           Immerse yourself in the beats that define your moments
         </p>
-        <button className="px-8 py-3 bg-white/10 backdrop-blur-md border border-white/20 text-white font-semibold text-lg rounded-full shadow-md hover:bg-white/20 transition duration-300 ease-in-out transform hover:scale-105">
+        <button className="px-6 py-2 sm:px-8 sm:py-3 bg-white/10 backdrop-blur-md border border-white/20 text-white font-semibold text-sm sm:text-lg rounded-full shadow-md hover:bg-white/20 transition duration-300 ease-in-out transform hover:scale-105">
           Start Listening
         </button>
       </div>
     </div>
+
   );
 };
 
