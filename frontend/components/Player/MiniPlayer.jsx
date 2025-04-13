@@ -61,8 +61,8 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
   return (
     <Rnd
       default={{
-        x: window.innerWidth - 380,
-        y: window.innerHeight - 280,
+        x: window.innerWidth - 400,
+        y: window.innerHeight - 300,
         width: 380,
         height: 260,
       }}
@@ -92,7 +92,7 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
           </div>
 
           <div className="flex flex-col items-center gap-2">
-            <button onClick={toggleFullScreen} className="p-1 hover:text-gray-300">
+            <button onClick={toggleFullScreen} className="p-1 hover:bg-gray-200 hover:text-black rounded-xl">
               <Maximize2 size={18} />
             </button>
             <button onClick={handleClose} className="p-1 hover:bg-red-600 rounded-xl">

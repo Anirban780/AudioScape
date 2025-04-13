@@ -9,6 +9,7 @@ import { fetchYoutubeMusic } from '../utils/youtube';
 import MusicCard from '../components/Cards/MusicCard';
 import { Sun, Moon, Menu } from 'lucide-react';
 import PlayerContainer from '../components/Player/PlayerContainer';
+import ResponsiveLayout from "../ResponsiveLayout";
 
 const curatedGenres = [
   "lofi music", "pop hits", "indie rock", "anime music", "k-pop", "electronic", "jazz chill", "hip hop",
@@ -120,7 +121,7 @@ const ExplorePage = () => {
 
       {/* Main Content */}
       <div className="flex flex-col flex-1 overflow-auto p-4 md:p-6 space-y-6">
-
+        <ResponsiveLayout>
         {/* Navbar Section */}
         <div className="flex justify-between items-center w-full">
           <button
@@ -151,7 +152,7 @@ const ExplorePage = () => {
           <UserMenu />
         </div>
 
-        <div className='lg:mx-8'>
+        <div className='lg:mx-8 mt-8'>
           {/* Explore Title */}
           <h1 className="text-3xl font-bold mb-4">Explore Music</h1>
 
@@ -191,6 +192,7 @@ const ExplorePage = () => {
             </div>
           ))}
         </div>
+        </ResponsiveLayout>
       </div>
 
       {currentTrack && (

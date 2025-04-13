@@ -28,7 +28,7 @@ const MusicCard = ({ id, name, artist, image, onClick }) => {
           <p className="text-sm text-gray-400 truncate w-full text-center">{artist}</p>
         )}
         {isHovered && (
-          <div className="absolute inset-0 flex items-center justify-center bg-transparent bg-opacity-50 transition-opacity duration-300">
+          <div className="absolute inset-0 flex items-center justify-center bottom-8 bg-transparent bg-opacity-50 transition-opacity duration-300">
             <Play size={40} className="text-white bg-green-500 rounded-full px-2" />
           </div>
         )}

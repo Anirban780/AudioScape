@@ -16,7 +16,10 @@ const RecentlyPlayed = ({ userId, setTrack }) => {
 
   useEffect(() => {
     if (userId) {
-      fetchLastPlayed(userId).then(setRecentlyPlayed);
+      fetchLastPlayed(userId).then((songs) => {
+        setRecentlyPlayed(songs);
+        setTimeout(() => handleScroll(), 100);
+      });
     }
   }, [userId]);
 

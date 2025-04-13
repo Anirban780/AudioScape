@@ -20,21 +20,25 @@ const ProgressBar = React.forwardRef(({ progress, duration, player, isReady, set
     };
 
     useEffect(() => {
-        const onMove = (e) => isDragging && handleInteraction(e.clientX);
+        const onMove = (e) => isDragging && handleInteraction(e.clientX || e.touches[0].clientX); // Use touch if available
         const onUp = (e) => {
             if (isDragging) {
-                handleInteraction(e.clientX, true);
+                handleInteraction(e.clientX || e.changedTouches[0].clientX, true);
                 setIsDragging(false);
             }
         };
 
         document.addEventListener("mousemove", onMove);
         document.addEventListener("mouseup", onUp);
+        document.addEventListener("touchmove", onMove);
+        document.addEventListener("touchend", onUp);
 
         // Cleanup the event listeners when the component unmounts
         return () => {
             document.removeEventListener("mousemove", onMove);
             document.removeEventListener("mouseup", onUp);
+            document.removeEventListener("touchmove", onMove);
+            document.removeEventListener("touchend", onUp);
         };
     }, [isDragging]);
 
@@ -49,6 +53,10 @@ const ProgressBar = React.forwardRef(({ progress, duration, player, isReady, set
                 onMouseDown={(e) => {
                     setIsDragging(true);
                     handleInteraction(e.clientX);
+                }}
+                onTouchStart={(e) => {
+                    setIsDragging(true);
+                    handleInteraction(e.touches[0].clientX);
                 }}
             >
                 <div className="absolute h-full bg-green-500 rounded-full" style={{ width: `${(progress / duration) * 100}%` }} />

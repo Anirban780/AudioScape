@@ -17,7 +17,7 @@ const VolumeBar = React.forwardRef(({ volume, setVolume, player, isReady }, ref)
         if (player && isReady) {
             player.setVolume(volume);
         }
-    }, [player, isReady]);
+    }, [player, isReady, volume]);
 
     useEffect(() => {
         const handleMouseMove = (e) => isDragging && handleChange(e.clientX);
@@ -29,6 +29,7 @@ const VolumeBar = React.forwardRef(({ volume, setVolume, player, isReady }, ref)
         };
         const handleTouchEnd = () => setIsDragging(false);
 
+        // Add event listeners for dragging
         if (isDragging) {
             window.addEventListener("mousemove", handleMouseMove);
             window.addEventListener("mouseup", handleMouseUp);
@@ -36,6 +37,7 @@ const VolumeBar = React.forwardRef(({ volume, setVolume, player, isReady }, ref)
             window.addEventListener("touchend", handleTouchEnd);
         }
 
+        // Cleanup event listeners when dragging stops
         return () => {
             window.removeEventListener("mousemove", handleMouseMove);
             window.removeEventListener("mouseup", handleMouseUp);
