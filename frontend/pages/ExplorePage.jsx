@@ -8,10 +8,13 @@ import { getPersonalizedExploreKeywords } from '../utils/keywords';
 import { fetchYoutubeMusic } from '../utils/youtube';
 import MusicCard from '../components/Cards/MusicCard';
 import { Sun, Moon, Menu } from 'lucide-react';
+import PlayerContainer from '../components/Player/PlayerContainer';
 
 const curatedGenres = [
   "lofi music", "pop hits", "indie rock", "anime music", "k-pop", "electronic", "jazz chill", "hip hop",
 ];
+
+const CACHE_EXPIRY_MS = 1000 * 60 * 60; // 1 hour
 
 const ExplorePage = () => {
   const { user } = useAuth();
@@ -21,39 +24,73 @@ const ExplorePage = () => {
   const [visibleTracks, setVisibleTracks] = useState({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [currentTrack, setCurrentTrack] = useState(null);
+  const [lastFetchTime, setLastFetchTime] = useState(null);
 
   useEffect(() => {
     const fetchExploreSections = async () => {
       try {
         let keywords = await getPersonalizedExploreKeywords(user.uid);
+
         if (!keywords || keywords.length === 0) {
           keywords = curatedGenres;
         }
 
-        const exploreData = await Promise.all(
-          keywords.slice(0, 10).map(async (keyword) => {
-            if (cache[keyword]) return { title: keyword, tracks: cache[keyword] };
+        // Check if cache is valid and not expired (1 hour)
+        const now = Date.now();
+        if (!lastFetchTime || now - lastFetchTime > CACHE_EXPIRY_MS) {
+          // Cache expired, make the API call
+          console.log("🔄 Fetching new data for all keywords");
 
-            const tracks = await fetchYoutubeMusic(keyword, 20);
-            setCache((prev) => ({ ...prev, [keyword]: tracks }));
-            return { title: keyword, tracks };
-          })
-        );
+          // Fetch data for all the keywords (personalized + curated)
+          const exploreData = await Promise.all(
+            keywords.slice(0, 10).map(async (keyword) => {
+              if (cache[keyword]) {
+                return { title: keyword, tracks: cache[keyword] }; // Use cache if available
+              }
 
-        const initialVisible = {};
-        exploreData.forEach(({ title }) => {
-          initialVisible[title] = 5;
-        });
+              const tracks = await fetchYoutubeMusic(keyword, 20);
+              setCache((prev) => ({ ...prev, [keyword]: tracks })); // Store the tracks in cache
+              return { title: keyword, tracks };
+            })
+          );
 
-        setVisibleTracks(initialVisible);
-        setExploreFeed(exploreData);
+          const initialVisible = {};
+          exploreData.forEach(({ title }) => {
+            initialVisible[title] = 5; // Set initial visible tracks for each keyword
+          });
+
+          setVisibleTracks(initialVisible);
+          setExploreFeed(exploreData);
+          setLastFetchTime(now); // Update the last fetch time
+        } else {
+          // Cache is valid, fetch from cache
+          console.log("✅ Using cached data");
+
+          const exploreData = await Promise.all(
+            keywords.slice(0, 10).map(async (keyword) => {
+              if (cache[keyword]) {
+                return { title: keyword, tracks: cache[keyword] }; // Use cache if available
+              }
+              return { title: keyword, tracks: [] }; // No tracks, just empty array (this case shouldn't happen)
+            })
+          );
+
+          const initialVisible = {};
+          exploreData.forEach(({ title }) => {
+            initialVisible[title] = 5; // Set initial visible tracks for each keyword
+          });
+
+          setVisibleTracks(initialVisible);
+          setExploreFeed(exploreData);
+        }
       } catch (err) {
         console.error("Explore fetch failed:", err);
       }
     };
 
     fetchExploreSections();
-  }, [user]);
+  }, [user, lastFetchTime]);
+
 
   const handleLoadMore = (title) => {
     setVisibleTracks((prev) => ({
@@ -113,6 +150,7 @@ const ExplorePage = () => {
           {/* User Menu */}
           <UserMenu />
         </div>
+
         <div className='lg:mx-8'>
           {/* Explore Title */}
           <h1 className="text-3xl font-bold mb-4">Explore Music</h1>
@@ -125,14 +163,16 @@ const ExplorePage = () => {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
                 {section.tracks
                   .slice(0, visibleTracks[section.title] || 5)
-                  .map((track) => (
+                  .map((track, index) => (
                     <MusicCard
-                      key={track.id}
+                      key={`${track.id}-${index}`}
                       id={track.id}
                       name={track.name}
                       artist={track.artist}
                       image={track.thumbnail}
-                      onClick={() => console.log("Clicked:", track.name)}
+                      onClick={() => {
+                        setCurrentTrack(track);
+                      }}
                     />
                   ))}
               </div>
@@ -153,6 +193,12 @@ const ExplorePage = () => {
         </div>
       </div>
 
+      {currentTrack && (
+        <PlayerContainer 
+          initialTrack={currentTrack} 
+          onClose={() => setCurrentTrack(null)}
+        />
+      )}
     </div>
   );
 };

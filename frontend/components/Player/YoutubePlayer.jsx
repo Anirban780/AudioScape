@@ -19,6 +19,7 @@ const YouTubePlayer = ({ trackId, onReady }) => {
       iv_load_policy: 3,
       fs: 0,
       disablekb: 1,
+      origin: window.location.origin,
     },
   };
 

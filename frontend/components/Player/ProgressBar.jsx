@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 
 const formatTime = (time) => {
     const minutes = Math.floor((time || 0) / 60);
@@ -8,10 +8,11 @@ const formatTime = (time) => {
 
 const ProgressBar = React.forwardRef(({ progress, duration, player, isReady, setProgress }, ref) => {
     const [isDragging, setIsDragging] = useState(false);
+    const localRef = useRef(null); // This local ref will track the div where the progress bar is rendered
 
     const handleInteraction = (clientX, isEnd = false) => {
-        if (!ref.current || !player || !isReady) return;
-        const rect = ref.current.getBoundingClientRect();
+        if (!localRef.current || !player || !isReady || !duration) return;
+        const rect = localRef.current.getBoundingClientRect();
         const pos = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
         const newTime = pos * duration;
         setProgress(newTime);
@@ -26,8 +27,11 @@ const ProgressBar = React.forwardRef(({ progress, duration, player, isReady, set
                 setIsDragging(false);
             }
         };
+
         document.addEventListener("mousemove", onMove);
         document.addEventListener("mouseup", onUp);
+
+        // Cleanup the event listeners when the component unmounts
         return () => {
             document.removeEventListener("mousemove", onMove);
             document.removeEventListener("mouseup", onUp);
@@ -37,7 +41,10 @@ const ProgressBar = React.forwardRef(({ progress, duration, player, isReady, set
     return (
         <div className="space-y-2">
             <div
-                ref={ref}
+                ref={(node) => { 
+                    localRef.current = node; // Attach the ref here
+                    if (typeof ref === 'function') ref(node); // Pass to parent ref if needed
+                }}
                 className="relative h-1 bg-gray-800 rounded-full cursor-pointer group"
                 onMouseDown={(e) => {
                     setIsDragging(true);

@@ -2,7 +2,7 @@ const { saveSongListen } = require("./services/firestoreService");
  // r1awikvhx3A  SZWU0VQ8rZs ZPTn5jXfLPw
 const test = async () => {
     const videoId = "ZPTn5jXfLPw"; // Replace with an actual video ID
-    const userId = "kL7PQ8ui2DfWnrH4Lso0Pbt0oPh1";   // Replace with an actual user ID
+    const userId = "IaCW2sstJAV0R3x6Xdzyb1xycif2";   // Replace with an actual user ID
 
     try {
         await saveSongListen(videoId, userId);

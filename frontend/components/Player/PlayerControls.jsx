@@ -5,7 +5,7 @@ const PlayerControls = ({ isPlaying, togglePlayPause, handleLike, isLiked }) => 
         <button onClick={handleLike} className={`p-2 rounded-full ${isLiked ? "text-white" : "text-gray-500 hover:text-white"}`}>
             <ThumbsUp size={22} fill="none" strokeWidth={isLiked ? 2.5 : 2} />
         </button>
-        <button className="p-2 hover:text-green-500 transition-colors">
+        <button className="ml-5 p-2 hover:text-green-500 transition-colors">
             <SkipBack size={20} />
         </button>
         <button
