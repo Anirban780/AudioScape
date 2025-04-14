@@ -50,7 +50,7 @@ const RecentlyPlayed = ({ userId, setTrack }) => {
   if (!recentlyPlayed.length) return null;
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-6 py-6 ml-4 relative">
+    <div className="w-full max-w-6xl mx-auto px-3 py-6 ml-4 relative">
       <h2 className="text-2xl font-semibold mb-6">Recently Played</h2>
       <div
         ref={scrollRef}

@@ -81,12 +81,10 @@ const HomePage = () => {
 
       {/* Inline Player */}
       {currentTrack && (
-       
-            <PlayerContainer
-              initialTrack={currentTrack}
-              onClose={() => setCurrentTrack(null)}
-            />
-          
+          <PlayerContainer
+            initialTrack={currentTrack}
+            onClose={() => setCurrentTrack(null)}
+          />
       )}
     </div>
   );

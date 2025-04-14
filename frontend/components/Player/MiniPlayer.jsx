@@ -66,16 +66,15 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
         width: 380,
         height: 260,
       }}
-      minWidth={320}
-      minHeight={220}
+      minWidth={300}
+      minHeight={200}
       bounds="window"
       dragHandleClassName="mini-player-header"
       className="z-50"
     >
       <div
-        className={`bg-gray-900 text-white rounded-xl shadow-lg w-full h-full p-4 flex flex-col justify-between ${
-          theme === 'dark' ? 'border-4 border-white' : ''
-        }`} // Add white border in dark mode
+        className={`bg-gray-900 text-white rounded-xl shadow-lg w-full h-full p-4 flex flex-col justify-between ${theme === 'dark' ? 'border-4 border-white' : ''
+          }`} // Add white border in dark mode
       >
         <div className="flex justify-between items-center mini-player-header cursor-move">
           <div className="flex items-center gap-4">
@@ -92,13 +91,29 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
           </div>
 
           <div className="flex flex-col items-center gap-2">
-            <button onClick={toggleFullScreen} className="p-1 hover:bg-gray-200 hover:text-black rounded-xl">
+            <button
+              onClick={toggleFullScreen}
+              onTouchEnd={(e) => {
+                e.preventDefault(); // Prevents double triggering
+                toggleFullScreen();
+              }}
+              className="p-1 hover:bg-gray-200 hover:text-black rounded-xl"
+            >
               <Maximize2 size={18} />
             </button>
-            <button onClick={handleClose} className="p-1 hover:bg-red-600 rounded-xl">
-              <X size={18} />
+
+            <button
+              onClick={handleClose}
+              onTouchEnd={(e) => {
+                e.preventDefault(); // Prevents duplicate event firing
+                handleClose();
+              }}
+              className="p-1 hover:bg-red-600 rounded-xl"
+            >
+              <X size={20} />
             </button>
           </div>
+
         </div>
 
         <ProgressBar
@@ -116,6 +131,7 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
             togglePlayPause={togglePlayPause}
             handleLike={handleLike}
             isLiked={isLiked}
+            size={20}
           />
 
           <div className="relative flex items-center">

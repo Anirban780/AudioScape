@@ -14,7 +14,7 @@ const VolumeBar = React.forwardRef(({ volume, setVolume, player, isReady }, ref)
     };
 
     useEffect(() => {
-        if (player && isReady) {
+        if (player && isReady && typeof volume === 'number') {
             player.setVolume(volume);
         }
     }, [player, isReady, volume]);

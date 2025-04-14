@@ -109,6 +109,7 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
             togglePlayPause={togglePlayPause}
             handleLike={handleLike}
             isLiked={isLiked}
+            size={30}
           />
 
           {/* Volume Control */}
