@@ -125,14 +125,19 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
           ref={progressRef}
         />
 
-        <div className="flex justify-between items-center mx-4 mt-2">
-          <PlayerControls
-            isPlaying={isPlaying}
-            togglePlayPause={togglePlayPause}
-            handleLike={handleLike}
-            isLiked={isLiked}
-            size={20}
-          />
+        <div className="flex sm:flex-row justify-center items-center sm:justify-between gap-4 sm:gap-0 mx-2 mt-2">
+          
+            <PlayerControls
+              isPlaying={isPlaying}
+              togglePlayPause={togglePlayPause}
+              handleLike={handleLike}
+              isLiked={isLiked}
+              size={20}
+            />
+
+        
+
+
 
           <div className="relative flex items-center">
             <button onClick={handleToggleVolume} className="p-1 hover:text-gray-300">

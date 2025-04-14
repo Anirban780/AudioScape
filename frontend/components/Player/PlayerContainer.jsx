@@ -1,19 +1,88 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import MusicPlayer from "./MusicPlayer";
 import FullScreenPlayer from "./FullScreenPlayer";
 import YouTubePlayer from "./YoutubePlayer";
 import MiniPlayer from "./MiniPlayer";
+import usePlayerStore from "../../store/usePlayerStore";
+import { generateQueue } from "../../utils/api";
 
-const PlayerContainer = ({ initialTrack, onClose }) => {
+// List of curated fallback genres
+const curatedGenres = [
+  "lofi music", "pop hits", "indie rock", "anime music", "k-pop", "electronic", "jazz chill", "hip hop",
+];
+
+const getRandomGenre = (genres) => {
+  if (genres && genres.length > 0) {
+    // If genre exists, pick a random genre from the provided genre array
+    return genres[Math.floor(Math.random() * genres.length)];
+  }
+  else {
+    // If no genre is provided, fallback to a random genre from curatedGenres
+    return curatedGenres[Math.floor(Math.random() * curatedGenres.length)];
+  }
+};
+
+const PlayerContainer = ({ initialTrack, onClose, uid }) => {
   const [track, setTrack] = useState(initialTrack);
   const [player, setPlayer] = useState(null);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const [isQueueFetched, setIsQueueFetched] = useState(false);
 
+  const { setQueue, setCurrentIndex } = usePlayerStore();
+
+  // Update track when initialTrack prop changes
   useEffect(() => {
     setTrack(initialTrack);
   }, [initialTrack]);
 
+  // When track changes, set the queue based on the new track (or any logic you need)
+  useEffect(() => {
+    if(track?.id && uid && !isQueueFetched) {
+        const keyword = getRandomGenre(track?.genre);
+
+        const fetchQueue = async() => {
+            const generatedQueue = await generateQueue(keyword, uid);
+            //console.log("Generated Queue:", generatedQueue);  
+
+            if(Array.isArray(generatedQueue) && generatedQueue.length > 0) {
+              setQueue(generatedQueue);
+              setCurrentIndex(0);
+              setIsQueueFetched(true);
+            }
+        };
+        
+        fetchQueue();
+    }
+  }, [track?.id, track?.genre, uid, setQueue, setCurrentIndex, isQueueFetched]);
+
+  //reset queue when the song stops
+  useEffect(() => {
+    const onSongEnd = () => {
+      setIsQueueFetched(false);
+      setQueue([]);
+    }
+
+    let playerStateCheck;
+
+    if(player && player.getPlayerState) {
+      playerStateCheck = setInterval(() => {
+        const state = player.getPlayerState();
+
+        if(state === 0) {
+          onSongEnd();
+          clearInterval(playerStateCheck); // Stop checking when song ends
+        }
+      }, 1000);
+    }
+
+    return () => {
+      if (playerStateCheck) clearInterval(playerStateCheck);  // Cleanup interval on unmount
+    };
+
+  }, [player, setQueue]);
+
+  // Handle player readiness
   const onPlayerReady = useCallback((event) => {
     const ytPlayer = event.target;
     setPlayer(ytPlayer);
@@ -25,6 +94,7 @@ const PlayerContainer = ({ initialTrack, onClose }) => {
 
   }, [track?.id]);
 
+  // Handle track change logic when a new track is selected
   useEffect(() => {
     if (isPlayerReady && player && track?.id) {
       const iframe = player.getIframe?.();
@@ -60,6 +130,8 @@ const PlayerContainer = ({ initialTrack, onClose }) => {
   const handleClose = () => {
     if (onClose) onClose(); // Call the onClose function passed as prop
     setTrack(null); // Optionally reset the track here as well
+    setIsPlayerReady(false);
+    setIsQueueFetched(false);
   };
 
   return (

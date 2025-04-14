@@ -10,16 +10,10 @@ import clsx from "clsx";
 
 const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
   const {
-    isPlaying,
-    setIsPlaying,
-    progress,
-    setProgress,
-    duration,
-    setDuration,
-    volume,
-    setVolume,
-    isLiked,
-    setIsLiked,
+    isPlaying, setIsPlaying, progress, setProgress, duration,
+    setDuration, volume, setVolume, isLiked, setIsLiked,
+    queue, currentIndex, setCurrentIndex, setTrack,
+
   } = usePlayerStore();
 
   const progressRef = useRef(null);
@@ -37,6 +31,7 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
     }, 1000);
     return () => clearInterval(interval);
   }, [player, isPlayerReady]);
+
 
   const togglePlayPause = () => {
     if (!player || !isPlayerReady) return;
@@ -110,6 +105,8 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
             handleLike={handleLike}
             isLiked={isLiked}
             size={30}
+            handleNext={usePlayerStore.getState().nextTrack}
+            handlePrev={usePlayerStore.getState().prevTrack}
           />
 
           {/* Volume Control */}
@@ -150,9 +147,43 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
 
         <h3 className="text-lg font-semibold mb-4 hidden md:block">UP NEXT</h3>
         {/* Queue Content */}
-        <div>
-          <p className="text-gray-400">No tracks in queue</p>
-          {/* TODO: Replace with mapped track queue */}
+        <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2">
+          {queue && queue.length > 0 ? (
+              queue.map((qTrack, index) => (
+                <div
+                  key={qTrack.id || index}
+                  className={clsx(
+                    "flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors",
+                    {
+                      "bg-gray-800": index === currentIndex,
+                    }
+                  )}
+
+                  onClick={() => {
+                    setCurrentIndex(index);
+                    setTrack(qTrack);
+                  }}
+                >
+                  <img
+                    src={qTrack.thumbnail || placeholder}
+                    alt={qTrack.name}
+                    className="w-12 h-12 object-cover rounded-md"
+                  />
+
+                  <div className="flex flex-col overflow-hidden">
+                    <p className="font-medium truncate">{qTrack.name}</p>
+                    <p className="text-sm text-gray-400 truncate">{qTrack.artist}</p>
+                  </div>
+
+                </div>
+              ))
+            ) : (
+              <p className="text-gray-400">No tracks in queue</p>
+            )
+          }
+
+
+
         </div>
       </div>
     </div>

@@ -84,6 +84,7 @@ const HomePage = () => {
           <PlayerContainer
             initialTrack={currentTrack}
             onClose={() => setCurrentTrack(null)}
+            uid={user.uid}
           />
       )}
     </div>

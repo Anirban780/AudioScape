@@ -27,7 +27,7 @@ app.use(cors({
 app.use(express.json());
 
 app.use("/youtube", trackRoutes);
-app.use('/api/songs', firestoreRoutes);
+app.use('/api/music', firestoreRoutes);
 
 app.get("/", (req, res) => {
     res.send("Audioscape Server is running successfully!");

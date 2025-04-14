@@ -24,9 +24,13 @@ const fetchAndCacheYoutubeMusic = async (query, maxResults = 20) => {
     const response = await axios.get(url);
     const tracks = response.data.items.map(item => ({
       id: item.id.videoId,
-      name: item.snippet.title,
-      artist: item.snippet.channelTitle,
+      name: item.snippet.title || "Unknown Title",
+      artist: item.snippet.channelTitle || "Unknown Artist",
       thumbnail: item.snippet.thumbnails.medium.url,
+      duration: item.contentDetails?.duration || 'PTOS',
+      genre: item.snippet.tags || [],
+      channelId: item.snippet.channelId || "Unknown",
+
     }));
 
     // Cache the data

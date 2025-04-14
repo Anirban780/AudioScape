@@ -67,7 +67,7 @@ const saveSongListen = async (videoId, userId) => {
  */
 
 const toggleSongLike = async (videoId, userId) => {
-    if(!userId) {
+    if (!userId) {
         console.error("User not logged in");
         return { success: false, error: "User not logged in" };
     }
@@ -92,7 +92,7 @@ const toggleSongLike = async (videoId, userId) => {
 
         // toggle the liked flag in user's history
         await songDoc.update({ liked: newLiked });
-        console.log(`${newLiked? "Liked" : "Unliked"} the song: ${data.name}`);
+        console.log(`${newLiked ? "Liked" : "Unliked"} the song: ${data.name}`);
         return { success: true, liked: newLiked };
     }
     catch (error) {
@@ -101,4 +101,25 @@ const toggleSongLike = async (videoId, userId) => {
     }
 }
 
-module.exports = { saveSongListen, toggleSongLike };
+
+const saveRelatedTracks = async (keyword, tracks) => {
+    const docRef = db.collection("relatedTracksCache")
+        .doc(keyword.toLowerCase());
+
+    const data = {
+        timestamp: new Date(),
+        tracks: tracks.map(track => ({
+            id: track.id,
+            name: track.name || "Unknown Title",
+            artist: track.artist || "Unknown Artist",
+            thumbnail: track.thumbnail,
+            duration: track.duration || 'PTOS',
+            genre: track.genre || [],
+            channelId: track.channelId || "Unknown channel ID",
+        }))
+    };
+
+    await docRef.set(data);
+}
+
+module.exports = { saveSongListen, toggleSongLike, saveRelatedTracks };

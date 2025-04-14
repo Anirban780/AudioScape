@@ -1,6 +1,6 @@
 import { Pause, Play, SkipBack, SkipForward, ThumbsUp } from "lucide-react";
 
-const PlayerControls = ({ isPlaying, togglePlayPause, handleLike, isLiked, size }) => (
+const PlayerControls = ({ isPlaying, togglePlayPause, handleLike, isLiked, size, handleNext, handlePrev }) => (
   <div className="flex items-center justify-center gap-4 sm:gap-6">
     
     {/* Like Button */}
@@ -15,6 +15,7 @@ const PlayerControls = ({ isPlaying, togglePlayPause, handleLike, isLiked, size 
 
     {/* Skip Back */}
     <button
+      onClick={handlePrev}
       className="p-2 text-gray-400 hover:text-green-400 transition-colors duration-200"
       aria-label="Previous"
     >
@@ -32,6 +33,7 @@ const PlayerControls = ({ isPlaying, togglePlayPause, handleLike, isLiked, size 
 
     {/* Skip Forward */}
     <button
+      onClick={handleNext}
       className="p-2 text-gray-400 hover:text-green-400 transition-colors duration-200"
       aria-label="Next"
     >
