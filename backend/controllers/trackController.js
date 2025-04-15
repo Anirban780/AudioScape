@@ -1,7 +1,7 @@
 const { searchTrack, getTrackDetails } = require("../services/youtubeService")
 const { saveSongListen, toggleSongLike, saveRelatedTracks } = require("../services/firestoreService")
 const { admin } = require('../config/firebase');
-const { getDoc, collection, getDocs, doc, query } = require("firebase/firestore");
+
 
 const db = admin.firestore();
 

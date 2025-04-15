@@ -119,7 +119,13 @@ const saveRelatedTracks = async (keyword, tracks) => {
         }))
     };
 
-    await docRef.set(data);
+    try {
+        await docRef.set(data);
+    } catch (error) {
+        console.error("Error saving related tracks cache:", error);
+        throw error;
+    }
+    
 }
 
 module.exports = { saveSongListen, toggleSongLike, saveRelatedTracks };
