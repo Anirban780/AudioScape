@@ -10,7 +10,7 @@ const YouTubePlayer = ({ trackId, onReady }) => {
     height: "0",
     width: "0",
     playerVars: {
-      autoplay: 0,
+      autoplay: 1, // Automatically play when ready
       controls: 0,
       modestbranding: 1,
       rel: 0,
@@ -27,14 +27,13 @@ const YouTubePlayer = ({ trackId, onReady }) => {
     const state = event.data;
     const player = event.target;
 
-    if (state === 1) {
+    if (state === 1) { // Playing
       setIsPlaying(true);
       setDuration(player.getDuration());
       if (trackId) saveSongListen(trackId).catch(console.error);
-    } else if (state === 2 || state === 0) {
+    } else if (state === 2 || state === 0) { // Paused or Ended
       setIsPlaying(false);
-    } else if (state === 5) {
-      // Cueing state
+    } else if (state === 5) { // Cueing state
       setIsPlaying(false);
       setDuration(player.getDuration());
     }

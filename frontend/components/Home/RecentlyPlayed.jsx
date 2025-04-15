@@ -5,8 +5,9 @@ import placeholder from "../../assets/placeholder.jpg";
 import { Button } from "../../../utils/components/ui/button";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import MusicCard from "../Cards/MusicCard";
+import usePlayerStore from "../../store/usePlayerStore";
 
-const RecentlyPlayed = ({ userId, setTrack }) => {
+const RecentlyPlayed = ({ userId }) => {
   const { theme } = useTheme();
   const [recentlyPlayed, setRecentlyPlayed] = useState([]);
   const [visibleSongs, setVisibleSongs] = useState(8);
@@ -65,7 +66,7 @@ const RecentlyPlayed = ({ userId, setTrack }) => {
               name={song.name}
               artist={song.artist}
               image={song.thumbnail || placeholder}
-              onClick={() => setTrack(song)}
+              onClick={() => usePlayerStore.getState().setTrack(song)}
             />
           </div>
         ))}

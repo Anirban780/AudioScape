@@ -27,8 +27,6 @@ const fetchAndCacheYoutubeMusic = async (query, maxResults = 20) => {
       name: item.snippet.title || "Unknown Title",
       artist: item.snippet.channelTitle || "Unknown Artist",
       thumbnail: item.snippet.thumbnails.medium.url,
-      duration: item.contentDetails?.duration || 'PTOS',
-      genre: item.snippet.tags || [],
       channelId: item.snippet.channelId || "Unknown",
 
     }));

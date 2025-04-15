@@ -6,7 +6,7 @@ import { Maximize2, Volume2, X } from 'lucide-react';
 import ProgressBar from './ProgressBar';
 import PlayerControls from './PlayerControls';
 import VolumeBar from './VolumeBar';
-import { useTheme } from '../../ThemeProvider';  // Make sure you're using next-themes for theme management
+import { useTheme } from '../../ThemeProvider';
 
 const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose }) => {
   const {
@@ -22,11 +22,11 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
     setIsLiked,
   } = usePlayerStore();
 
-  const { theme } = useTheme();  // Fetch current theme
+  const { theme } = useTheme();
   const progressRef = useRef(null);
   const volumeRef = useRef(null);
   const [showVolume, setShowVolume] = useState(false);
-  const [isVisible, setIsVisible] = useState(true); // For close button
+  const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -48,12 +48,10 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
   };
 
   const handleLike = () => setIsLiked(!isLiked);
-  const handleToggleVolume = () => setShowVolume((prev) => !prev);
+  const handleToggleVolume = () => setShowVolume(prev => !prev);
   const handleClose = () => {
     setIsVisible(false);
-    if (onClose) {
-      onClose(); // This will call the parent onClose and reset the track
-    }
+    onClose?.(); // Reset track from parent
   };
 
   if (!isVisible) return null;
@@ -73,9 +71,11 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
       className="z-50"
     >
       <div
-        className={`bg-gray-900 text-white rounded-xl shadow-lg w-full h-full p-4 flex flex-col justify-between ${theme === 'dark' ? 'border-4 border-white' : ''
-          }`} // Add white border in dark mode
+        className={`rounded-xl shadow-lg w-full h-full p-4 flex flex-col justify-between transition-all duration-200 ${
+          theme === 'dark' ? 'bg-gray-900 text-white border-4 border-white' : 'bg-white text-black'
+        }`}
       >
+        {/* Header */}
         <div className="flex justify-between items-center mini-player-header cursor-move">
           <div className="flex items-center gap-4">
             <img
@@ -83,10 +83,9 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
               alt={track?.name}
               className="w-16 h-16 rounded object-cover"
             />
-
             <div>
-              <p className="text-sm font-medium">{track?.name}</p>
-              <p className="mt-1 text-xs text-gray-400">{track?.artist}</p>
+              <p className="text-sm font-medium line-clamp-1">{track?.name}</p>
+              <p className="mt-1 text-xs text-gray-400 line-clamp-1">{track?.artist}</p>
             </div>
           </div>
 
@@ -94,28 +93,29 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
             <button
               onClick={toggleFullScreen}
               onTouchEnd={(e) => {
-                e.preventDefault(); // Prevents double triggering
+                e.preventDefault();
                 toggleFullScreen();
               }}
+              aria-label="Expand to full screen"
               className="p-1 hover:bg-gray-200 hover:text-black rounded-xl"
             >
               <Maximize2 size={18} />
             </button>
-
             <button
               onClick={handleClose}
               onTouchEnd={(e) => {
-                e.preventDefault(); // Prevents duplicate event firing
+                e.preventDefault();
                 handleClose();
               }}
+              aria-label="Close mini player"
               className="p-1 hover:bg-red-600 rounded-xl"
             >
               <X size={20} />
             </button>
           </div>
-
         </div>
 
+        {/* Progress Bar */}
         <ProgressBar
           progress={progress}
           duration={duration}
@@ -125,22 +125,24 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
           ref={progressRef}
         />
 
+        {/* Controls */}
         <div className="flex sm:flex-row justify-center items-center sm:justify-between gap-4 sm:gap-0 mx-2 mt-2">
-          
-            <PlayerControls
-              isPlaying={isPlaying}
-              togglePlayPause={togglePlayPause}
-              handleLike={handleLike}
-              isLiked={isLiked}
-              size={20}
-            />
-
-        
-
-
+          <PlayerControls
+            isPlaying={isPlaying}
+            togglePlayPause={togglePlayPause}
+            handleLike={handleLike}
+            isLiked={isLiked}
+            size={20}
+            handleNext={usePlayerStore.getState().nextTrack}
+            handlePrev={usePlayerStore.getState().prevTrack}
+          />
 
           <div className="relative flex items-center">
-            <button onClick={handleToggleVolume} className="p-1 hover:text-gray-300">
+            <button
+              onClick={handleToggleVolume}
+              aria-label="Toggle volume slider"
+              className="p-1 hover:text-gray-300"
+            >
               <Volume2 size={20} />
             </button>
             {showVolume && (

@@ -116,7 +116,7 @@ const shuffleAndPick = (arr, count) => {
   };
 
   const generateQueue = async (req, res) => {
-    const { keyword, uid } = req.body;
+    const { keyword, uid, currentTrack } = req.body;
   
     if (!keyword || !uid) {
       return res.status(400).json({ message: "Missing keyword or uid" });
@@ -157,6 +157,7 @@ const shuffleAndPick = (arr, count) => {
       }
   
       const queue = [
+        currentTrack,
         ...shuffledRelated.slice(0, relatedCount),
         ...shuffledRecent.slice(0, recentCount),
       ];

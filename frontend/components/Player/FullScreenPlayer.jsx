@@ -1,3 +1,4 @@
+// FullScreenPlayer.js
 import React, { useEffect, useRef, useState } from "react";
 import Sidebar from "../Home/Sidebar";
 import ProgressBar from "./ProgressBar";
@@ -5,15 +6,14 @@ import PlayerControls from "./PlayerControls";
 import VolumeBar from "./VolumeBar";
 import { X, ListMusic } from "lucide-react";
 import placeholder from "../../assets/placeholder.jpg";
-import usePlayerStore from "./../../store/usePlayerStore";
-import clsx from "clsx";
+import usePlayerStore from "../../store/usePlayerStore";
+import TrackQueue from "./TrackQueue"; // Import the Queue component
 
 const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
   const {
     isPlaying, setIsPlaying, progress, setProgress, duration,
     setDuration, volume, setVolume, isLiked, setIsLiked,
     queue, currentIndex, setCurrentIndex, setTrack,
-
   } = usePlayerStore();
 
   const progressRef = useRef(null);
@@ -31,7 +31,6 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
     }, 1000);
     return () => clearInterval(interval);
   }, [player, isPlayerReady]);
-
 
   const togglePlayPause = () => {
     if (!player || !isPlayerReady) return;
@@ -124,68 +123,15 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
         </div>
       </div>
 
-      {/* Queue Drawer (Mobile toggle, visible by default on Desktop) */}
-      <div
-        className={clsx(
-          "fixed md:static top-0 right-0 h-full w-80 bg-gray-900 p-4 border-l border-gray-700 z-50 transform transition-transform duration-300 ease-in-out",
-          {
-            "translate-x-0": showQueue,
-            "translate-x-full md:translate-x-0": !showQueue,
-          }
-        )}
-      >
-        {/* Hide button on mobile */}
-        <div className="flex justify-between items-center mb-4 md:hidden">
-          <h3 className="text-lg font-semibold">Up Next</h3>
-          <button
-            onClick={() => setShowQueue(false)}
-            className="p-1 bg-gray-800 hover:bg-gray-700 rounded-full"
-          >
-            <X size={18} />
-          </button>
-        </div>
-
-        <h3 className="text-lg font-semibold mb-4 hidden md:block">UP NEXT</h3>
-        {/* Queue Content */}
-        <div className="space-y-3 max-h-[70vh] overflow-y-auto pr-2">
-          {queue && queue.length > 0 ? (
-              queue.map((qTrack, index) => (
-                <div
-                  key={qTrack.id || index}
-                  className={clsx(
-                    "flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors",
-                    {
-                      "bg-gray-800": index === currentIndex,
-                    }
-                  )}
-
-                  onClick={() => {
-                    setCurrentIndex(index);
-                    setTrack(qTrack);
-                  }}
-                >
-                  <img
-                    src={qTrack.thumbnail || placeholder}
-                    alt={qTrack.name}
-                    className="w-12 h-12 object-cover rounded-md"
-                  />
-
-                  <div className="flex flex-col overflow-hidden">
-                    <p className="font-medium truncate">{qTrack.name}</p>
-                    <p className="text-sm text-gray-400 truncate">{qTrack.artist}</p>
-                  </div>
-
-                </div>
-              ))
-            ) : (
-              <p className="text-gray-400">No tracks in queue</p>
-            )
-          }
-
-
-
-        </div>
-      </div>
+      {/* Queue Drawer */}
+      <TrackQueue
+        queue={queue}
+        currentIndex={currentIndex}
+        setCurrentIndex={setCurrentIndex}
+        setTrack={setTrack}
+        showQueue={showQueue}
+        setShowQueue={setShowQueue}
+      />
     </div>
   );
 };

@@ -161,7 +161,7 @@ export const cacheRelatedTracks = async(keyword, tracks) => {
 };
 
 
-export const generateQueue = async(keyword, uid) => {
+export const generateQueue = async(keyword, uid, currentTrack) => {
     if (!auth.currentUser) {
         console.error("⚠️ Error: User not logged in");
         return;
@@ -178,7 +178,7 @@ export const generateQueue = async(keyword, uid) => {
                     'Content-Type': 'application/json',
                     "Authorization": `Bearer ${token}`,
                 },
-                body: JSON.stringify({ keyword, uid }),
+                body: JSON.stringify({ keyword, uid, currentTrack }),
             }
         );
 

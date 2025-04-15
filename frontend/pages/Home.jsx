@@ -9,10 +9,11 @@ import RecentlyPlayed from "../components/Home/RecentlyPlayed";
 import { useAuth } from "../context/AuthContext";
 import PlayerContainer from "../components/Player/PlayerContainer";
 import ResponsiveLayout from "../ResponsiveLayout";
+import usePlayerStore from "../store/usePlayerStore";
 
 const HomePage = () => {
   const { theme, setTheme } = useTheme();
-  const [currentTrack, setCurrentTrack] = useState(null);
+  const {track , setTrack} = usePlayerStore();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { user } = useAuth();
 
@@ -45,7 +46,7 @@ const HomePage = () => {
 
             {/* Search Bar */}
             <div className="w-full max-w-lg mx-auto">
-              <SearchBar onSelectTrack={setCurrentTrack} />
+              <SearchBar onSelectTrack={setTrack} />
             </div>
 
             {/* Theme Toggle */}
@@ -73,17 +74,16 @@ const HomePage = () => {
           {/* Recently Played */}
           {user && (
             <div className="mt-6">
-              <RecentlyPlayed userId={user.uid} setTrack={setCurrentTrack} />
+              <RecentlyPlayed userId={user.uid} />
             </div>
           )}
         </ResponsiveLayout>
       </div>
 
       {/* Inline Player */}
-      {currentTrack && (
+      {track && (
           <PlayerContainer
-            initialTrack={currentTrack}
-            onClose={() => setCurrentTrack(null)}
+            onClose={() => setTrack(null)}
             uid={user.uid}
           />
       )}
