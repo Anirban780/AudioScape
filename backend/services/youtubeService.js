@@ -25,7 +25,7 @@ const searchTrack = async (query, pageToken = "") => {
                 return {
                     videoId: item.id.videoId,
                     title: item.snippet.title,
-                    thumbNail: item.snippet.thumbnails.default.url,
+                    thumbNail: item.snippet.thumbnails.default.url || item.snippet.thumbnails.high.url,
                     channelTitle: item.snippet.channelTitle,
                 };
             });
@@ -52,7 +52,7 @@ const getTrackDetails = async(videoId) => {
     return {
         videoId: track.id,
         title: track.snippet.title || 'Unknown Title',
-        thumbNail: track.snippet.thumbnails.medium.url,
+        thumbNail: track.snippet.thumbnails.high.url,
         channelTitle: track.snippet.channelTitle || 'Unknown Artist',
         duration: track.contentDetails?.duration || 'PTOS',
         genre: track.snippet.tags || [],
