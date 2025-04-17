@@ -11,6 +11,7 @@ import { Sun, Moon, Menu } from 'lucide-react';
 import PlayerContainer from '../components/Player/PlayerContainer';
 import ResponsiveLayout from "../ResponsiveLayout";
 import { cacheRelatedTracks } from '../utils/api';
+import usePlayerStore from "../store/usePlayerStore";
 
 const curatedGenres = [
   "lofi music", "pop hits", "indie rock", "anime music", "k-pop", "electronic", "jazz chill", "hip hop",
@@ -25,7 +26,7 @@ const ExplorePage = () => {
   const [cache, setCache] = useState({});
   const [visibleTracks, setVisibleTracks] = useState({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [currentTrack, setCurrentTrack] = useState(null);
+  const { track, setTrack } = usePlayerStore();
   const [lastFetchTime, setLastFetchTime] = useState(null);
 
   useEffect(() => {
@@ -137,7 +138,7 @@ const ExplorePage = () => {
 
             {/* Search Bar */}
             <div className="w-full max-w-lg mx-auto">
-              <SearchBar onSelectTrack={setCurrentTrack} />
+              <SearchBar onSelectTrack={setTrack} />
             </div>
 
             {/* Theme Toggle */}
@@ -199,10 +200,10 @@ const ExplorePage = () => {
         </ResponsiveLayout>
       </div>
 
-      {currentTrack && (
+      {track && (
         <PlayerContainer
-          initialTrack={currentTrack}
-          onClose={() => setCurrentTrack(null)}
+          onClose={() => setTrack(null)}
+          uid={user.uid}
         />
       )}
     </div>
