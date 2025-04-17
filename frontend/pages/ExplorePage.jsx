@@ -177,7 +177,7 @@ const ExplorePage = () => {
                         artist={track.artist}
                         image={track.thumbnail}
                         onClick={() => {
-                          setCurrentTrack(track);
+                          setTrack(track);
                         }}
                       />
                     ))}
