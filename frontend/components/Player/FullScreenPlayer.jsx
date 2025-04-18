@@ -1,19 +1,31 @@
-// FullScreenPlayer.js
 import React, { useEffect, useRef, useState } from "react";
 import Sidebar from "../Home/Sidebar";
 import ProgressBar from "./ProgressBar";
 import PlayerControls from "./PlayerControls";
 import VolumeBar from "./VolumeBar";
-import { X, ListMusic } from "lucide-react";
+import { X, ListMusic, VolumeX, Volume2 } from "lucide-react";
 import placeholder from "../../assets/placeholder.jpg";
 import usePlayerStore from "../../store/usePlayerStore";
 import TrackQueue from "./TrackQueue"; // Import the Queue component
 
 const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
   const {
-    isPlaying, setIsPlaying, progress, setProgress, duration,
-    setDuration, volume, setVolume, isLiked, setIsLiked,
-    queue, currentIndex, setCurrentIndex, setTrack,
+    isPlaying,
+    setIsPlaying,
+    progress,
+    setProgress,
+    duration,
+    setDuration,
+    isMuted,
+    toggleMute,
+    isLiked,
+    setIsLiked,
+    queue,
+    currentIndex,
+    setCurrentIndex,
+    setTrack,
+    isFullScreen,   // Added FullScreen state
+    toggleFullScreen, // Added FullScreen toggle
   } = usePlayerStore();
 
   const progressRef = useRef(null);
@@ -40,8 +52,25 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
 
   const handleLike = () => setIsLiked(!isLiked);
 
+  useEffect(() => {
+    if (!player) return;
+
+    if (isMuted) {
+      player.mute();
+    } else {
+      player.unMute();
+    }
+  }, [isMuted, player]);
+
+  const handleFullScreenToggle = () => {
+    toggleFullScreen(); // Toggle FullScreen state from store
+    // Add additional logic if required for full screen specific styles
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col md:flex-row bg-black text-white overflow-hidden">
+    <div
+      className={`fixed inset-0 z-50 flex flex-col md:flex-row bg-black text-white overflow-hidden ${isFullScreen ? 'w-full h-full' : ''}`}
+    >
       {/* Sidebar (Desktop only) */}
       <div className="hidden md:block">
         <Sidebar />
@@ -59,12 +88,13 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
             <ListMusic size={20} />
           </button>
           <button
-            onClick={onClose}
+            onClick={handleFullScreenToggle}
             className="p-2 bg-gray-800 hover:bg-red-500 rounded-full transition-colors"
             title="Exit Fullscreen"
           >
             <X size={20} />
           </button>
+  
         </div>
 
         <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 md:space-y-10 space-y-6">
@@ -106,20 +136,9 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
             size={30}
             handleNext={usePlayerStore.getState().nextTrack}
             handlePrev={usePlayerStore.getState().prevTrack}
+            isMuted={isMuted}
+            toggleMute={toggleMute}
           />
-
-          {/* Volume Control */}
-          <div className="w-full flex justify-center pb-4 md:pb-6">
-            <div className="w-40">
-              <VolumeBar
-                volume={volume}
-                setVolume={setVolume}
-                player={player}
-                ref={volumeRef}
-                isReady={isPlayerReady}
-              />
-            </div>
-          </div>
         </div>
       </div>
 

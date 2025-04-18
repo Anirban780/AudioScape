@@ -30,10 +30,13 @@ const YouTubePlayer = ({ trackId, onReady }) => {
     if (state === 1) { // Playing
       setIsPlaying(true);
       setDuration(player.getDuration());
-      if (trackId) saveSongListen(trackId).catch(console.error);
-    } else if (state === 2 || state === 0) { // Paused or Ended
+      if (trackId)
+        saveSongListen(trackId).catch(console.error);
+    }
+    else if (state === 2 || state === 0) { // Paused or Ended
       setIsPlaying(false);
-    } else if (state === 5) { // Cueing state
+    }
+    else if (state === 5) { // Cueing state
       setIsPlaying(false);
       setDuration(player.getDuration());
     }

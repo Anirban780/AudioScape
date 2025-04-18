@@ -1,6 +1,4 @@
-// PlayerContainer.jsx
 import React, { useState, useCallback, useEffect } from "react";
-import MusicPlayer from "./MusicPlayer";
 import FullScreenPlayer from "./FullScreenPlayer";
 import YouTubePlayer from "./YoutubePlayer";
 import MiniPlayer from "./MiniPlayer";
@@ -20,14 +18,22 @@ const getRandomGenre = (genres) => {
 const PlayerContainer = ({ onClose, uid }) => {
   const [player, setPlayer] = useState(null);
   const [isPlayerReady, setIsPlayerReady] = useState(false);
-  const [isFullScreen, setIsFullScreen] = useState(false);
-  const [isQueueFetched, setIsQueueFetched] = useState(false);
 
-  const { track, setTrack, setQueue, setCurrentIndex } = usePlayerStore();
+  const {
+    track,
+    setTrack,
+    queue,
+    setQueue,
+    currentIndex,
+    setCurrentIndex,
+    isLooping,
+    isFullScreen,
+
+  } = usePlayerStore();
 
   // Generate queue when new track is played
   useEffect(() => {
-    if (track?.id && uid && !isQueueFetched) {
+    if (track?.id && uid) {
       const keyword = getRandomGenre(track.genre);
 
       const fetchQueue = async () => {
@@ -36,7 +42,6 @@ const PlayerContainer = ({ onClose, uid }) => {
           if (Array.isArray(generatedQueue) && generatedQueue.length > 0) {
             setQueue(generatedQueue);
             setCurrentIndex(0);
-            setIsQueueFetched(true);
           }
         } catch (err) {
           console.error("Queue generation failed", err);
@@ -45,75 +50,58 @@ const PlayerContainer = ({ onClose, uid }) => {
 
       fetchQueue();
     }
-  }, [track?.id, track?.genre, uid, isQueueFetched, setQueue, setCurrentIndex]);
+  }, [track?.id, track?.genre, uid, setQueue, setCurrentIndex]);
 
-  // Reset queue when song ends
+  // Auto-advance to next track when current track ends
   useEffect(() => {
-    let playerStateCheck;
+    if (!player || !track?.id) return;
 
-    const onSongEnd = () => {
-      setIsQueueFetched(false);
-      setQueue([]);
-    };
+    const checkState = () => {
+      const state = player.getPlayerState();
+      if (state === 0) { // ended
 
-    if (player && player.getPlayerState) {
-      playerStateCheck = setInterval(() => {
-        if (player.getPlayerState() === 0) {
-          onSongEnd();
-          clearInterval(playerStateCheck);
+        if(isLooping) {
+          player.seekTo(0);
+          player.playVideo();
+          return;
         }
-      }, 1000);
-    }
 
-    return () => {
-      if (playerStateCheck) clearInterval(playerStateCheck);
+        const nextIndex = (currentIndex + 1) % queue.length;
+        const nextTrack = queue[nextIndex];
+        if (nextTrack) {
+          setTrack(nextTrack);
+          setCurrentIndex(nextIndex);
+        }
+      }
     };
-  }, [player, setQueue]);
+
+    const interval = setInterval(checkState, 1000);
+    return () => clearInterval(interval);
+  }, [player, track?.id, queue, currentIndex, setTrack, setCurrentIndex, isLooping]);
 
   // Handle player readiness
   const onPlayerReady = useCallback((event) => {
-    console.log("YouTube player is ready.");
     const ytPlayer = event.target;
     setPlayer(ytPlayer);
     setIsPlayerReady(true);
-  
+
     if (track?.id) {
-      console.log("Loading video with ID: ", track.id);
       ytPlayer.loadVideoById({ videoId: track.id });
-      ytPlayer.playVideo();  // Start video immediately
+      ytPlayer.playVideo();
     }
   }, [track?.id]);
-  
 
-  // Handle track switching
+  // Load and play video when track changes
   useEffect(() => {
     if (isPlayerReady && player && track?.id) {
       try {
-        // First, load the new video (track)
         player.loadVideoById({ videoId: track.id });
-  
-        // Add a 5-second delay before playing the track
-        const delay = 5000; // 5 seconds
-  
-        const playAfterDelay = setTimeout(() => {
-          try {
-            player.playVideo();
-          } catch (err) {
-            console.error("Failed to play video after delay", err);
-          }
-        }, delay);
-  
-        // Cleanup the timeout if the effect reruns
-        return () => clearTimeout(playAfterDelay);
-  
+        player.playVideo();
       } catch (err) {
         console.error("Failed to load and play video", err);
       }
     }
   }, [track?.id, isPlayerReady, player]);
-  
-  
-  
 
   const toggleFullScreen = () => setIsFullScreen((prev) => !prev);
 
@@ -121,7 +109,6 @@ const PlayerContainer = ({ onClose, uid }) => {
     if (onClose) onClose();
     setTrack(null);
     setIsPlayerReady(false);
-    setIsQueueFetched(false);
   };
 
   return (
@@ -139,7 +126,6 @@ const PlayerContainer = ({ onClose, uid }) => {
           track={track}
           player={player}
           isPlayerReady={isPlayerReady}
-          toggleFullScreen={toggleFullScreen}
           onClose={handleClose}
         />
       )}

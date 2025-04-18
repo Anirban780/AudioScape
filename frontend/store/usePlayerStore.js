@@ -6,7 +6,7 @@ const usePlayerStore = create((set) => ({
     isFullScreen: false,
     progress: 0,
     duration: 0,
-    volume: 80,
+    isMuted: false,
     isLiked: false,
     player: null,
     isPlayerReady: false,
@@ -16,7 +16,6 @@ const usePlayerStore = create((set) => ({
     setProgress: (progress) => set({ progress }),
     setDuration: (duration) => set({ duration }),
 
-    setVolume: (volume) => set({ volume }),
     setIsLiked: (isLiked) => set({ isLiked }),
     setPlayer: (player) => set({ player }),
     setIsPlayerReady: (isPlayerReady) => set({ isPlayerReady }),
@@ -25,7 +24,9 @@ const usePlayerStore = create((set) => ({
     toggleFullScreen: () => set((state) => ({ isFullScreen: !state.isFullScreen })),
     setIsFullScreen: (isFullScreen) => set({ isFullScreen }),
     toggleLike: () => set((state) => ({ isLiked: !state.isLiked })),
+    toggleMute: () => set((state) => ({ isMuted: !state.isMuted })),
 
+    
     queue: [],
     currentIndex: 0,
 
@@ -55,6 +56,12 @@ const usePlayerStore = create((set) => ({
         }
         return state;
     }),
+
+    isLooping: false,
+    isShuffling: false,
+
+    toggleLooping: () => set((state) => ({ isLooping: !state.isLooping })),
+    toggleShuffling: () => set((state) => ({ isShuffling: !state.isShuffling })),
 
 }));
 

@@ -2,13 +2,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import usePlayerStore from '../../store/usePlayerStore';
 import { Rnd } from 'react-rnd';
 import placeholder from '../../assets/placeholder.jpg';
-import { Maximize2, Volume2, X } from 'lucide-react';
+import { Maximize2, X } from 'lucide-react';
 import ProgressBar from './ProgressBar';
 import PlayerControls from './PlayerControls';
-import VolumeBar from './VolumeBar';
 import { useTheme } from '../../ThemeProvider';
 
-const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose }) => {
+const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
   const {
     isPlaying,
     setIsPlaying,
@@ -16,16 +15,19 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
     setProgress,
     duration,
     setDuration,
-    volume,
-    setVolume,
+    isMuted,
+    toggleMute,
     isLiked,
     setIsLiked,
+    isLooping,
+    toggleLooping,
+    isFullScreen,  // Access global full-screen state
+    toggleFullScreen, // Access toggle function
+    setIsFullScreen, // Set full-screen state directly
   } = usePlayerStore();
 
   const { theme } = useTheme();
   const progressRef = useRef(null);
-  const volumeRef = useRef(null);
-  const [showVolume, setShowVolume] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
@@ -48,7 +50,15 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
   };
 
   const handleLike = () => setIsLiked(!isLiked);
-  const handleToggleVolume = () => setShowVolume(prev => !prev);
+
+  useEffect(() => {
+    if(!player) return;
+
+    if(isMuted) player.mute();
+    else player.unMute();
+
+  }, [isMuted, player]);
+
   const handleClose = () => {
     setIsVisible(false);
     onClose?.(); // Reset track from parent
@@ -71,9 +81,8 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
       className="z-50"
     >
       <div
-        className={`rounded-xl shadow-lg w-full h-full p-4 flex flex-col justify-between transition-all duration-200 ${
-          theme === 'dark' ? 'bg-gray-900 text-white border-4 border-white' : 'bg-white text-black'
-        }`}
+        className={`rounded-xl shadow-lg w-full h-full p-4 flex flex-col justify-between transition-all duration-200 ${theme === 'dark' ? 'bg-gray-900 text-white border-4 border-white' : 'bg-white text-black'
+          }`}
       >
         {/* Header */}
         <div className="flex justify-between items-center mini-player-header cursor-move">
@@ -91,10 +100,12 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
 
           <div className="flex flex-col items-center gap-2">
             <button
-              onClick={toggleFullScreen}
+              onClick={() => {
+                setIsFullScreen(true);  // Set full-screen state
+              }}
               onTouchEnd={(e) => {
                 e.preventDefault();
-                toggleFullScreen();
+                setIsFullScreen(true);  // Set full-screen state
               }}
               aria-label="Expand to full screen"
               className="p-1 hover:bg-gray-200 hover:text-black rounded-xl"
@@ -126,37 +137,20 @@ const MiniPlayer = ({ track, player, isPlayerReady, toggleFullScreen, onClose })
         />
 
         {/* Controls */}
-        <div className="flex sm:flex-row justify-center items-center sm:justify-between gap-4 sm:gap-0 mx-2 mt-2">
+        <div className="flex sm:flex-row justify-center items-center sm:justify-between gap-4 sm:gap-0 mx-auto mt-2">
           <PlayerControls
             isPlaying={isPlaying}
             togglePlayPause={togglePlayPause}
             handleLike={handleLike}
             isLiked={isLiked}
-            size={20}
+            size={18}
             handleNext={usePlayerStore.getState().nextTrack}
             handlePrev={usePlayerStore.getState().prevTrack}
+            isMuted={isMuted}
+            toggleMute={toggleMute}
+            isLooping={isLooping}
+            toggleLooping={toggleLooping}
           />
-
-          <div className="relative flex items-center">
-            <button
-              onClick={handleToggleVolume}
-              aria-label="Toggle volume slider"
-              className="p-1 hover:text-gray-300"
-            >
-              <Volume2 size={20} />
-            </button>
-            {showVolume && (
-              <div className="absolute right-0 bottom-8 w-28 bg-gray-800 p-2 rounded-md shadow-md">
-                <VolumeBar
-                  volume={volume}
-                  setVolume={setVolume}
-                  player={player}
-                  isReady={isPlayerReady}
-                  ref={volumeRef}
-                />
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </Rnd>
