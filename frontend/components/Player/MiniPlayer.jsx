@@ -5,7 +5,6 @@ import placeholder from '../../assets/placeholder.jpg';
 import { Maximize2, X } from 'lucide-react';
 import ProgressBar from './ProgressBar';
 import PlayerControls from './PlayerControls';
-import { useTheme } from '../../ThemeProvider';
 
 const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
   const {
@@ -21,12 +20,9 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
     setIsLiked,
     isLooping,
     toggleLooping,
-    isFullScreen,  // Access global full-screen state
-    toggleFullScreen, // Access toggle function
-    setIsFullScreen, // Set full-screen state directly
+    setIsFullScreen,
   } = usePlayerStore();
 
-  const { theme } = useTheme();
   const progressRef = useRef(null);
   const [isVisible, setIsVisible] = useState(true);
 
@@ -52,11 +48,9 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
   const handleLike = () => setIsLiked(!isLiked);
 
   useEffect(() => {
-    if(!player) return;
+    if (!player) return;
 
-    if(isMuted) player.mute();
-    else player.unMute();
-
+    isMuted ? player.mute() : player.unMute();
   }, [isMuted, player]);
 
   const handleClose = () => {
@@ -80,10 +74,7 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
       dragHandleClassName="mini-player-header"
       className="z-50"
     >
-      <div
-        className={`rounded-xl shadow-lg w-full h-full p-4 flex flex-col justify-between transition-all duration-200 ${theme === 'dark' ? 'bg-gray-900 text-white border-4 border-white' : 'bg-white text-black'
-          }`}
-      >
+      <div className="rounded-xl shadow-lg w-full h-full p-4 flex flex-col justify-between transition-all duration-200 bg-gray-900 text-white border-3 border-white">
         {/* Header */}
         <div className="flex justify-between items-center mini-player-header cursor-move">
           <div className="flex items-center gap-4">
@@ -100,12 +91,10 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
 
           <div className="flex flex-col items-center gap-2">
             <button
-              onClick={() => {
-                setIsFullScreen(true);  // Set full-screen state
-              }}
+              onClick={() => setIsFullScreen(true)}
               onTouchEnd={(e) => {
                 e.preventDefault();
-                setIsFullScreen(true);  // Set full-screen state
+                setIsFullScreen(true);
               }}
               aria-label="Expand to full screen"
               className="p-1 hover:bg-gray-200 hover:text-black rounded-xl"

@@ -41,7 +41,6 @@ const TrackQueue = ({ queue, currentIndex, setCurrentIndex, setTrack, showQueue,
                                 "flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:bg-gray-800 transition-colors",
                                 {
                                     "bg-gray-800": index === currentIndex,
-                                    
                                 }
                             )}
                             onClick={() => handleQueueTrackClick(qTrack, index)}
@@ -49,13 +48,14 @@ const TrackQueue = ({ queue, currentIndex, setCurrentIndex, setTrack, showQueue,
                             <img
                                 src={qTrack.thumbnail || placeholder}
                                 alt={qTrack.name}
-                                className="w-14 h-14 object-cover rounded-md shadow-lg transition-transform transform hover:scale-110"
+                                className="w-14 h-14 object-cover rounded-md shadow-lg shrink-0"
                             />
                             <div className="flex flex-col overflow-hidden">
                                 <p className="font-medium truncate">{qTrack.name}</p>
                                 <p className="text-sm text-gray-400 truncate">{qTrack.artist}</p>
                             </div>
                         </div>
+
                     ))
                 ) : (
                     <p className="text-gray-400">No tracks in queue</p>

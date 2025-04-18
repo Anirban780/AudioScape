@@ -3,7 +3,7 @@ import { db } from "../firebase/firebaseConfig";
 
 // Define constants for cache management
 const CACHE_KEY = "personalized_explore_keywords";
-const CACHE_EXPIRY_MS = 1000 * 60 * 60; // 1 hour
+const CACHE_EXPIRY_MS = 1000 * 60 * 30; // 30 minutes
 
 export const getPersonalizedExploreKeywords = async (userId) => {
   if (!userId) return [];

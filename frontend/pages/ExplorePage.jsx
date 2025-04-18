@@ -17,7 +17,7 @@ const curatedGenres = [
   "lofi music", "pop hits", "indie rock", "anime music", "k-pop", "electronic", "jazz chill", "hip hop",
 ];
 
-const CACHE_EXPIRY_MS = 1000 * 60 * 60; // 1 hour
+const CACHE_EXPIRY_MS = 1000 * 60 * 30; // 30 minutes
 
 const ExplorePage = () => {
   const { user } = useAuth();
@@ -68,7 +68,9 @@ const ExplorePage = () => {
           setVisibleTracks(initialVisible);
           setExploreFeed(exploreData);
           setLastFetchTime(now); // Update the last fetch time
-        } else {
+
+        } 
+        else {
           // Cache is valid, fetch from cache
           console.log("✅ Using cached data");
 

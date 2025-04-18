@@ -50,7 +50,7 @@ const fetchAndCacheYoutubeMusic = async (query, maxResults = 20) => {
 
 export const fetchYoutubeMusic = async (query, maxResults = 20) => {
   const CACHE_KEY = `yt_music_cache_${query}`;
-  const CACHE_EXPIRY_MS = 1000 * 60 * 60; // 1 hour
+  const CACHE_EXPIRY_MS = 1000 * 60 * 30; // 30 minutes
   const cached = localStorage.getItem(CACHE_KEY);
 
   if (cached) {

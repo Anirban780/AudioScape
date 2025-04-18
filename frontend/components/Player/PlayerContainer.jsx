@@ -33,7 +33,7 @@ const PlayerContainer = ({ onClose, uid }) => {
 
   // Generate queue when new track is played
   useEffect(() => {
-    if (track?.id && uid) {
+    if (track?.id && uid && queue.length === 0) {
       const keyword = getRandomGenre(track.genre);
 
       const fetchQueue = async () => {
@@ -50,7 +50,7 @@ const PlayerContainer = ({ onClose, uid }) => {
 
       fetchQueue();
     }
-  }, [track?.id, track?.genre, uid, setQueue, setCurrentIndex]);
+  }, [track?.id, uid]);
 
   // Auto-advance to next track when current track ends
   useEffect(() => {
@@ -108,6 +108,7 @@ const PlayerContainer = ({ onClose, uid }) => {
   const handleClose = () => {
     if (onClose) onClose();
     setTrack(null);
+    setQueue([]);
     setIsPlayerReady(false);
   };
 

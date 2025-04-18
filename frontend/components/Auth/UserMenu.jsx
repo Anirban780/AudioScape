@@ -10,10 +10,12 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Settings, History, HelpCircle, LogOut, User } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 const UserMenu = () => {
   const { user, signInWithGoogle, logout } = useAuth();
   const [avatarUrl, setAvatarUrl] = useState("");
+  const navigate = useNavigate();
 
   // Debugging: Log user info
   useEffect(() => {
@@ -78,7 +80,10 @@ const UserMenu = () => {
 
             <DropdownMenuSeparator className="my-1 border-gray-200 dark:border-gray-700" />
 
-            <DropdownMenuItem className="menu-item ml-2">
+            <DropdownMenuItem 
+              className="menu-item ml-2"
+              onClick={() => navigate("/profile")}
+            >
               <User size={18} />
               Profile
             </DropdownMenuItem>
