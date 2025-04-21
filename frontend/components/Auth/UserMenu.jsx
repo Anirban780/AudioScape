@@ -39,6 +39,12 @@ const UserMenu = () => {
     }
   }, [user]);
 
+  const handleLogout = async () => {
+    await logout();         // Sign out the user
+    navigate("/");          // Redirect to Landing Page
+  };
+
+
   return (
     <div className="flex items-center space-x-4">
       {user ? (
@@ -106,12 +112,12 @@ const UserMenu = () => {
             <DropdownMenuSeparator className="my-1 border-gray-200 dark:border-gray-700" />
 
             <DropdownMenuItem
-              onClick={logout}
+              onClick={handleLogout}
               className="px-4 py-2 flex items-center gap-2 text-red-600 hover:bg-red-100 
-                         dark:text-red-400 dark:hover:bg-red-900 rounded-md transition cursor-pointer"
+                         dark:text-red-400 dark:hover:bg-red-900  rounded-md transition cursor-pointer"
             >
               <LogOut size={18} />
-              Logout
+              <p className="dark:hover:text-white">Log out</p>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
