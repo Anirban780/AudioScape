@@ -5,6 +5,7 @@ import { useTheme } from "../../ThemeProvider";
 import axios from "axios";
 import placeholder from '../../assets/placeholder.jpg';
 import { getBackendURL } from "../../utils/api";
+import toast from "react-hot-toast";
 
 const SearchBar = ({ onSelectTrack }) => {
   const { theme } = useTheme();
@@ -35,6 +36,8 @@ const SearchBar = ({ onSelectTrack }) => {
 
     } catch (error) {
       console.error("Error fetching search results:", error);
+      toast.error("Search is currently unavailable. Please try next day");
+
     } finally {
       setLoading(false);
     }
@@ -102,9 +105,11 @@ const SearchBar = ({ onSelectTrack }) => {
 
       setIsFocused(false);
       setQuery(""); // Clear search input
+      toast.success("Search Track selected successfully");
 
     } catch (error) {
       console.error("Error fetching track details:", error);
+      toast.error("Track couldn't be selected");
     }
   };
 

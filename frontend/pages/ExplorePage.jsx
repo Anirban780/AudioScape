@@ -12,6 +12,7 @@ import PlayerContainer from '../components/Player/PlayerContainer';
 import ResponsiveLayout from "../ResponsiveLayout";
 import { cacheRelatedTracks } from '../utils/api';
 import usePlayerStore from "../store/usePlayerStore";
+import toast from 'react-hot-toast';
 
 const curatedGenres = [
   "lofi music", "pop hits", "indie rock", "anime music", "k-pop", "electronic", "jazz chill", "hip hop",
@@ -68,7 +69,8 @@ const ExplorePage = () => {
           setVisibleTracks(initialVisible);
           setExploreFeed(exploreData);
           setLastFetchTime(now); // Update the last fetch time
-
+          
+          toast.success("Explore page contents fetched successfully");
         } 
         else {
           // Cache is valid, fetch from cache
@@ -93,6 +95,7 @@ const ExplorePage = () => {
         }
       } catch (err) {
         console.error("Explore fetch failed:", err);
+        toast.error("Explore page contents couldn't be fetched");
       }
     };
 
@@ -180,6 +183,7 @@ const ExplorePage = () => {
                         image={track.thumbnail}
                         onClick={() => {
                           setTrack(track);
+                          toast.success("Track selected successfully");
                         }}
                       />
                     ))}

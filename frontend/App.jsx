@@ -7,6 +7,7 @@ import { ThemeProvider } from "./ThemeProvider";
 import Loader from "./components/Home/Loader";
 import { useState, useEffect } from "react";
 import ExplorePage from "./pages/ExplorePage";
+import { Toaster } from "react-hot-toast";
 
 function AppContent() {
   const { user } = useAuth();
@@ -22,6 +23,9 @@ function AppContent() {
   return (
     <div className="relative">
       {isLoading && <Loader />}
+
+      <Toaster position="top-right" reverseOrder={false} />
+
       <Routes>
         <Route path="/" element={user ? <Navigate to="/home" /> : <LandingPage />} />
         <Route path="/home" element={user ? <Home /> : <Navigate to="/" />} />

@@ -6,6 +6,7 @@ import { Button } from "../../../utils/components/ui/button";
 import { ChevronRight, ChevronLeft } from "lucide-react";
 import MusicCard from "../Cards/MusicCard";
 import usePlayerStore from "../../store/usePlayerStore";
+import toast from "react-hot-toast";
 
 const RecentlyPlayed = ({ userId }) => {
   const { theme } = useTheme();
@@ -66,7 +67,10 @@ const RecentlyPlayed = ({ userId }) => {
               name={song.name}
               artist={song.artist}
               image={song.thumbnail || placeholder}
-              onClick={() => usePlayerStore.getState().setTrack(song)}
+              onClick={() => {
+                usePlayerStore.getState().setTrack(song)
+                toast.success("Track selected successfully");
+              }}
             />
           </div>
         ))}
