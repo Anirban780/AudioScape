@@ -2,8 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Sidebar from "../Home/Sidebar";
 import ProgressBar from "./ProgressBar";
 import PlayerControls from "./PlayerControls";
-import VolumeBar from "./VolumeBar";
-import { X, ListMusic, VolumeX, Volume2 } from "lucide-react";
+import { X, ListMusic } from "lucide-react";
 import placeholder from "../../assets/placeholder.jpg";
 import usePlayerStore from "../../store/usePlayerStore";
 import TrackQueue from "./TrackQueue"; // Import the Queue component
@@ -26,10 +25,13 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
     setTrack,
     isFullScreen,   // Added FullScreen state
     toggleFullScreen, // Added FullScreen toggle
+    isLooping,
+    toggleLooping,
+    isShuffling,
+    toggleShuffling,
   } = usePlayerStore();
 
   const progressRef = useRef(null);
-  const volumeRef = useRef(null);
   const [showQueue, setShowQueue] = useState(false);
 
   useEffect(() => {
@@ -138,6 +140,10 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
             handlePrev={usePlayerStore.getState().prevTrack}
             isMuted={isMuted}
             toggleMute={toggleMute}
+            isLooping={isLooping}
+            toggleLooping={toggleLooping}
+            isShuffling={isShuffling}
+            toggleShuffling={toggleShuffling}
           />
         </div>
       </div>

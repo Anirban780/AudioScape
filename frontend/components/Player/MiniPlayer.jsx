@@ -20,6 +20,8 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
     setIsLiked,
     isLooping,
     toggleLooping,
+    isShuffling,
+    toggleShuffling,
     setIsFullScreen,
   } = usePlayerStore();
 
@@ -139,6 +141,8 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
             toggleMute={toggleMute}
             isLooping={isLooping}
             toggleLooping={toggleLooping}
+            isShuffling={isShuffling}
+            toggleShuffling={toggleShuffling}
           />
         </div>
       </div>

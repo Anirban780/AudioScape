@@ -28,6 +28,9 @@ const YouTubePlayer = ({ trackId, onReady }) => {
     const player = event.target;
 
     if (state === 1) { // Playing
+      player.unMute();
+      player.setVolume(100);
+      
       setIsPlaying(true);
       setDuration(player.getDuration());
       if (trackId)

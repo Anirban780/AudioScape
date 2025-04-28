@@ -6,7 +6,7 @@ import usePlayerStore from "../../store/usePlayerStore";
 import { generateQueue } from "../../utils/api";
 
 const curatedGenres = [
-  "lofi music", "pop hits", "indie rock", "anime music", "k-pop", "electronic", "jazz chill", "hip hop"
+  "lofi music", "pop hits", "indie rock", "anime music", "k-pop", "electronic", "jazz chill", "hip hop",
 ];
 
 const getRandomGenre = (genres) => {
@@ -28,10 +28,11 @@ const PlayerContainer = ({ onClose, uid }) => {
     setCurrentIndex,
     isLooping,
     isFullScreen,
-
+    toggleFullScreen,
+    nextTrack
   } = usePlayerStore();
 
-  // Generate queue when new track is played
+  // Generate queue when a new track is played
   useEffect(() => {
     if (track?.id && uid && queue.length === 0) {
       const keyword = getRandomGenre(track.genre);
@@ -50,7 +51,7 @@ const PlayerContainer = ({ onClose, uid }) => {
 
       fetchQueue();
     }
-  }, [track?.id, uid]);
+  }, [track?.id, uid, queue.length, setQueue, setCurrentIndex]);
 
   // Auto-advance to next track when current track ends
   useEffect(() => {
@@ -58,19 +59,12 @@ const PlayerContainer = ({ onClose, uid }) => {
 
     const checkState = () => {
       const state = player.getPlayerState();
-      if (state === 0) { // ended
-
-        if(isLooping) {
+      if (state === 0) { // Ended
+        if (isLooping) {
           player.seekTo(0);
           player.playVideo();
-          return;
-        }
-
-        const nextIndex = (currentIndex + 1) % queue.length;
-        const nextTrack = queue[nextIndex];
-        if (nextTrack) {
-          setTrack(nextTrack);
-          setCurrentIndex(nextIndex);
+        } else {
+          nextTrack();
         }
       }
     };
@@ -79,7 +73,7 @@ const PlayerContainer = ({ onClose, uid }) => {
     return () => clearInterval(interval);
   }, [player, track?.id, queue, currentIndex, setTrack, setCurrentIndex, isLooping]);
 
-  // Handle player readiness
+  // Handle player ready
   const onPlayerReady = useCallback((event) => {
     const ytPlayer = event.target;
     setPlayer(ytPlayer);
@@ -91,7 +85,7 @@ const PlayerContainer = ({ onClose, uid }) => {
     }
   }, [track?.id]);
 
-  // Load and play video when track changes
+  // Load new video when track changes
   useEffect(() => {
     if (isPlayerReady && player && track?.id) {
       try {
@@ -102,8 +96,6 @@ const PlayerContainer = ({ onClose, uid }) => {
       }
     }
   }, [track?.id, isPlayerReady, player]);
-
-  const toggleFullScreen = () => setIsFullScreen((prev) => !prev);
 
   const handleClose = () => {
     if (onClose) onClose();
