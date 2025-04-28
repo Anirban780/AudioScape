@@ -197,7 +197,7 @@ export const generateQueue = async(keyword, uid, currentTrack) => {
     }
 };
 
-export const getRecommendations = async(userId, topN) => {
+export const getRecommendations = async(topN) => {
     if (!auth.currentUser) {
         console.error("⚠️ Error: User not logged in");
         return;
@@ -213,7 +213,7 @@ export const getRecommendations = async(userId, topN) => {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    
+                    'Authorization': `Bearer ${token}`,
                 },
                 body: JSON.stringify({ userId, topN }),
             }

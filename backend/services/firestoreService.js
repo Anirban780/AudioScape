@@ -130,7 +130,7 @@ const saveRelatedTracks = async (keyword, tracks) => {
 }
 
 // Fetch user's music history (latest N songs)
-const fetchUserMusicHistory = async (userId, maxSongs = 20) => {
+const fetchUserMusicHistory = async (userId, maxSongs = 100) => {
     try {
         const historyRef = db
             .collection('users')
@@ -153,6 +153,8 @@ const fetchUserMusicHistory = async (userId, maxSongs = 20) => {
                 keywords: data.genre || [],
                 lastPlayedAt: data.lastPlayedAt ? data.lastPlayedAt.toDate().toISOString() : null,
                 playCount: data.playCount || 0,
+                liked: data.liked || false,
+                
             });
         });
 

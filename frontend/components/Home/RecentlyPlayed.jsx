@@ -9,7 +9,6 @@ import usePlayerStore from "../../store/usePlayerStore";
 import toast from "react-hot-toast";
 
 const RecentlyPlayed = ({ userId }) => {
-  const { theme } = useTheme();
   const [recentlyPlayed, setRecentlyPlayed] = useState([]);
   const [visibleSongs, setVisibleSongs] = useState(8);
   const [showScrollRight, setShowScrollRight] = useState(false);

@@ -71,6 +71,7 @@ testGenerateQueue();
 
 const { fetchUserMusicHistory, fetchRelatedTracks } = require('./services/firestoreService'); // <- update the correct path
 const { db } = require('./config/firebase'); // <- your firebase config
+const { recommendSongs } = require('./recommend');
 
 async function testFirestoreFunctions() {
     const testUserId = 'IaCW2sstJAV0R3x6Xdzyb1xycif2'; // <-- replace with a real userId from your Firestore!
@@ -78,9 +79,9 @@ async function testFirestoreFunctions() {
     try {
         console.log('Testing fetchUserMusicHistory...');
 
-        const userHistory = await fetchUserMusicHistory(testUserId, 10);
+        const userHistory = await fetchUserMusicHistory(testUserId);
         console.log(`Fetched ${userHistory.length} songs from user's music history.`);
-        console.log(userHistory[0]);
+        //console.log(userHistory[0]);
 
         console.log('--------------------------------------');
 
@@ -88,7 +89,12 @@ async function testFirestoreFunctions() {
 
         const relatedTracks = await fetchRelatedTracks();
         console.log(`Fetched ${relatedTracks.length} related tracks from cache.`);
-        console.log(relatedTracks[0]);
+        //console.log(relatedTracks[0]);
+
+        const currentTimestamp = Date.now(); // Use current timestamp for testing
+        const recommendations = recommendSongs(userHistory, relatedTracks, currentTimestamp, 10);
+        console.log('Recommendations:', recommendations);
+        console.log('--------------------------------------');
 
     } catch (error) {
         console.error('Error testing Firestore functions:', error);

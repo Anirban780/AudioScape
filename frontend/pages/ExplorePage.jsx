@@ -13,6 +13,7 @@ import ResponsiveLayout from "../ResponsiveLayout";
 import { cacheRelatedTracks } from '../utils/api';
 import usePlayerStore from "../store/usePlayerStore";
 import toast from 'react-hot-toast';
+import Loader2 from '../components/Home/Loader2';
 
 const curatedGenres = [
   "lofi music", "pop hits", "indie rock", "anime music", "k-pop", "electronic", "jazz chill", "hip hop",
@@ -28,80 +29,61 @@ const ExplorePage = () => {
   const [visibleTracks, setVisibleTracks] = useState({});
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { track, setTrack } = usePlayerStore();
-  const [lastFetchTime, setLastFetchTime] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchExploreSections = async () => {
+      setLoading(true);
+
       try {
         let keywords = await getPersonalizedExploreKeywords(user.uid);
-
         if (!keywords || keywords.length === 0) {
           keywords = curatedGenres;
         }
 
-        // Check if cache is valid and not expired (1 hour)
         const now = Date.now();
-        if (!lastFetchTime || now - lastFetchTime > CACHE_EXPIRY_MS) {
-          // Cache expired, make the API call
-          console.log("🔄 Fetching new data for all keywords");
+        const cachedFetchTime = localStorage.getItem('lastFetchTime');
+        const isCacheValid = cachedFetchTime && (now - parseInt(cachedFetchTime) < CACHE_EXPIRY_MS);
 
-          // Fetch data for all the keywords (personalized + curated)
-          const exploreData = await Promise.all(
-            keywords.slice(0, 10).map(async (keyword) => {
-              if (cache[keyword]) {
-                return { title: keyword, tracks: cache[keyword] }; // Use cache if available
-              }
+        const exploreData = await Promise.all(
+          keywords.slice(0, 10).map(async (keyword) => {
+            if (isCacheValid && cache[keyword]) {
+              return { title: keyword, tracks: cache[keyword] };
+            }
 
-              const tracks = await fetchYoutubeMusic(keyword, 20);
-              setCache((prev) => ({ ...prev, [keyword]: tracks })); // Store the tracks in cache
+            const tracks = await fetchYoutubeMusic(keyword, 20);
+            setCache((prev) => ({ ...prev, [keyword]: tracks }));
+            await cacheRelatedTracks(keyword, tracks);
+            return { title: keyword, tracks };
+          })
+        );
 
-              // Cache related tracks to Firestore
-              await cacheRelatedTracks(keyword, tracks);
-              return { title: keyword, tracks };
-            })
-          );
+        setExploreFeed(exploreData);
 
-          const initialVisible = {};
-          exploreData.forEach(({ title }) => {
-            initialVisible[title] = 5; // Set initial visible tracks for each keyword
-          });
+        const initialVisible = {};
+        exploreData.forEach(({ title }) => {
+          initialVisible[title] = 5;
+        });
+        setVisibleTracks(initialVisible);
+        localStorage.setItem('lastFetchTime', now.toString());
 
-          setVisibleTracks(initialVisible);
-          setExploreFeed(exploreData);
-          setLastFetchTime(now); // Update the last fetch time
-          
-          toast.success("Explore page contents fetched successfully");
-        } 
-        else {
-          // Cache is valid, fetch from cache
-          console.log("✅ Using cached data");
-
-          const exploreData = await Promise.all(
-            keywords.slice(0, 10).map(async (keyword) => {
-              if (cache[keyword]) {
-                return { title: keyword, tracks: cache[keyword] }; // Use cache if available
-              }
-              return { title: keyword, tracks: [] }; // No tracks, just empty array (this case shouldn't happen)
-            })
-          );
-
-          const initialVisible = {};
-          exploreData.forEach(({ title }) => {
-            initialVisible[title] = 5; // Set initial visible tracks for each keyword
-          });
-
-          setVisibleTracks(initialVisible);
-          setExploreFeed(exploreData);
-        }
+        toast.success("Explore page contents fetched successfully");
       } catch (err) {
         console.error("Explore fetch failed:", err);
         toast.error("Explore page contents couldn't be fetched");
+        setExploreFeed([]); // Ensure exploreFeed is reset
+      } finally {
+        setLoading(false); // Always stop loader
       }
     };
 
-    fetchExploreSections();
-  }, [user, lastFetchTime]);
-
+    if (user?.uid) {
+      fetchExploreSections();
+    } else {
+      setLoading(false); // No user, stop loading
+      setExploreFeed([]); // Reset feed
+    }
+  }, [user]); // Depend only on user
 
   const handleLoadMore = (title) => {
     setVisibleTracks((prev) => ({
@@ -112,27 +94,20 @@ const ExplorePage = () => {
 
   return (
     <div className={`h-screen flex transition-all duration-300 ${theme === "dark" ? "bg-slate-900 text-white" : "bg-gray-100 text-black"}`}>
-
       <div className="hidden md:flex">
         <Sidebar />
       </div>
 
-      {/* Sidebar - Mobile Drawer */}
       {isSidebarOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden">
-          {/* Sidebar */}
-          <div className="w-60 h-full bg-white dark:bg-gray-900  shadow-md relative z-50">
-
+          <div className="w-60 h-full bg-white dark:bg-gray-900 shadow-md relative z-50">
             <Sidebar isOpen={true} onToggle={() => setIsSidebarOpen(false)} />
           </div>
-
         </div>
       )}
 
-      {/* Main Content */}
       <div className="flex flex-col flex-1 overflow-auto p-4 md:p-6 space-y-6">
         <ResponsiveLayout>
-          {/* Navbar Section */}
           <div className="flex justify-between items-center w-full">
             <button
               onClick={() => setIsSidebarOpen(true)}
@@ -141,12 +116,10 @@ const ExplorePage = () => {
               <Menu size={20} />
             </button>
 
-            {/* Search Bar */}
             <div className="w-full max-w-lg mx-auto">
               <SearchBar onSelectTrack={setTrack} />
             </div>
 
-            {/* Theme Toggle */}
             <button
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               className="p-2 mx-4 rounded-full bg-gray-300 dark:bg-gray-700 transition-all"
@@ -158,50 +131,58 @@ const ExplorePage = () => {
               )}
             </button>
 
-            {/* User Menu */}
             <UserMenu />
           </div>
 
           <div className='lg:mx-8 mt-8'>
-            {/* Explore Title */}
             <h1 className="text-3xl font-bold mb-4">Explore Music</h1>
 
-            {/* Explore Sections */}
-            {exploreFeed.map((section) => (
-              <div key={section.title} className="mb-10">
-                <h2 className="text-xl font-semibold mb-3 capitalize">{section.title}</h2>
-
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-                  {section.tracks
-                    .slice(0, visibleTracks[section.title] || 5)
-                    .map((track, index) => (
-                      <MusicCard
-                        key={`${track.id}-${index}`}
-                        id={track.id}
-                        name={track.name}
-                        artist={track.artist}
-                        image={track.thumbnail}
-                        onClick={() => {
-                          setTrack(track);
-                          toast.success("Track selected successfully");
-                        }}
-                      />
-                    ))}
-                </div>
-
-                {/* Load More */}
-                {visibleTracks[section.title] < section.tracks.length && (
-                  <div className="mt-4 flex justify-end mr-12">
-                    <button
-                      onClick={() => handleLoadMore(section.title)}
-                      className="bg-blue-600 text-white px-4 py-2  rounded hover:bg-blue-700 transition-all dark:bg-blue-500 dark:hover:bg-blue-600"
-                    >
-                      Load More
-                    </button>
-                  </div>
-                )}
+            {loading ? (
+              <Loader2 />
+            ) : exploreFeed.length === 0 ? (
+              <div className="text-center text-lg">
+                No music content available. Try searching or check back later!
               </div>
-            ))}
+            ) : (
+              exploreFeed.map((section) => (
+                <div key={section.title} className="mb-10">
+                  <h2 className="text-xl font-semibold mb-3 capitalize">{section.title}</h2>
+
+                  {section.tracks.length === 0 ? (
+                    <p className="text-gray-500">No tracks available for {section.title}</p>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+                      {section.tracks
+                        .slice(0, visibleTracks[section.title] || 5)
+                        .map((track, index) => (
+                          <MusicCard
+                            key={`${track.id}-${index}`}
+                            id={track.id}
+                            name={track.name}
+                            artist={track.artist}
+                            image={track.thumbnail}
+                            onClick={() => {
+                              setTrack(track);
+                              toast.success("Track selected successfully");
+                            }}
+                          />
+                        ))}
+                    </div>
+                  )}
+
+                  {visibleTracks[section.title] < section.tracks.length && (
+                    <div className="mt-4 flex justify-end mr-12">
+                      <button
+                        onClick={() => handleLoadMore(section.title)}
+                        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-all dark:bg-blue-500 dark:hover:bg-blue-600"
+                      >
+                        Load More
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
           </div>
         </ResponsiveLayout>
       </div>
