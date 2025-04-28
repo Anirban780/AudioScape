@@ -1,6 +1,7 @@
 const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { saveSong, likeSong, cacheRelatedTracks, generateQueue } = require('../controllers/trackController');
+const { recommendSongs } = require('../controllers/recommendationController');
 
 const router = express.Router();
 
@@ -16,5 +17,8 @@ router.post('/save', limiter, saveSong);
 router.post('/like', limiter, likeSong);
 router.post('/cache-related-tracks', limiter, cacheRelatedTracks);
 router.post('/generate-queue', limiter, generateQueue);
+
+// POST /api/songs/recommend - Get song recommendations
+router.post('/recommend', limiter, recommendSongs);
 
 module.exports = router;

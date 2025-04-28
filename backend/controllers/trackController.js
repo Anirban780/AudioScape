@@ -115,7 +115,7 @@ const shuffleAndPick = (arr, count) => {
     return shuffled.slice(0, count);
   };
 
-  const generateQueue = async (req, res) => {
+const generateQueue = async (req, res) => {
     const { keyword, uid, currentTrack } = req.body;
   
     if (!keyword || !uid) {

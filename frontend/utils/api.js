@@ -20,6 +20,7 @@ export async function getBackendURL() {
     return PROD_API_URL;
 }
 
+
 /**
  * Saves a song listen event to Firestore through the backend.
  * @param {string} videoId - The ID of the song/video.
@@ -195,3 +196,47 @@ export const generateQueue = async(keyword, uid, currentTrack) => {
         return [];
     }
 };
+
+export const getRecommendations = async(userId, topN) => {
+    if (!auth.currentUser) {
+        console.error("⚠️ Error: User not logged in");
+        return;
+    }
+    
+    try {
+        const token = await auth.currentUser.getIdToken();
+        const API_URL = await getBackendURL();
+        const userId = auth.currentUser.uid;
+
+        const response = await fetch(`${API_URL}/api/music/recommend`,
+            {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    
+                },
+                body: JSON.stringify({ userId, topN }),
+            }
+        );
+
+        if(!response.ok) {
+            throw new Error("Failed to fetch recommendations");
+        }
+
+        const data = await response.json();
+
+        if (data.success) {
+            console.log('Recommended Songs:', data.recommendations);
+        } else {
+            console.error('Error:', data.error || 'Something went wrong');
+        }
+
+        return data.recommendations;
+    }
+    catch (err) {
+        console.error("Recommendation error:", err);
+        return [];
+    }
+};
+
+

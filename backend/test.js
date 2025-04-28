@@ -15,7 +15,7 @@ const test = async () => {
 test();
 */
 
-const fetch = require('node-fetch'); // If using Node v18+, you can omit this and use global fetch
+/*const fetch = require('node-fetch'); // If using Node v18+, you can omit this and use global fetch
 const fs = require('fs');
 
 const API_URL = "http://localhost:5000/api/music/generate-queue"; // your backend URL
@@ -67,4 +67,38 @@ async function testGenerateQueue() {
 }
 
 testGenerateQueue();
+*/
+
+const { fetchUserMusicHistory, fetchRelatedTracks } = require('./services/firestoreService'); // <- update the correct path
+const { db } = require('./config/firebase'); // <- your firebase config
+
+async function testFirestoreFunctions() {
+    const testUserId = 'IaCW2sstJAV0R3x6Xdzyb1xycif2'; // <-- replace with a real userId from your Firestore!
+
+    try {
+        console.log('Testing fetchUserMusicHistory...');
+
+        const userHistory = await fetchUserMusicHistory(testUserId, 10);
+        console.log(`Fetched ${userHistory.length} songs from user's music history.`);
+        console.log(userHistory[0]);
+
+        console.log('--------------------------------------');
+
+        console.log('Testing fetchRelatedTracks...');
+
+        const relatedTracks = await fetchRelatedTracks();
+        console.log(`Fetched ${relatedTracks.length} related tracks from cache.`);
+        console.log(relatedTracks[0]);
+
+    } catch (error) {
+        console.error('Error testing Firestore functions:', error);
+    } finally {
+        // Optional: Close DB if needed (for Admin SDK)
+        if (db && db.terminate) {
+            await db.terminate();
+        }
+    }
+}
+
+testFirestoreFunctions();
 

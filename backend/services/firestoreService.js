@@ -1,3 +1,4 @@
+
 const { db, admin } = require("../config/firebase");
 const { getTrackDetails } = require("./youtubeService");
 
@@ -125,7 +126,69 @@ const saveRelatedTracks = async (keyword, tracks) => {
         console.error("Error saving related tracks cache:", error);
         throw error;
     }
-    
+
 }
 
-module.exports = { saveSongListen, toggleSongLike, saveRelatedTracks };
+// Fetch user's music history (latest N songs)
+const fetchUserMusicHistory = async (userId, maxSongs = 20) => {
+    try {
+        const historyRef = db
+            .collection('users')
+            .doc(userId)
+            .collection('music_history')
+            .orderBy('lastPlayedAt', 'desc')
+            .limit(maxSongs);
+
+        const querySnapshot = await historyRef.get();
+        const history = [];
+
+        querySnapshot.forEach((doc) => {
+            const data = doc.data();
+            history.push({
+                id: data.id,
+                name: data.name,
+                artist: data.artist,
+                thumbnail: data.thumbnail,
+                duration: data.duration,
+                keywords: data.genre || [],
+                lastPlayedAt: data.lastPlayedAt ? data.lastPlayedAt.toDate().toISOString() : null,
+                playCount: data.playCount || 0,
+            });
+        });
+
+        return history;
+    } catch (error) {
+        console.error("Error fetching user music history:", error);
+        throw error;
+    }
+};
+
+// Fetch related tracks cache
+const fetchRelatedTracks = async () => {
+    try {
+        const relatedTracksRef = db.collection("relatedTracksCache");
+        const querySnapshot = await relatedTracksRef.get();
+
+        const relatedTracks = [];
+
+        querySnapshot.forEach((doc) => {
+            const keyword = doc.id;
+            const tracks = doc.data().tracks || [];
+            relatedTracks.push({ keyword, tracks }); // flatten into a single array
+        });
+
+        return relatedTracks;
+    } catch (error) {
+        console.error("Error fetching related tracks cache:", error);
+        throw error;
+    }
+};
+
+
+module.exports = { 
+    saveSongListen, 
+    toggleSongLike, 
+    saveRelatedTracks, 
+    fetchUserMusicHistory, 
+    fetchRelatedTracks 
+};

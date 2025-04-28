@@ -32,6 +32,9 @@ const signInWithGoogle = async () => {
         }, { merge: true }); // Merge to prevent overwriting existing data
 
         console.log("User signed in and data stored:", user);
+
+
+        
     } catch (error) {
         console.error("Error during sign-in:", error);
     }
@@ -44,5 +47,6 @@ const logout = async () => {
         console.error("Error during logout:", error);
     }
 };
+
 
 export { db, auth, signInWithGoogle, logout };
