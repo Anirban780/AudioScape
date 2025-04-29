@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import YouTube from "react-youtube";
 import { saveSongListen } from "../../utils/api";
 import usePlayerStore from "../../store/usePlayerStore";

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect } from "react";
 import FullScreenPlayer from "./FullScreenPlayer";
-import YouTubePlayer from "./YouTubePlayer";
+import YoutubePlayer from "./YoutubePlayer";
 import MiniPlayer from "./MiniPlayer";
 import usePlayerStore from "../../store/usePlayerStore";
 import { generateQueue } from "../../utils/api";
@@ -96,7 +96,7 @@ const PlayerContainer = ({ onClose, uid }) => {
 
   return (
     <>
-      <YouTubePlayer trackId={track?.id} onReady={onPlayerReady} />
+      <YoutubePlayer trackId={track?.id} onReady={onPlayerReady} />
       {isFullScreen ? (
         <FullScreenPlayer
           track={track}
