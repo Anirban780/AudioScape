@@ -1,6 +1,9 @@
 import { create } from 'zustand'
+import { saveLikeSong, fetchLikedStatus } from '../utils/api';
+import { auth } from "../firebase/firebaseConfig";
+import toast from 'react-hot-toast';
 
-const usePlayerStore = create((set) => ({
+const usePlayerStore = create((set, get) => ({
     track: null,
     isPlaying: false,
     isFullScreen: false,
@@ -11,7 +14,18 @@ const usePlayerStore = create((set) => ({
     player: null,
     isPlayerReady: false,
 
-    setTrack: (track) => set({ track }),
+    setTrack: async(track) => {
+        const user = auth.currentUser;
+        let liked = false;
+
+        if (user && track?.id) {
+            liked= await fetchLikedStatus(user.uid, track.id);
+        }
+
+        set({ track, isLiked: liked });
+    },
+    
+    
     setIsPlaying: (isPlaying) => set({ isPlaying }),
     setProgress: (progress) => set({ progress }),
     setDuration: (duration) => set({ duration }),
@@ -23,9 +37,27 @@ const usePlayerStore = create((set) => ({
     togglePlayPause: () => set((state) => ({ isPlaying: !state.isPlaying })),
     toggleFullScreen: () => set((state) => ({ isFullScreen: !state.isFullScreen })),
     setIsFullScreen: (isFullScreen) => set({ isFullScreen }),
-    toggleLike: () => set((state) => ({ isLiked: !state.isLiked })),
     toggleMute: () => set((state) => ({ isMuted: !state.isMuted })),
+    
+    toggleLike: async() => {
+        const { track, isLiked } = get();
+        const user = auth.currentUser;
 
+        if(!track.id || !user) {
+            console.warn("⚠️ Error: Track ID or User not found");
+            return;
+        }
+
+        const newLiked = !isLiked;
+        await saveLikeSong(user.uid, track, newLiked);
+        toast.success(newLiked ? "Added to favourites" : "Removed from favourites");
+
+        set({
+            isLiked: newLiked,
+            track: { ...track, liked: newLiked },
+        });
+    },
+    
 
     queue: [],
     currentIndex: 0,

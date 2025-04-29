@@ -18,7 +18,7 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
     isMuted,
     toggleMute,
     isLiked,
-    setIsLiked,
+    toggleLike,
     queue,
     currentIndex,
     setCurrentIndex,
@@ -52,7 +52,6 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
     setIsPlaying(!isPlaying);
   };
 
-  const handleLike = () => setIsLiked(!isLiked);
 
   useEffect(() => {
     if (!player) return;
@@ -133,7 +132,6 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
           <PlayerControls
             isPlaying={isPlaying}
             togglePlayPause={togglePlayPause}
-            handleLike={handleLike}
             isLiked={isLiked}
             size={30}
             handleNext={usePlayerStore.getState().nextTrack}
@@ -144,6 +142,7 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
             toggleLooping={toggleLooping}
             isShuffling={isShuffling}
             toggleShuffling={toggleShuffling}
+            toggleLike={toggleLike}
           />
         </div>
       </div>

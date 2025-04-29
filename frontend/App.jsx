@@ -8,9 +8,13 @@ import Loader from "./components/Home/Loader";
 import { useState, useEffect } from "react";
 import ExplorePage from "./pages/ExplorePage";
 import { Toaster } from "react-hot-toast";
+import FavoritesPage from "./pages/FavoritesPage";
+import PlayerContainer from "./components/Player/PlayerContainer";
+import usePlayerStore from "./store/usePlayerStore";
 
 function AppContent() {
   const { user } = useAuth();
+  const { track } = usePlayerStore();
   const location = useLocation();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -26,12 +30,15 @@ function AppContent() {
 
       <Toaster position="top-right" reverseOrder={false} />
 
+      {/* Persistent PlayerContainer to avoid unmounting during routing */}
+      {user && track && <PlayerContainer uid={user.uid} />}
+
       <Routes>
         <Route path="/" element={user ? <Navigate to="/home" /> : <LandingPage />} />
         <Route path="/home" element={user ? <Home /> : <Navigate to="/" />} />
-        <Route path="/explore" element={ <ExplorePage /> } />
+        <Route path="/explore" element={<ExplorePage />} />
+        <Route path="/favourites" element={user ? <FavoritesPage /> : <Navigate to="/" />} />
         <Route path="*" element={<NotFound />} />
-        
       </Routes>
     </div>
   );

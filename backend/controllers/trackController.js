@@ -1,5 +1,5 @@
 const { searchTrack, getTrackDetails } = require("../services/youtubeService")
-const { saveSongListen, toggleSongLike, saveRelatedTracks } = require("../services/firestoreService")
+const { saveSongListen, saveRelatedTracks } = require("../services/firestoreService")
 const { admin } = require('../config/firebase');
 
 
@@ -55,35 +55,6 @@ const saveSong = async(req, res) => {
      catch (error) {
         res.status(500).json({ error: error.message });
     }
-}
-
-const likeSong = async (req, res) => {
-    const { videoId } = req.body;
-    const token = req.headers.authorization?.split('Bearer ')[1];
-
-    if(!videoId) 
-        return res.status(400).json({ error: "Video ID is required" });
-
-    if(!token)
-        return res.status(401).json({ error: "Authorization token is required" });
-
-    try {
-        const decodedToken = await admin.auth().verifyIdToken(token);
-        const userId = decodedToken.uid;
-
-        const result = await toggleSongLike(videoId, userId);
-        if (result) {
-            res.status(200).json({ message: "Song liked successfully" });
-        }
-        else {
-            res.status(200).json({ message: 'Song is disliked. Tap again to like it' });
-        }
-    }
-    catch (error) {
-        console.error("Error in /like route:", error);
-        res.status(500).json({ error: error.message });
-    }
-    
 }
 
 
@@ -172,6 +143,6 @@ const generateQueue = async (req, res) => {
 
 
 module.exports = { 
-    searchSongs, fetchTrack, saveSong, likeSong, 
+    searchSongs, fetchTrack, saveSong,
     cacheRelatedTracks, generateQueue 
 };

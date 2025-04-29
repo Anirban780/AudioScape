@@ -1,6 +1,6 @@
-import React, { useState, useCallback, useEffect } from "react";
+import React, { useCallback, useEffect } from "react";
 import FullScreenPlayer from "./FullScreenPlayer";
-import YouTubePlayer from "./YoutubePlayer";
+import YouTubePlayer from "./YouTubePlayer";
 import MiniPlayer from "./MiniPlayer";
 import usePlayerStore from "../../store/usePlayerStore";
 import { generateQueue } from "../../utils/api";
@@ -16,26 +16,27 @@ const getRandomGenre = (genres) => {
 };
 
 const PlayerContainer = ({ onClose, uid }) => {
-  const [player, setPlayer] = useState(null);
-  const [isPlayerReady, setIsPlayerReady] = useState(false);
-
   const {
+    player,
+    setPlayer,
+    isPlayerReady,
+    setIsPlayerReady,
     track,
     setTrack,
     queue,
     setQueue,
-    currentIndex,
     setCurrentIndex,
     isLooping,
     isFullScreen,
     toggleFullScreen,
-    nextTrack
+    nextTrack,
   } = usePlayerStore();
 
   // Generate queue when a new track is played
   useEffect(() => {
     if (track?.id && uid && queue.length === 0) {
       const keyword = getRandomGenre(track.genre);
+      console.debug("Generating queue for track:", track.id, "with keyword:", keyword);
 
       const fetchQueue = async () => {
         try {
@@ -71,33 +72,22 @@ const PlayerContainer = ({ onClose, uid }) => {
 
     const interval = setInterval(checkState, 1000);
     return () => clearInterval(interval);
-  }, [player, track?.id, queue, currentIndex, setTrack, setCurrentIndex, isLooping]);
+  }, [player, track?.id, isLooping, nextTrack]);
 
-  // Handle player ready
   const onPlayerReady = useCallback((event) => {
     const ytPlayer = event.target;
     setPlayer(ytPlayer);
     setIsPlayerReady(true);
 
-    if (track?.id) {
-      ytPlayer.loadVideoById({ videoId: track.id });
+    const currentTrack = usePlayerStore.getState().track;
+    if (currentTrack?.id && ytPlayer.getVideoData().video_id !== currentTrack.id) {
+      ytPlayer.loadVideoById({ videoId: currentTrack.id });
       ytPlayer.playVideo();
     }
-  }, [track?.id]);
-
-  // Load new video when track changes
-  useEffect(() => {
-    if (isPlayerReady && player && track?.id) {
-      try {
-        player.loadVideoById({ videoId: track.id });
-        player.playVideo();
-      } catch (err) {
-        console.error("Failed to load and play video", err);
-      }
-    }
-  }, [track?.id, isPlayerReady, player]);
+  }, [setPlayer, setIsPlayerReady]);
 
   const handleClose = () => {
+    console.debug("Closing player");
     if (onClose) onClose();
     setTrack(null);
     setQueue([]);

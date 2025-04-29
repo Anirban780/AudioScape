@@ -1,4 +1,4 @@
-import { collection, query, orderBy, limit, getDocs } from "firebase/firestore";
+import { collection, query, orderBy, limit, getDocs, getDoc, setDoc, doc } from "firebase/firestore";
 import { auth, db } from "../firebase/firebaseConfig";
 
 const LOCAL_API_URL = "http://localhost:5000";
@@ -85,34 +85,99 @@ export async function fetchLastPlayed(userId) {
     }
 }
 
+export async function fetchUserLikedSongs(userId) {
+    if (!userId) {
+        console.warn("⚠️ User ID is missing");
+        return [];
+    }
 
-export async function saveLikeSong(videoId) {
-    if (!auth.currentUser) {
-        console.error("⚠️ Error: User not logged in");
+    const userRef = collection(db, "users", userId, "music_history");
+
+    const likedSongsQuery = query(
+        userRef,
+        orderBy("lastPlayedAt", "desc"),
+    );
+
+    try {
+        const snapshot = await getDocs(likedSongsQuery);
+        return snapshot.docs
+            .map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+            }))
+            .filter(song => song.liked === true);
+
+    } catch (error) {
+        console.error("Error fetching liked songs:", error);
+        return [];
+    }
+}
+
+
+export async function saveLikeSong(userId, track, liked) {
+    if(!userId || !track?.id) {
+        console.warn("⚠️ User ID or Video ID is missing");
         return;
     }
 
     try {
-        const token = await auth.currentUser.getIdToken();
-        const API_URL = await getBackendURL();
+        // Reference to the music_history collection for the specific user
+        const musicHistoryRef = collection(db, "users", userId, "music_history");
 
-        const response = await fetch(`${API_URL}/api/music/like`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${token}`,
-            },
-            body: JSON.stringify({ videoId }),
+        // Search for the track document that contains the videoId
+        const querySnapshot = await getDocs(musicHistoryRef);
+
+        let trackDocRef;
+        querySnapshot.forEach((doc) => {
+            const trackData = doc.data();
+            if (trackData.id === track.id) {
+                trackDocRef = doc.ref;
+            }
         });
 
-        if (!response.ok) {
-            throw new Error(`Failed to like song: ${response.status} ${response.statusText}`);
+        if (!trackDocRef) {
+            console.warn("⚠️ Track not found in music history.");
+            return;
         }
 
-        console.log("Song liked/disliked successfully");
+        // Now that we have the track document, we save or update the liked status
+        await setDoc(trackDocRef, {
+            ...track, 
+            liked: liked,            
+            
+        }, { merge: true }); // Merge to update only the liked status and not overwrite the rest of the data
+
+    } catch (error) {
+        console.error("Error saving like status:", error);
     }
-    catch (error) {
-        console.error("Error liking/disliking song:", error);``
+}
+
+export async function fetchLikedStatus (userId, videoId) {
+    if (!userId || !videoId) {
+        console.warn("⚠️ User ID or track ID is missing");
+        return false;
+    }
+
+    try {
+        // Reference to the music_history collection for the specific user
+        const musicHistoryRef = collection(db, "users", userId, "music_history");
+
+        // Search for the track document that contains the videoId
+        const querySnapshot = await getDocs(musicHistoryRef);
+
+        let likedStatus = false;
+        querySnapshot.forEach((doc) => {
+            const trackData = doc.data();
+            if (trackData.id === videoId) {
+                likedStatus = trackData.liked; // If found, set the liked status
+            }
+        });
+
+        return likedStatus; // Return the liked status of the track (true/false)
+        
+    } catch (error) {
+        console.error("Error fetching liked status:", error);
+        return false; // Return false in case of an error
     }
 }
 

@@ -9,7 +9,7 @@ const saveSongListen = async (videoId, userId) => {
     }
 
     const songDetails = await getTrackDetails(videoId);
-    console.log("Fetched song details:", songDetails);
+    //console.log("Fetched song details:", songDetails);
 
     if (!songDetails) {
         console.error("Song details not found for videoId:", videoId);
@@ -57,50 +57,6 @@ const saveSongListen = async (videoId, userId) => {
         return { success: false, error: error.message };
     }
 };
-
-/**
- * Toggle the "like" status for a song in the user's history,
- * and update the global like counter for the song.
- * 
- * @param {string} videoId - The YouTube video ID of the song.
- * @param {string} userId - The ID of the current user.
- * @returns {Object} Result object with success flag and liked status.
- */
-
-const toggleSongLike = async (videoId, userId) => {
-    if (!userId) {
-        console.error("User not logged in");
-        return { success: false, error: "User not logged in" };
-    }
-
-    // check if the song exists in the user'history
-    const userRef = db.collection("users").doc(userId);
-    const historyRef = userRef.collection("music_history");
-
-    try {
-        const snapshot = await historyRef.where("id", "==", videoId).limit(1).get();
-
-        if (snapshot.empty) {
-            console.error("Song not found in user's history. User must listen to the song first for few seconds.");
-            return { success: false, error: "Song not found in user's history" };
-        }
-
-        // get the document reference and currnet liked status
-        const songDoc = snapshot.docs[0].ref;
-        const data = snapshot.docs[0].data();
-        const currentLiked = data.liked || false;
-        const newLiked = !currentLiked;
-
-        // toggle the liked flag in user's history
-        await songDoc.update({ liked: newLiked });
-        console.log(`${newLiked ? "Liked" : "Unliked"} the song: ${data.name}`);
-        return { success: true, liked: newLiked };
-    }
-    catch (error) {
-        console.error("Error toggling song like:", error);
-        return { success: false, error: error.message };
-    }
-}
 
 
 const saveRelatedTracks = async (keyword, tracks) => {
@@ -189,7 +145,6 @@ const fetchRelatedTracks = async () => {
 
 module.exports = { 
     saveSongListen, 
-    toggleSongLike, 
     saveRelatedTracks, 
     fetchUserMusicHistory, 
     fetchRelatedTracks 

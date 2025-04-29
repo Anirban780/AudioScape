@@ -15,7 +15,6 @@ import usePlayerStore from "../../store/usePlayerStore";
 const PlayerControls = ({
   isPlaying,
   togglePlayPause,
-  handleLike,
   isLiked,
   size,
   handleNext,
@@ -26,6 +25,7 @@ const PlayerControls = ({
   toggleLooping,
   isShuffling,
   toggleShuffling,
+  toggleLike
 }) => {
   const { isFullScreen } = usePlayerStore();
 
@@ -92,15 +92,19 @@ const PlayerControls = ({
       {isFullScreen && (
         <div className="flex items-center justify-center gap-6 mt-2">
           <button
-            onClick={handleLike}
+            onClick={toggleLike}
             className={cn(
-              "p-2 rounded-full transition-colors duration-200",
-              isLiked ? "text-white" : "text-gray-500 hover:text-white"
+              "p-2 rounded-full transition-all duration-300 ease-in-out transform",
+              isLiked
+                ? " text-green-600 hover:text-white hover:bg-gray-500 shadow-lg scale-105"
+                : "text-gray-500 hover:text-white hover:bg-green-400 hover:scale-105",
+              "hover:shadow-md"
             )}
             aria-label="Like"
           >
             <ThumbsUp size={size} fill="none" strokeWidth={isLiked ? 2.5 : 2} />
           </button>
+
 
           <button
             onClick={toggleMute}

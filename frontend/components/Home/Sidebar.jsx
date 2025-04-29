@@ -56,7 +56,7 @@ const Sidebar = ({ isOpen: externalOpen, onToggle }) => {
         <MenuItem icon={Home} text="Home" to="/home" />
         <MenuItem icon={Compass} text="Explore" to="/explore" />
         <MenuItem icon={Library} text="Library" to="/library" />
-        <MenuItem icon={Heart} text="Liked Songs" to="/liked-songs" />
+        <MenuItem icon={Heart} text="Favourites" to="/favourites" />
       </ul>
     </div>
   );

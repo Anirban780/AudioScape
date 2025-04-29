@@ -8,7 +8,6 @@ import { getPersonalizedExploreKeywords } from '../utils/keywords';
 import { fetchYoutubeMusic } from '../utils/youtube';
 import MusicCard from '../components/Cards/MusicCard';
 import { Sun, Moon, Menu } from 'lucide-react';
-import PlayerContainer from '../components/Player/PlayerContainer';
 import ResponsiveLayout from "../ResponsiveLayout";
 import { cacheRelatedTracks } from '../utils/api';
 import usePlayerStore from "../store/usePlayerStore";
@@ -187,12 +186,6 @@ const ExplorePage = () => {
         </ResponsiveLayout>
       </div>
 
-      {track && (
-        <PlayerContainer
-          onClose={() => setTrack(null)}
-          uid={user.uid}
-        />
-      )}
     </div>
   );
 };

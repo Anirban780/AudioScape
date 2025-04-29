@@ -59,8 +59,11 @@ const RecentlyPlayed = ({ userId }) => {
         className="grid grid-flow-col auto-cols-[minmax(200px,1fr)] gap-5 overflow-x-auto scrollbar-hide scroll-smooth"
         style={{ scrollSnapType: "x mandatory", paddingBottom: "10px" }}
       >
-        {recentlyPlayed.slice(0, visibleSongs).map((song) => (
-          <div key={song.id} style={{ scrollSnapAlign: "start" }}>
+        {recentlyPlayed.slice(0, visibleSongs).map((song, index) => (
+          <div
+            key={`${song.id}-${index}`}
+            style={{ scrollSnapAlign: "start" }}
+          >
             <MusicCard
               id={song.id}
               name={song.name}

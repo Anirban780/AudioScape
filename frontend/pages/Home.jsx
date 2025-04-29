@@ -7,7 +7,6 @@ import { useTheme } from "../ThemeProvider";
 import HeroSection from "../components/Home/HeroSection";
 import RecentlyPlayed from "../components/Home/RecentlyPlayed";
 import { useAuth } from "../context/AuthContext";
-import PlayerContainer from "../components/Player/PlayerContainer";
 import ResponsiveLayout from "../ResponsiveLayout";
 import usePlayerStore from "../store/usePlayerStore";
 import RecommendForYou from "../components/Home/RecommendForYou";
@@ -88,13 +87,6 @@ const HomePage = () => {
         </ResponsiveLayout>
       </div>
 
-      {/* Inline Player */}
-      {track && (
-          <PlayerContainer
-            onClose={() => setTrack(null)}
-            uid={user.uid}
-          />
-      )}
     </div>
   );
 };
