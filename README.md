@@ -13,7 +13,6 @@
 - 🎼 **Dynamic Playlists** with right-side sliding track details  
 - 🗂 **Category-Based Album Pages** with pagination and "See All" support  
 - 🔐 **Authentication with Firebase + Google OAuth**  
-- ☁️ **Music Uploads via AWS S3**  
 - ⚡ **Queue System** with related tracks and history integration  
 - 🌗 **Dark/Light Theme Support**
 
