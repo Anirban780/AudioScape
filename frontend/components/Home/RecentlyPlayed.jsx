@@ -18,7 +18,10 @@ const RecentlyPlayed = ({ userId }) => {
   useEffect(() => {
     if (userId) {
       fetchLastPlayed(userId).then((songs) => {
-        setRecentlyPlayed(songs);
+        const uniqueSongs = Array.from(
+          new Map(songs.map((song) => [song.id, song])).values()
+        );
+        setRecentlyPlayed(uniqueSongs);
         setTimeout(() => handleScroll(), 100);
       });
     }

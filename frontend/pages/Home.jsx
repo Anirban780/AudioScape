@@ -71,19 +71,20 @@ const HomePage = () => {
             <HeroSection />
           </div>
 
-          {/* Recommended for you */}
-          {user && (
-            <div className="mt-6">
-              <RecommendForYou userId={user.uid} />
-            </div>
-          )}
-
           {/* Recently Played */}
           {user && (
             <div className="mt-4">
               <RecentlyPlayed userId={user.uid} />
             </div>
           )}
+
+          {/* Recommended for you */}
+          {user && (
+            <div className="mt-6">
+              <RecommendForYou userId={user.uid} />
+            </div>
+          )}
+          
         </ResponsiveLayout>
       </div>
 

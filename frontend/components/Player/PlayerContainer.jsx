@@ -59,6 +59,8 @@ const PlayerContainer = ({ onClose, uid }) => {
     if (!player || !track?.id) return;
 
     const checkState = () => {
+      if (!player) return; // Prevent errors if player is not available
+
       const state = player.getPlayerState();
       if (state === 0) { // Ended
         if (isLooping) {
@@ -76,6 +78,10 @@ const PlayerContainer = ({ onClose, uid }) => {
 
   const onPlayerReady = useCallback((event) => {
     const ytPlayer = event.target;
+
+    // Check if ytPlayer is valid before continuing
+    if (!ytPlayer) return;
+
     setPlayer(ytPlayer);
     setIsPlayerReady(true);
 
@@ -84,14 +90,47 @@ const PlayerContainer = ({ onClose, uid }) => {
       ytPlayer.loadVideoById({ videoId: currentTrack.id });
       ytPlayer.playVideo();
     }
+
   }, [setPlayer, setIsPlayerReady]);
 
   const handleClose = () => {
     console.debug("Closing player");
-    if (onClose) onClose();
+
+    // Ensure player cleanup is done safely with proper checks
+    if (player) {
+      try {
+        // Check if methods exist before calling them
+        if (typeof player.stopVideo === 'function') {
+          player.stopVideo();
+        }
+
+        // Allow a small delay before destroying the player
+        // This helps prevent the "Cannot read properties of null (reading 'src')" error
+        setTimeout(() => {
+          try {
+            if (player && typeof player.destroy === 'function') {
+              player.destroy();
+            }
+          } catch (err) {
+            console.warn("Error destroying player:", err);
+          } finally {
+            // Reset states after player operations
+            setPlayer(null);
+            setIsPlayerReady(false);
+          }
+        }, 100);
+      } catch (err) {
+        console.error("Error during player cleanup:", err);
+      }
+    }
+
+    // Reset the track and queue state immediately
+    // These operations don't depend on the player
     setTrack(null);
     setQueue([]);
-    setIsPlayerReady(false);
+
+    // Call the onClose callback if it exists
+    if (onClose) onClose();
   };
 
   return (

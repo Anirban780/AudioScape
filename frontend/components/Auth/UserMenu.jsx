@@ -87,24 +87,24 @@ const UserMenu = () => {
             <DropdownMenuSeparator className="my-1 border-gray-200 dark:border-gray-700" />
 
             <DropdownMenuItem 
-              className="menu-item ml-2"
+              className="menu-item ml-2 hover:bg-gray-100 dark:hover:bg-gray-800"
               onClick={() => navigate("/profile")}
             >
               <User size={18} />
               Profile
             </DropdownMenuItem>
 
-            <DropdownMenuItem className="menu-item ml-2">
-              <Settings size={18} />
-              Settings
-            </DropdownMenuItem>
-
-            <DropdownMenuItem className="menu-item ml-2">
+            <DropdownMenuItem 
+              className="menu-item ml-2 "
+            >
               <History size={18} />
               History
             </DropdownMenuItem>
 
-            <DropdownMenuItem className="menu-item ml-2">
+            <DropdownMenuItem 
+              className="menu-item ml-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+              onClick={() => navigate("/help")}
+            >
               <HelpCircle size={18} />
               Help & Feedback
             </DropdownMenuItem>

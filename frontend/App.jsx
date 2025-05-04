@@ -11,6 +11,7 @@ import { Toaster } from "react-hot-toast";
 import FavoritesPage from "./pages/FavoritesPage";
 import PlayerContainer from "./components/Player/PlayerContainer";
 import usePlayerStore from "./store/usePlayerStore";
+import HelpFeedback from "./pages/HelpFeedback";
 
 function AppContent() {
   const { user } = useAuth();
@@ -38,6 +39,7 @@ function AppContent() {
         <Route path="/home" element={user ? <Home /> : <Navigate to="/" />} />
         <Route path="/explore" element={<ExplorePage />} />
         <Route path="/favourites" element={user ? <FavoritesPage /> : <Navigate to="/" />} />
+        <Route path='/help' element={<HelpFeedback />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </div>
