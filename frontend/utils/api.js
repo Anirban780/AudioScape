@@ -227,41 +227,6 @@ export const cacheRelatedTracks = async(keyword, tracks) => {
 };
 
 
-export const generateQueue = async(keyword, uid, currentTrack) => {
-    if (!auth.currentUser) {
-        console.error("⚠️ Error: User not logged in");
-        return;
-    }
-    
-    try {
-        const token = await auth.currentUser.getIdToken();
-        const API_URL = await getBackendURL();
-
-        const response = await fetch(`${API_URL}/api/music/generate-queue`,
-            {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    "Authorization": `Bearer ${token}`,
-                },
-                body: JSON.stringify({ keyword, uid, currentTrack }),
-            }
-        );
-
-        if(!response.ok) {
-            throw new Error("Failed to generate queue");
-        }
-
-        const data = await response.json();
-        console.log(data.queue);
-        return data.queue;
-    }
-    catch (err) {
-        console.error("Queue generation error:", err);
-        return [];
-    }
-};
-
 export const getRecommendations = async(topN) => {
     if (!auth.currentUser) {
         console.error("⚠️ Error: User not logged in");

@@ -3,17 +3,31 @@ import FullScreenPlayer from "./FullScreenPlayer";
 import YoutubePlayer from "./YoutubePlayer";
 import MiniPlayer from "./MiniPlayer";
 import usePlayerStore from "../../store/usePlayerStore";
-import { generateQueue } from "../../utils/api";
+import { generateQueue } from "../../utils/generateQueue";
 
-const curatedGenres = [
-  "lofi music", "pop hits", "indie rock", "anime music", "k-pop", "electronic", "jazz chill", "hip hop",
-];
+const isValidKeyword = (keyword) => {
+  if (!keyword) return false;
+  const invalidKeywords = ["music", "new", "lyrics", "song", "video", "live", "official"];
+  const cleaned = keyword.toLowerCase().trim();
+  return !invalidKeywords.includes(cleaned);
+};
 
 const getRandomGenre = (genres) => {
-  return genres?.length > 0
-    ? genres[Math.floor(Math.random() * genres.length)]
-    : curatedGenres[Math.floor(Math.random() * curatedGenres.length)];
+  if (Array.isArray(genres) && genres.length > 0) {
+    // Filter invalid or vague keywords
+    const cleanedGenres = genres
+      .map((g) => g.toLowerCase().trim())
+      .filter(isValidKeyword);
+
+    if (cleanedGenres.length > 0) {
+      return cleanedGenres[Math.floor(Math.random() * cleanedGenres.length)];
+    }
+  }
+
+  // If no valid genres are found, return null or a default genre (e.g., 'unknown')
+  return null;
 };
+
 
 const PlayerContainer = ({ onClose, uid }) => {
   const {
