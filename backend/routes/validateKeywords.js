@@ -8,8 +8,8 @@ let genAI = null;
 // Dynamically import GoogleGenAI inside async scope
 async function getGenAI() {
   if (!genAI) {
-    const { GoogleGenerativeAI } = await import('@google/genai');
-    genAI = new GoogleGenerativeAI({
+    const { GoogleGenAI } = await import('@google/genai');
+    genAI = new GoogleGenAI({
       apiKey: process.env.GEMINI_API_KEY
     });
   }
