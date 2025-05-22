@@ -77,12 +77,14 @@ export const fetchYoutubeMusic = async (query, maxResults = 20) => {
     if (now - parsed.timestamp < CACHE_EXPIRY_MS) {
       console.log("✅ Using cached data for:", query);
       return parsed.data; // Return cached data if it's still valid
-    } else {
+    } 
+    else {
       console.log("⏰ Cache expired for:", query);
       // Cache expired, so make the API call
       return await fetchAndCacheYoutubeMusic(query, maxResults);
     }
-  } else {
+  } 
+  else {
     console.log("🔄 No cached data found for:", query);
     // No cache, make the API call
     return await fetchAndCacheYoutubeMusic(query, maxResults);

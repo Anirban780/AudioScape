@@ -14,6 +14,7 @@
   "type": "commonjs",
   "dependencies": {
     "@google-cloud/firestore": "^7.11.0",
+    "@google/genai": "^1.0.1",
     "@grpc/grpc-js": "^1.13.1",
     "axios": "^1.8.4",
     "cors": "^2.8.5",
