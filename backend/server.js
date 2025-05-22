@@ -4,6 +4,7 @@ const cors = require("cors");
 
 const trackRoutes = require("./routes/trackRoutes")
 const firestoreRoutes = require("./routes/firestoreRoutes")
+const validateKeywords = require("./routes/validateKeywords")
 
 const app = express();
 
@@ -29,6 +30,7 @@ app.use(express.json());
 
 app.use("/youtube", trackRoutes);
 app.use('/api/music', firestoreRoutes);
+app.use('/api', validateKeywords);
 
 app.get("/", (req, res) => {
     res.send("Audioscape Server is running successfully!");

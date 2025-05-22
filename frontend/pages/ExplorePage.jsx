@@ -4,7 +4,7 @@ import SearchBar from '../components/Home/SearchBar';
 import UserMenu from '../components/Auth/UserMenu';
 import { useTheme } from '../ThemeProvider';
 import { useAuth } from '../context/AuthContext';
-import { getPersonalizedExploreKeywords } from '../utils/keywords';
+import { getExploreKeywords } from '../utils/keywords';
 import { fetchYoutubeMusic } from '../utils/youtube';
 import MusicCard from '../components/Cards/MusicCard';
 import { Sun, Moon, Menu } from 'lucide-react';
@@ -35,7 +35,7 @@ const ExplorePage = () => {
       setLoading(true);
 
       try {
-        let keywords = await getPersonalizedExploreKeywords(user.uid);
+        let keywords = await getExploreKeywords(user.uid);
         if (!keywords || keywords.length === 0) {
           keywords = curatedGenres;
         }

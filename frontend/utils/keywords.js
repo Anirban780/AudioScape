@@ -1,97 +1,71 @@
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, limit } from "firebase/firestore";
 import { db } from "../firebase/firebaseConfig";
+import { fetchKeywordsFromAI } from "./api"; // Adjust path as needed
 
-// Cache config
-const CACHE_KEY = "personalized_explore_keywords";
-const CACHE_EXPIRY_MS = 1000 * 60 * 30; // 30 minutes
-
-// Fallback genres (in case user has no history)
-const FALLBACK_GENRES = [
-  "pop", "rock", "hip hop", "jazz", "electronic",
-  "classical", "lo-fi", "indie", "trap", "dance", "anime music"
+const FALLBACK_KEYWORDS = [
+  "pop", "chill", "hip hop", "indie", "romantic",
+  "electronic", "classical", "party", "lofi", "rock"
 ];
 
-// Fisher-Yates shuffle
-const shuffleArray = (array) => {
-  const arr = [...array];
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-};
+const CACHE_EXPIRY_MS = 1000; // 30 minutes
+const MAX_HISTORY_RECORDS = 100;
 
-export const getPersonalizedExploreKeywords = async (userId) => {
-  if (!userId) return [];
+export async function getExploreKeywords(
+  userId,
+  {
+    cacheKey = `explore_keywords_${userId}`,
+    fallbackList = FALLBACK_KEYWORDS,
+    cacheExpiry = CACHE_EXPIRY_MS,
+  } = {}
+) {
+  if (!userId) return fallbackList;
 
-  // Check cache
-  const cachedData = localStorage.getItem(CACHE_KEY);
-  const now = Date.now();
-
-  if (cachedData) {
-    const parsed = JSON.parse(cachedData);
-    if (now - parsed.timestamp < CACHE_EXPIRY_MS) {
-      console.log("✅ Using cached personalized keywords");
-      return parsed.keywords;
-    } else {
-      console.log("⏰ Cache expired. Fetching new keywords...");
-    }
-  }
-
-  const historyRef = collection(db, "users", userId, "music_history");
-
+  // 1. Use cached keywords if available
   try {
-    const snapshot = await getDocs(historyRef);
-    const keywordMap = {};
-
-    snapshot.forEach((doc) => {
-      const track = doc.data();
-      const count = track.playCount || 1;
-
-      // Handle genre (string or array)
-      const genres = Array.isArray(track.genre)
-        ? track.genre
-        : (track.genre?.split(",") || []);
-      genres.forEach((g) => {
-        const key = g.trim().toLowerCase();
-        if (key.length >= 3) {
-          keywordMap[key] = (keywordMap[key] || 0) + count;
-        }
-      });
-
-      // Handle artist
-      if (track.artist) {
-        const artist = track.artist.toLowerCase().split(/[-|,]/)[0].trim();
-        if (artist.length >= 3) {
-          keywordMap[artist] = (keywordMap[artist] || 0) + count;
-        }
+    const raw = localStorage.getItem(cacheKey);
+    if (raw) {
+      const { ts, keywords } = JSON.parse(raw);
+      if (Date.now() - ts < cacheExpiry) {
+        return keywords;
       }
-    });
+    }
+  } catch {}
 
-    const sorted = Object.entries(keywordMap)
-      .sort((a, b) => b[1] - a[1])
-      .map(([keyword]) => keyword);
-
-    const top3 = sorted.slice(0, 3);
-    const random7 = shuffleArray(sorted.slice(3)).slice(0, 7);
-
-    const keywords = [...top3, ...random7];
-
-    // Fallback if no keywords
-    const finalKeywords = keywords.length ? keywords : shuffleArray(FALLBACK_GENRES).slice(0, 10);
-
-    // Cache the result
-    localStorage.setItem(
-      CACHE_KEY,
-      JSON.stringify({
-        timestamp: now,
-        keywords: finalKeywords,
-      })
+  // 2. Fetch user history from Firestore
+  let history = [];
+  try {
+    const q = query(
+      collection(db, "users", userId, "music_history"),
+      orderBy("lastPlayedAt", "desc"),
+      limit(MAX_HISTORY_RECORDS)
     );
-
-    return finalKeywords;
-  } catch (error) {
-    console.error("Error fetching personalized keywords:", error);
-    return shuffleArray(FALLBACK_GENRES).slice(0, 10);
+    const snap = await getDocs(q);
+    history = snap.docs.map(doc => doc.data());
+  } catch (e) {
+    console.error("Firestore error:", e);
   }
-};
+
+  // 3. Call Gemini API via helper function
+  const aiKeywords = await fetchKeywordsFromAI(history);
+
+  // 4. Mix with fallback if needed
+  const final = aiKeywords.length >= 10
+    ? aiKeywords.slice(0, 10)
+    : [...aiKeywords, ...shuffleArray(fallbackList).slice(0, 10 - aiKeywords.length)];
+
+  // 5. Cache the result
+  try {
+    localStorage.setItem(cacheKey, JSON.stringify({ ts: Date.now(), keywords: final }));
+  } catch {}
+
+  return final;
+}
+
+function shuffleArray(arr) {
+  const a = arr.slice();
+  for (let i = a.length; i > 1; i--) {
+    const j = Math.floor(Math.random() * i);
+    [a[i - 1], a[j]] = [a[j], a[i - 1]];
+  }
+  return a;
+}

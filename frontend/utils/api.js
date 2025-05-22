@@ -270,3 +270,28 @@ export const getRecommendations = async(topN) => {
 };
 
 
+export async function fetchKeywordsFromAI(history = []) {
+    try {
+        const API_URL = await getBackendURL();
+        const res = await fetch(`${API_URL}/api/extractKeywords`, {
+            method: 'POST',
+            headers: { "Content-Type": "application/json"},
+            body: JSON.stringify({history}),
+        });
+
+        if(res.ok) {
+            const json = await res.json();
+            return json.keywords || [];
+        }
+        else {
+            console.error("Gemini API response not OK:", res.status);
+        }
+    }
+    catch (err) {
+        console.error("AI keyword fetch failed: ", err);
+    }
+
+    return [];
+}
+
+

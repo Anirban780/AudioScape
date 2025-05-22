@@ -22,5 +22,9 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
+const firestore = admin.firestore();
+
+// Enable ignoring undefined properties globally
+firestore.settings({ ignoreUndefinedProperties: true });
 
 module.exports = { db, admin }; 
