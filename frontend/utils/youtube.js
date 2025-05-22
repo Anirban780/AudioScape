@@ -18,20 +18,36 @@ const fetchAndCacheYoutubeMusic = async (query, maxResults = 20) => {
   const musicCategoryId = await getMusicCategoryId();
   if (!musicCategoryId) throw new Error("Music category not found");
 
-  const url = `${BASE_URL}/search?part=snippet&type=video&q=${encodeURIComponent(query)}&maxResults=${maxResults}&videoCategoryId=${musicCategoryId}&key=${API_KEY}`;
+  const searchUrl = `${BASE_URL}/search?part=snippet&type=video&q=${encodeURIComponent(query)}&maxResults=${maxResults}&videoCategoryId=${musicCategoryId}&key=${API_KEY}`;
 
   try {
-    const response = await axios.get(url);
-    const tracks = response.data.items.map(item => ({
-      id: item.id.videoId,
-      name: item.snippet.title || "Unknown Title",
-      artist: item.snippet.channelTitle || "Unknown Artist",
-      thumbnail: item.snippet.thumbnails.medium.url,
-      channelId: item.snippet.channelId || "Unknown",
+    const searchResponse = await axios.get(searchUrl);
+    const videoIds = searchResponse.data.items.map(item => item.id.videoId).join(",");
 
-    }));
+    const detailsUrl = `${BASE_URL}/videos?part=contentDetails,snippet&id=${videoIds}&key=${API_KEY}`;
+    const detailsResponse = await axios.get(detailsUrl);
 
-    // Cache the data
+    const tracks = detailsResponse.data.items
+      .filter(item => {
+        const duration = item.contentDetails.duration;
+
+        // Parse ISO 8601 duration into total seconds
+        const match = duration.match(/PT(?:(\d+)M)?(?:(\d+)S)?/);
+        const minutes = parseInt(match?.[1] || "0", 10);
+        const seconds = parseInt(match?.[2] || "0", 10);
+        const totalSeconds = minutes * 60 + seconds;
+
+        // Filter: only videos 60s to 360s (1 to 6 min)
+        return totalSeconds >= 60 && totalSeconds <= 360;
+      })
+      .map(item => ({
+        id: item.id,
+        name: item.snippet.title || "Unknown Title",
+        artist: item.snippet.channelTitle || "Unknown Artist",
+        thumbnail: item.snippet.thumbnails.medium.url,
+        channelId: item.snippet.channelId || "Unknown",
+      }));
+
     const CACHE_KEY = `yt_music_cache_${query}`;
     localStorage.setItem(
       CACHE_KEY,
@@ -47,6 +63,7 @@ const fetchAndCacheYoutubeMusic = async (query, maxResults = 20) => {
     throw error;
   }
 };
+
 
 export const fetchYoutubeMusic = async (query, maxResults = 20) => {
   const CACHE_KEY = `yt_music_cache_${query}`;
