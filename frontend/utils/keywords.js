@@ -7,7 +7,7 @@ const FALLBACK_KEYWORDS = [
   "electronic", "classical", "party", "lofi", "rock"
 ];
 
-const CACHE_EXPIRY_MS = 1000; // 30 minutes
+const CACHE_EXPIRY_MS = 30 * 60 * 1000; // 30 minutes
 const MAX_HISTORY_RECORDS = 100;
 
 export async function getExploreKeywords(
