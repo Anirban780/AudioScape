@@ -14,8 +14,8 @@ router.post("/extractKeywords", async (req, res) => {
   try {
     const response = await genAI.models.generateContent({
       model: "gemini-2.0-flash",
-      contents: `Give 10 music keywords or genres from this history. Only a plain numbered list (no extra text or explanation):\n\n${JSON.stringify(history, null, 2)}`
-
+      contents: `From the following listening history, generate 10 diverse, one-word keywords or genres related to music. 
+        Only return a plain numbered list. No explanations, no punctuation, just the keywords:\n\n${JSON.stringify(history, null, 2)}`
     });
 
     const rawText = response.text;
