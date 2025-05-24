@@ -12,6 +12,8 @@ import FavoritesPage from "./pages/FavoritesPage";
 import PlayerContainer from "./components/Player/PlayerContainer";
 import usePlayerStore from "./store/usePlayerStore";
 import HelpFeedback from "./pages/HelpFeedback";
+import PlaylistModal from "./components/Cards/PlaylistModal";
+import PlaylistsPage from "./pages/PlaylistsPage";
 
 function AppContent() {
   const { user } = useAuth();
@@ -34,11 +36,14 @@ function AppContent() {
       {/* Persistent PlayerContainer to avoid unmounting during routing */}
       {user && track && <PlayerContainer uid={user.uid} />}
 
+      <PlaylistModal userId={user.uid} />
+
       <Routes>
         <Route path="/" element={user ? <Navigate to="/home" /> : <LandingPage />} />
         <Route path="/home" element={user ? <Home /> : <Navigate to="/" />} />
         <Route path="/explore" element={<ExplorePage />} />
         <Route path="/favourites" element={user ? <FavoritesPage /> : <Navigate to="/" />} />
+        <Route path="/playlists" element={user ? <PlaylistsPage /> : <Navigate to="/" />} />
         <Route path='/help' element={<HelpFeedback />} />
         <Route path="*" element={<NotFound />} />
       </Routes>

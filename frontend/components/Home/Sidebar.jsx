@@ -55,8 +55,9 @@ const Sidebar = ({ isOpen: externalOpen, onToggle }) => {
       <ul className={cn('space-y-2', isOpen && 'px-4', !isOpen && 'flex flex-col items-center')}>
         <MenuItem icon={Home} text="Home" to="/home" />
         <MenuItem icon={Compass} text="Explore" to="/explore" />
-        <MenuItem icon={Library} text="Library" to="/library" />
         <MenuItem icon={Heart} text="Favourites" to="/favourites" />
+        <MenuItem icon={Library} text="Playlists" to="/playlists" />
+        
       </ul>
     </div>
   );
