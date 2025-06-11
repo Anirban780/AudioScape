@@ -12,7 +12,7 @@ import FavoritesPage from "./pages/FavoritesPage";
 import PlayerContainer from "./components/Player/PlayerContainer";
 import usePlayerStore from "./store/usePlayerStore";
 import HelpFeedback from "./pages/HelpFeedback";
-import PlaylistModal from "./components/Cards/PlaylistModal";
+import PlaylistModal from "./components/Playlist/PlaylistModal";
 import PlaylistsPage from "./pages/PlaylistsPage";
 
 function AppContent() {

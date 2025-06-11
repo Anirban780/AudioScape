@@ -29,6 +29,10 @@ const PlaylistsPage = () => {
     try {
       await deletePlaylist(user.uid, playlistId);
       removePlaylist(playlistId);
+
+      const updatedPlaylists = await getPlaylists(user.uid);
+      setPlaylists(updatedPlaylists);
+      
       toast.success("Playlist deleted");
     } catch {
       toast.error("Failed to delete playlist");
@@ -54,23 +58,21 @@ const PlaylistsPage = () => {
 
   return (
     <div
-      className={`mx-auto max-w-7xl px-4 py-8 transition-colors duration-300 ${
-        theme === "dark" ? "bg-black text-white" : "bg-white text-black"
-      }`}
+      className={`mx-auto max-w-7xl px-4 py-8 transition-colors duration-300 ${theme === "dark" ? "bg-black text-white" : "bg-white text-black"
+        }`}
     >
       <h2 className="text-2xl font-bold mb-6">Your Playlists</h2>
 
       {!playlists.length && <p>You have no playlists.</p>}
 
       <div className="space-y-8">
-        {playlists.map((playlist) => (
+        {playlists.map((playlist, index) => (
           <div
-            key={playlist.id}
-            className={`p-4 rounded-md border transition-all duration-200 ${
-              theme === "dark"
-                ? "border-gray-700 bg-gray-900"
-                : "border-gray-200 bg-gray-100"
-            }`}
+            key={`${playlist.id}-${index}`}
+            className={`p-4 rounded-md border transition-all duration-200 ${theme === "dark"
+              ? "border-gray-700 bg-gray-900"
+              : "border-gray-200 bg-gray-100"
+              }`}
           >
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-xl font-semibold">{playlist.name}</h3>
