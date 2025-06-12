@@ -97,7 +97,7 @@ const PlaylistModal = ({ userId }) => {
 
                 {/* Modal Header */}
                 <h2 className="text-lg font-semibold mb-4 text-center">
-                    Save {tracksToHandle.length > 1 ? "Tracks" : "Track"} to Playlist
+                    Save to Playlist
                 </h2>
 
                 {/* Create Playlist Section */}
@@ -131,19 +131,18 @@ const PlaylistModal = ({ userId }) => {
                             {playlists.map((pl) => (
                                 <label
                                     key={pl.id}
-                                    className={`flex items-center justify-between rounded-md px-3 py-2 cursor-pointer transition-colors ${theme === "dark"
-                                        ? "hover:bg-neutral-800"
-                                        : "hover:bg-gray-100"
+                                    className={`flex items-center justify-between rounded-md px-3 py-2 cursor-pointer transition-colors ${theme === "dark" ? "hover:bg-neutral-800" : "hover:bg-gray-100"
                                         }`}
                                 >
                                     <span className="text-sm">{pl.name}</span>
-                                    <button
-                                        onClick={() => handleToggle(pl)}
-                                        className="px-2 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700"
-                                    >
-                                        Toggle
-                                    </button>
+                                    <input
+                                        type="checkbox"
+                                        className="form-checkbox h-4 w-5 accent-black"
+                                        checked={tracksToHandle.every((track) => isInPlaylist(pl, track))}
+                                        onChange={() => handleToggle(pl)}
+                                    />
                                 </label>
+
                             ))}
                         </div>
                     )}

@@ -36,7 +36,7 @@ function AppContent() {
       {/* Persistent PlayerContainer to avoid unmounting during routing */}
       {user && track && <PlayerContainer uid={user.uid} />}
 
-      <PlaylistModal userId={user.uid} />
+      {user && <PlaylistModal userId={user.uid} />}
 
       <Routes>
         <Route path="/" element={user ? <Navigate to="/home" /> : <LandingPage />} />

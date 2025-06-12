@@ -29,7 +29,9 @@ const fetchAndCacheYoutubeMusic = async (query, maxResults = 20) => {
 
     const tracks = detailsResponse.data.items
       .filter(item => {
-        const duration = item.contentDetails.duration;
+        const duration = item?.contentDetails?.duration;
+
+        if (!duration) return false; // Skip if duration is missing
 
         // Parse ISO 8601 duration into total seconds
         const match = duration.match(/PT(?:(\d+)M)?(?:(\d+)S)?/);
@@ -40,6 +42,7 @@ const fetchAndCacheYoutubeMusic = async (query, maxResults = 20) => {
         // Filter: only videos 60s to 360s (1 to 6 min)
         return totalSeconds >= 60 && totalSeconds <= 360;
       })
+
       .map(item => ({
         id: item.id,
         name: item.snippet.title || "Unknown Title",
@@ -77,13 +80,13 @@ export const fetchYoutubeMusic = async (query, maxResults = 20) => {
     if (now - parsed.timestamp < CACHE_EXPIRY_MS) {
       console.log("✅ Using cached data for:", query);
       return parsed.data; // Return cached data if it's still valid
-    } 
+    }
     else {
       console.log("⏰ Cache expired for:", query);
       // Cache expired, so make the API call
       return await fetchAndCacheYoutubeMusic(query, maxResults);
     }
-  } 
+  }
   else {
     console.log("🔄 No cached data found for:", query);
     // No cache, make the API call

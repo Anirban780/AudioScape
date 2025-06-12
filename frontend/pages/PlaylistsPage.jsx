@@ -10,16 +10,14 @@ import toast from "react-hot-toast";
 import MusicCard from "../components/Cards/MusicCard";
 import { Sun, Moon, Menu, Trash2 } from "lucide-react";
 import ResponsiveLayout from "../ResponsiveLayout";
-import {
-  getPlaylists,
-  deletePlaylist,
-} from "../utils/playlists";
+import { getPlaylists, deletePlaylist } from "../utils/playlists";
 
 const PlaylistsPage = () => {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
   const { playlists, setPlaylists } = usePlaylistStore();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [deleteModal, setDeleteModal] = useState({ open: false, playlist: null });
 
   useEffect(() => {
     if (!user) return;
@@ -28,18 +26,23 @@ const PlaylistsPage = () => {
       .catch(() => toast.error("Failed to load playlists"));
   }, [user, setPlaylists]);
 
-  const handleDeletePlaylist = async (playlistId) => {
-    if (!user) return toast.error("User not logged in");
+  const confirmDeletePlaylist = (playlist) => {
+    setDeleteModal({ open: true, playlist });
+  };
+
+  const handleDeletePlaylist = async () => {
+    if (!user || !deleteModal.playlist) return toast.error("User not logged in");
 
     try {
-      await deletePlaylist(user.uid, playlistId);
-      toast.success("Deleted from Firestore");
+      await deletePlaylist(user.uid, deleteModal.playlist.id);
       const updated = await getPlaylists(user.uid);
       setPlaylists(updated);
       toast.success("Playlist deleted");
     } catch (error) {
       console.error("Delete failed:", error);
       toast.error("Failed to delete playlist");
+    } finally {
+      setDeleteModal({ open: false, playlist: null });
     }
   };
 
@@ -75,11 +78,7 @@ const PlaylistsPage = () => {
               onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               className="p-2 mx-4 rounded-full bg-gray-300 dark:bg-gray-700 transition-all"
             >
-              {theme === "dark" ? (
-                <Sun size={20} className="text-yellow-400" />
-              ) : (
-                <Moon size={20} className="text-gray-900" />
-              )}
+              {theme === "dark" ? <Sun size={20} className="text-yellow-400" /> : <Moon size={20} className="text-gray-900" />}
             </button>
 
             <UserMenu />
@@ -94,22 +93,18 @@ const PlaylistsPage = () => {
               {playlists.map((playlist, index) => (
                 <div
                   key={`${playlist.id}-${index}`}
-                  className={`p-4 rounded-xl border-2 backdrop-blur-md bg-opacity-60 shadow transition-all duration-300 ${theme === "dark"
-                    ? "border-gray-700 bg-gray-800/60 shadow-blue-500"
-                    : "border-gray-200 bg-white/60 shadow-gray-500"
-                    }`}
+                  className={`p-4 rounded-xl border-2 backdrop-blur-md bg-opacity-60 shadow transition-all duration-300 ${theme === "dark" ? "border-gray-700 bg-gray-800/60 shadow-blue-500" : "border-gray-200 bg-white/60 shadow-gray-500"}`}
                 >
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-semibold capitalize tracking-wide">
                       {playlist.name}
                     </h3>
                     <button
-                      onClick={() => handleDeletePlaylist(playlist.id)}
+                      onClick={() => confirmDeletePlaylist(playlist)}
                       className="flex items-center gap-2 px-4 py-2 rounded-md bg-red-500 text-white shadow-lg transition-all duration-200 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-1"
                       title="Delete Playlist"
                     >
                       <Trash2 size={18} />
-                      <span className="hidden sm:inline">Delete</span>
                     </button>
                   </div>
 
@@ -135,10 +130,32 @@ const PlaylistsPage = () => {
                 </div>
               ))}
             </div>
-
           </div>
         </ResponsiveLayout>
       </div>
+
+      {deleteModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className={`bg-white dark:bg-gray-800 text-black dark:text-white p-6 rounded-lg shadow-xl max-w-sm w-full`}>
+            <h2 className="text-lg font-bold mb-4">Confirm Deletion</h2>
+            <p className="mb-4">Are you sure you want to delete the playlist "{deleteModal.playlist?.name}"?</p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteModal({ open: false, playlist: null })}
+                className="px-4 py-2 bg-gray-400 text-white rounded hover:bg-gray-600"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeletePlaylist}
+                className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-800"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
