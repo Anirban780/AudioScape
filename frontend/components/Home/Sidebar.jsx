@@ -42,7 +42,7 @@ const Sidebar = ({ isOpen: externalOpen, onToggle }) => {
         'h-screen p-4 transition-all duration-300 ease-in-out border-r border-border',
         isOpen ? 'w-60' : 'w-20',
         theme === 'dark' || (theme === 'system' && window.matchMedia("(prefers-color-scheme: dark)").matches)
-          ? 'bg-gray-900 text-white border-white/40'
+          ? 'bg-gray-800 text-white border-white/40'
           : 'bg-slate-200 text-foreground border-gray-900/50'
       )}
     >
