@@ -7,7 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { getExploreKeywords } from '../utils/keywords';
 import { fetchYoutubeMusic } from '../utils/youtube';
 import MusicCard from '../components/Cards/MusicCard';
-import { Sun, Moon, Menu } from 'lucide-react';
+import { Sun, Moon, Menu, RefreshCcw } from 'lucide-react';
 import ResponsiveLayout from "../ResponsiveLayout";
 import { cacheRelatedTracks } from '../utils/api';
 import usePlayerStore from "../store/usePlayerStore";
@@ -133,56 +133,70 @@ const ExplorePage = () => {
             <UserMenu />
           </div>
 
-          <div className='lg:mx-8 mt-8'>
-            <h1 className="text-3xl font-bold mb-4">Explore Music</h1>
+          <div className='lg:mx-8 mt-8 pb-32'>
+            <h1 className="text-3xl font-bold mb-6 text-center md:text-left">🔍 Explore Music 🎶</h1>
 
             {loading ? (
               <Loader2 />
             ) : exploreFeed.length === 0 ? (
-              <div className="text-center text-lg">
+              <div className="text-center text-lg text-gray-500 dark:text-gray-400">
                 No music content available. Try searching or check back later!
               </div>
             ) : (
-              exploreFeed.map((section) => (
-                <div key={section.title} className="mb-10">
-                  <h2 className="text-xl font-semibold mb-3 capitalize">{section.title}</h2>
+              <div className="space-y-8">
+                {exploreFeed.map((section, index) => (
+                  <div
+                    key={`${section.title}-${index}`}
+                    className={`p-4 rounded-2xl border-2 shadow backdrop-blur-lg transition-all duration-300 ${theme === "dark"
+                      ? "border-gray-700 bg-gray-900/60 shadow-blue-500"
+                      : "border-gray-200 bg-white/60 shadow-gray-500"
+                      }`}
+                  >
+                    <div className="flex justify-between items-center mb-4">
+                      <h2 className="text-2xl font-semibold capitalize">{section.title}</h2>
 
-                  {section.tracks.length === 0 ? (
-                    <p className="text-gray-500">No tracks available for {section.title}</p>
-                  ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-                      {section.tracks
-                        .slice(0, visibleTracks[section.title] || 5)
-                        .map((track, index) => (
-                          <MusicCard
-                            key={`${track.id}-${index}`}
-                            id={track.id}
-                            name={track.name}
-                            artist={track.artist}
-                            image={track.thumbnail}
-                            onClick={() => {
-                              setTrack(track);
-                              toast.success("Track selected successfully");
-                            }}
-                          />
-                        ))}
                     </div>
-                  )}
 
-                  {visibleTracks[section.title] < section.tracks.length && (
-                    <div className="mt-4 flex justify-end mr-12">
-                      <button
-                        onClick={() => handleLoadMore(section.title)}
-                        className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-all dark:bg-blue-500 dark:hover:bg-blue-600"
-                      >
-                        Load More
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))
+                    {section.tracks.length === 0 ? (
+                      <p className="text-gray-500">No tracks available for {section.title}</p>
+                    ) : (
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+                        {section.tracks
+                          .slice(0, visibleTracks[section.title] || 5)
+                          .map((track, index) => (
+                            <MusicCard
+                              key={`${track.id}-${index}`}
+                              id={track.id}
+                              name={track.name}
+                              artist={track.artist}
+                              image={track.thumbnail}
+                              onClick={() => {
+                                setTrack(track);
+                                toast.success("Track selected successfully");
+                              }}
+                            />
+                          ))}
+                      </div>
+                    )}
+
+                    {visibleTracks[section.title] < section.tracks.length && (
+                      <div className="flex justify-end mt-4">
+                        <button
+                          onClick={() => handleLoadMore(section.title)}
+                          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-all dark:bg-blue-500 dark:hover:bg-blue-600"
+                        >
+                          <RefreshCcw size={18} />
+                          <span>More</span>
+                        </button>
+                      </div>
+                    )}
+
+                  </div>
+                ))}
+              </div>
             )}
           </div>
+
         </ResponsiveLayout>
       </div>
 

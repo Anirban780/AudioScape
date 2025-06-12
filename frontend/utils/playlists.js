@@ -1,4 +1,4 @@
-import { addDoc, arrayRemove, collection, deleteDoc, doc, getDocs, getDoc, updateDoc, query, setDoc, writeBatch } from "firebase/firestore"
+import { addDoc, arrayRemove, collection, deleteDoc, doc, getDocs, getDoc, updateDoc, query, setDoc, writeBatch, where } from "firebase/firestore"
 import { db } from "../firebase/firebaseConfig"
 
 export const createPlaylist = async (userId, name) => {
@@ -155,3 +155,4 @@ export const removeSongFromPlaylist = async (userId, playlistId, songId) => {
         }
     });
 };
+

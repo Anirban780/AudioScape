@@ -12,11 +12,13 @@ import toast from "react-hot-toast";
 
 const PlaylistModal = ({ userId }) => {
     const { theme } = useTheme();
-    const { selectedSong, isModalOpen, closeModal } = usePlaylistStore();
+    const { selectedSong, selectedTracks, isModalOpen, closeModal } = usePlaylistStore();
 
     const [playlists, setPlaylists] = useState([]);
     const [newName, setNewName] = useState("");
     const [loading, setLoading] = useState(false);
+
+    const tracksToHandle = selectedTracks?.length > 0 ? selectedTracks : selectedSong ? [selectedSong] : [];
 
     useEffect(() => {
         if (!isModalOpen) return;
@@ -26,20 +28,28 @@ const PlaylistModal = ({ userId }) => {
             .finally(() => setLoading(false));
     }, [isModalOpen, userId]);
 
-    const inPlaylist = (pl) =>
-        pl.songs?.some((s) => s.id === selectedSong.id) ?? false;
+    const isInPlaylist = (pl, track) => pl.songs?.some((s) => s.id === track.id);
 
     const handleToggle = async (pl) => {
         try {
-            if (inPlaylist(pl)) {
-                await removeSongFromPlaylist(userId, pl.id, selectedSong.id);
-                toast.success(`Removed from "${pl.name}"`);
-            } else {
-                await addSongToPlaylist(userId, pl.id, selectedSong);
-                toast.success(`Added to "${pl.name}"`);
+            let added = 0;
+            let removed = 0;
+
+            for (const track of tracksToHandle) {
+                if (isInPlaylist(pl, track)) {
+                    await removeSongFromPlaylist(userId, pl.id, track.id);
+                    removed++;
+                } else {
+                    await addSongToPlaylist(userId, pl.id, track);
+                    added++;
+                }
             }
+
             const updated = await getPlaylists(userId);
             setPlaylists(updated);
+
+            if (added) toast.success(`Added ${added} track(s) to "${pl.name}"`);
+            if (removed) toast.success(`Removed ${removed} track(s) from "${pl.name}"`);
         } catch (err) {
             toast.error("Failed to update playlist");
         }
@@ -54,18 +64,19 @@ const PlaylistModal = ({ userId }) => {
 
         try {
             const docRef = await createPlaylist(userId, name);
-            await addSongToPlaylist(userId, docRef.id, selectedSong);
+            for (const track of tracksToHandle) {
+                await addSongToPlaylist(userId, docRef.id, track);
+            }
             const refreshed = await getPlaylists(userId);
             setPlaylists(refreshed);
             setNewName("");
-            toast.success("Playlist created successfully!");
+            toast.success("Playlist created and tracks added!");
         } catch (err) {
             toast.error(err.message || "Failed to create playlist");
         }
     };
 
-
-    if (!isModalOpen || !selectedSong) return null;
+    if (!isModalOpen || tracksToHandle.length === 0) return null;
 
     const baseBg =
         theme === "dark" ? "bg-neutral-900 text-white" : "bg-white text-black";
@@ -75,9 +86,7 @@ const PlaylistModal = ({ userId }) => {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div
-                className={`w-[320px] rounded-xl shadow-lg p-5 relative ${baseBg} ${border}`}
-            >
+            <div className={`w-[320px] rounded-xl shadow-lg p-5 relative ${baseBg} ${border}`}>
                 {/* Close button */}
                 <button
                     className="absolute top-2 right-3 p-1 rounded-full hover:bg-red-500"
@@ -88,7 +97,7 @@ const PlaylistModal = ({ userId }) => {
 
                 {/* Modal Header */}
                 <h2 className="text-lg font-semibold mb-4 text-center">
-                    Save to Playlist
+                    Save {tracksToHandle.length > 1 ? "Tracks" : "Track"} to Playlist
                 </h2>
 
                 {/* Create Playlist Section */}
@@ -119,26 +128,23 @@ const PlaylistModal = ({ userId }) => {
                         <p className="text-center text-sm opacity-70">No playlists yet.</p>
                     ) : (
                         <div className="max-h-[260px] overflow-y-auto space-y-2 pr-1">
-                            {playlists.map((pl) => {
-                                const checked = inPlaylist(pl);
-                                return (
-                                    <label
-                                        key={pl.id}
-                                        className={`flex items-center justify-between rounded-md px-3 py-2 cursor-pointer transition-colors ${theme === "dark"
-                                            ? "hover:bg-neutral-800"
-                                            : "hover:bg-gray-100"
-                                            }`}
+                            {playlists.map((pl) => (
+                                <label
+                                    key={pl.id}
+                                    className={`flex items-center justify-between rounded-md px-3 py-2 cursor-pointer transition-colors ${theme === "dark"
+                                        ? "hover:bg-neutral-800"
+                                        : "hover:bg-gray-100"
+                                        }`}
+                                >
+                                    <span className="text-sm">{pl.name}</span>
+                                    <button
+                                        onClick={() => handleToggle(pl)}
+                                        className="px-2 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700"
                                     >
-                                        <span className="text-sm">{pl.name}</span>
-                                        <input
-                                            type="checkbox"
-                                            checked={checked}
-                                            onChange={() => handleToggle(pl)}
-                                            className="form-checkbox h-4 w-4 accent-green-600"
-                                        />
-                                    </label>
-                                );
-                            })}
+                                        Toggle
+                                    </button>
+                                </label>
+                            ))}
                         </div>
                     )}
                 </div>
