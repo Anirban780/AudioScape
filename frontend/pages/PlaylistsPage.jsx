@@ -93,7 +93,9 @@ const PlaylistsPage = () => {
               {playlists.map((playlist, index) => (
                 <div
                   key={`${playlist.id}-${index}`}
-                  className={`p-4 rounded-xl border-2 backdrop-blur-md bg-opacity-60 shadow transition-all duration-300 ${theme === "dark" ? "border-gray-700 bg-gray-800/60 shadow-blue-500" : "border-gray-200 bg-white/60 shadow-gray-500"}`}
+                  className={`p-4 rounded-xl border-2 backdrop-blur-md bg-opacity-60 shadow transition-all duration-300 
+                    ${theme === "dark" ? "border-gray-700 bg-gray-800/60 shadow-blue-500" 
+                      : "border-gray-200 bg-white/60 shadow-gray-500"}`}
                 >
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-semibold capitalize tracking-wide">
