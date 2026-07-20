@@ -32,18 +32,15 @@ const fetchTrack = async (req, res) => {
 // Controller to save a song listen
 const saveSong = async(req, res) => {
     const { videoId } = req.body;
-    const token = req.headers.authorization?.split('Bearer ')[1];
+    const userId = req.user?.uid;
 
-    if(!videoId) 
+    if (!videoId) 
         return res.status(400).json({ error: "Video ID is required" });
 
-    if(!token)
+    if (!userId)
         return res.status(401).json({ error: "Authorization token is required" });
 
     try {
-        const decodedToken = await admin.auth().verifyIdToken(token);
-        const userId = decodedToken.uid;
-
         const result = await saveSongListen(videoId, userId);
         if (result) {
             res.status(201).json({ message: "Song listen saved successfully" , data: result });

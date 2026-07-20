@@ -3,11 +3,12 @@ const { fetchUserMusicHistory, fetchRelatedTracks } = require('../services/fires
 
 const recommendSongs = async(req, res) => {
     try {
-        const { userId, topN } = req.body;
+        const userId = req.user?.uid || req.body.userId;
+        const topN = typeof req.body.topN === 'number' ? req.body.topN : 10;
 
         // Validate inputs
-        if (!userId || typeof topN !== 'number') {
-            return res.status(400).json({ error: 'Invalid input format' });
+        if (!userId) {
+            return res.status(400).json({ error: 'User ID is required' });
         }
 
         // Fetch user history and related tracks
@@ -19,7 +20,7 @@ const recommendSongs = async(req, res) => {
         }
 
         // Call the recommendation service
-        const recommendations = await getTopRecommendedSongs(userHistory, relatedTracks, topN || 10);
+        const recommendations = await getTopRecommendedSongs(userHistory, relatedTracks, topN);
 
         return res.status(200).json({
             success: true,

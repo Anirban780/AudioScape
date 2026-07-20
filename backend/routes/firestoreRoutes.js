@@ -2,6 +2,7 @@ const express = require('express');
 const rateLimit = require('express-rate-limit');
 const { saveSong, cacheRelatedTracks } = require('../controllers/trackController');
 const { recommendSongs } = require('../controllers/recommendationController');
+const { verifyToken } = require('../middleware/auth');
 
 const router = express.Router();
 
@@ -12,11 +13,11 @@ const limiter = rateLimit({
     message: 'Too many requests from this IP, please try again later.'
 });
 
-// POST /api/songs/save - Save a song listen
-router.post('/save', limiter, saveSong);
-router.post('/cache-related-tracks', limiter, cacheRelatedTracks);
+// POST /api/music/save - Save a song listen
+router.post('/save', limiter, verifyToken, saveSong);
+router.post('/cache-related-tracks', limiter, verifyToken, cacheRelatedTracks);
 
-// POST /api/songs/recommend - Get song recommendations
-router.post('/recommend', limiter, recommendSongs);
+// POST /api/music/recommend - Get song recommendations
+router.post('/recommend', limiter, verifyToken, recommendSongs);
 
 module.exports = router;

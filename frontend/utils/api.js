@@ -1,4 +1,4 @@
-import { collection, query, orderBy, limit, getDocs, getDoc, setDoc, doc } from "firebase/firestore";
+import { collection, query, orderBy, limit, getDocs, setDoc, where } from "firebase/firestore";
 import { auth, db } from "../firebase/firebaseConfig";
 
 const LOCAL_API_URL = "http://localhost:5000";
@@ -19,7 +19,6 @@ export async function getBackendURL() {
     }
     return PROD_API_URL;
 }
-
 
 /**
  * Saves a song listen event to Firestore through the backend.
@@ -85,6 +84,9 @@ export async function fetchLastPlayed(userId) {
     }
 }
 
+/**
+ * Fetches only liked songs directly via Firestore query filtering.
+ */
 export async function fetchUserLikedSongs(userId) {
     if (!userId) {
         console.warn("⚠️ User ID is missing");
@@ -92,104 +94,80 @@ export async function fetchUserLikedSongs(userId) {
     }
 
     const userRef = collection(db, "users", userId, "music_history");
-
     const likedSongsQuery = query(
         userRef,
-        orderBy("lastPlayedAt", "desc"),
+        where("liked", "==", true)
     );
 
     try {
         const snapshot = await getDocs(likedSongsQuery);
-        return snapshot.docs
-            .map(doc => ({
-                id: doc.id,
-                ...doc.data(),
-            }))
-            .filter(song => song.liked === true);
-
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data(),
+        }));
     } catch (error) {
         console.error("Error fetching liked songs:", error);
         return [];
     }
 }
 
-
+/**
+ * Saves/updates like status for a track using targeted Firestore query.
+ */
 export async function saveLikeSong(userId, track, liked) {
-    if(!userId || !track?.id) {
+    if (!userId || !track?.id) {
         console.warn("⚠️ User ID or Video ID is missing");
         return;
     }
 
     try {
-        // Reference to the music_history collection for the specific user
         const musicHistoryRef = collection(db, "users", userId, "music_history");
+        const trackQuery = query(musicHistoryRef, where("id", "==", track.id), limit(1));
+        const querySnapshot = await getDocs(trackQuery);
 
-        // Search for the track document that contains the videoId
-        const querySnapshot = await getDocs(musicHistoryRef);
-
-        let trackDocRef;
-        querySnapshot.forEach((doc) => {
-            const trackData = doc.data();
-            if (trackData.id === track.id) {
-                trackDocRef = doc.ref;
-            }
-        });
-
-        if (!trackDocRef) {
+        if (querySnapshot.empty) {
             console.warn("⚠️ Track not found in music history.");
             return;
         }
 
-        // Now that we have the track document, we save or update the liked status
+        const trackDocRef = querySnapshot.docs[0].ref;
         await setDoc(trackDocRef, {
             ...track, 
-            liked: liked,            
-            
-        }, { merge: true }); // Merge to update only the liked status and not overwrite the rest of the data
+            liked: liked,
+        }, { merge: true });
 
     } catch (error) {
         console.error("Error saving like status:", error);
     }
 }
 
-export async function fetchLikedStatus (userId, videoId) {
+/**
+ * Fetches liked status for a track using targeted Firestore query.
+ */
+export async function fetchLikedStatus(userId, videoId) {
     if (!userId || !videoId) {
         console.warn("⚠️ User ID or track ID is missing");
         return false;
     }
 
     try {
-        // Reference to the music_history collection for the specific user
         const musicHistoryRef = collection(db, "users", userId, "music_history");
+        const trackQuery = query(musicHistoryRef, where("id", "==", videoId), limit(1));
+        const querySnapshot = await getDocs(trackQuery);
 
-        // Search for the track document that contains the videoId
-        const querySnapshot = await getDocs(musicHistoryRef);
-
-        let likedStatus = false;
-        querySnapshot.forEach((doc) => {
-            const trackData = doc.data();
-            if (trackData.id === videoId) {
-                likedStatus = trackData.liked; // If found, set the liked status
-            }
-        });
-
-        return likedStatus; // Return the liked status of the track (true/false)
-        
+        if (!querySnapshot.empty) {
+            return querySnapshot.docs[0].data().liked || false;
+        }
+        return false;
     } catch (error) {
         console.error("Error fetching liked status:", error);
-        return false; // Return false in case of an error
+        return false;
     }
 }
 
-
 /**
  * Cache related tracks to Firestore under `relatedTracksCache`
- * 
- * @param {string} keyword - Search keyword used to fetch related tracks
- * @param {Array} tracks - Raw YouTube API response items (array of tracks)
- * @returns {Promise<{ success: boolean, message?: string, error?: string }>}
  */
-
 export const cacheRelatedTracks = async(keyword, tracks) => {
     if (!auth.currentUser) {
         console.error("⚠️ Error: User not logged in");
@@ -213,7 +191,7 @@ export const cacheRelatedTracks = async(keyword, tracks) => {
 
         const data = await response.json();
 
-        if(!response.ok) {
+        if (!response.ok) {
             throw new Error(data.error || 'Failed to cache related tracks');
         }
         
@@ -223,9 +201,8 @@ export const cacheRelatedTracks = async(keyword, tracks) => {
     catch (error) {
         console.error('Error caching related tracks:', error);
         return { success: false, error: error.message };
-      }
+    }
 };
-
 
 export const getRecommendations = async(topN) => {
     if (!auth.currentUser) {
@@ -249,7 +226,7 @@ export const getRecommendations = async(topN) => {
             }
         );
 
-        if(!response.ok) {
+        if (!response.ok) {
             throw new Error("Failed to fetch recommendations");
         }
 
@@ -269,17 +246,20 @@ export const getRecommendations = async(topN) => {
     }
 };
 
-
 export async function fetchKeywordsFromAI(history = []) {
     try {
+        const token = auth.currentUser ? await auth.currentUser.getIdToken() : "";
         const API_URL = await getBackendURL();
         const res = await fetch(`${API_URL}/api/extractKeywords`, {
             method: 'POST',
-            headers: { "Content-Type": "application/json"},
-            body: JSON.stringify({history}),
+            headers: { 
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ history }),
         });
 
-        if(res.ok) {
+        if (res.ok) {
             const json = await res.json();
             return json.keywords || [];
         }
@@ -293,5 +273,3 @@ export async function fetchKeywordsFromAI(history = []) {
 
     return [];
 }
-
-
