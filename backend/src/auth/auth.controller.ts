@@ -1,8 +1,8 @@
 import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
 import { AuthService } from './auth.service';
-import { FirebaseAuthGuard } from './firebase-auth.guard';
+import { GoogleLoginDto } from './dto/google-login.dto';
+import { JwtAuthGuard } from './jwt-auth.guard';
 import { GetUser } from './decorators/get-user.decorator';
-import { SyncUserDto } from './dto/sync-user.dto';
 
 @Controller('api/auth')
 export class AuthController {
@@ -10,24 +10,21 @@ export class AuthController {
 
   @Get('status')
   getAuthStatus() {
-    return { status: 'Auth module operational', timestamp: new Date().toISOString() };
-  }
-
-  @UseGuards(FirebaseAuthGuard)
-  @Post('sync')
-  async syncUser(@GetUser() user: any, @Body() body: Partial<SyncUserDto>) {
-    const syncDto: SyncUserDto = {
-      authId: user.uid,
-      email: user.email || body.email,
-      displayName: user.name || body.displayName,
-      photoUrl: user.picture || body.photoUrl,
+    return {
+      status: 'Google OAuth module operational',
+      authMethod: 'Google OAuth 2.0',
+      timestamp: new Date().toISOString(),
     };
-    return this.authService.syncUser(syncDto);
   }
 
-  @UseGuards(FirebaseAuthGuard)
+  @Post('google')
+  async googleLogin(@Body() dto: GoogleLoginDto) {
+    return this.authService.verifyAndSyncGoogleUser(dto.idToken);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Get('me')
-  async getProfile(@GetUser('uid') authId: string) {
-    return this.authService.getUserProfile(authId);
+  async getProfile(@GetUser('id') userId: string) {
+    return this.authService.getUserProfile(userId);
   }
 }
