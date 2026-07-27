@@ -17,9 +17,26 @@ services:
       context: ./backend
       dockerfile: Dockerfile
     ports:
-      - "5000:5000"
+      - "5000:5000" # your backend API port
+      - "5555:5555" # required for Prisma Studio
     volumes:
       - ./backend:/app
       - /app/node_modules
     env_file:
       - ./backend/.env
+
+  postgres:
+    image: postgres:16
+    container_name: audioscape_postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgrespassword
+      POSTGRES_DB: audioscape
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+
