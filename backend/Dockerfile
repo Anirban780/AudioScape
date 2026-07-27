@@ -7,6 +7,7 @@ COPY package*.json ./
 
 # Install dependencies
 RUN npm install
+RUN apk add --no-cache openssl
 
 # Copy source code
 COPY . .
