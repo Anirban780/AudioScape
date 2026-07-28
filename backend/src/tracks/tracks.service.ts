@@ -252,7 +252,7 @@ export class TracksService {
       const result = {
         videoId: trackItem.id,
         title: trackItem.snippet?.title || 'Unknown Title',
-        thumbNail: trackItem.snippet?.thumbnails?.high?.url || trackItem.snippet?.thumbnails?.default?.url || '',
+        thumbNail: trackItem.snippet?.thumbnails?.high?.url || trackItem.snippet?.thumbnails?.medium?.url || trackItem.snippet?.thumbnails?.default?.url || '',
         channelTitle: trackItem.snippet?.channelTitle || 'Unknown Artist',
         duration: rawDuration,
         durationSeconds,
