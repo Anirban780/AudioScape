@@ -12,6 +12,8 @@ export class AppController {
         authStatus: '/api/auth/status',
         authGoogle: 'POST /api/auth/google',
         profile: 'GET /api/auth/me',
+        youtubeSearch: 'GET /youtube/search?query=...',
+        youtubeTrackDetails: 'GET /youtube/track/:videoId',
       },
       timestamp: new Date().toISOString(),
     };
