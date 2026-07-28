@@ -187,6 +187,32 @@ flowchart TD
 8. **`reorderPlaylistTracks(userId, playlistId, dto: ReorderTracksDto)`**:
    - Atomically updates positions for tracks within a playlist.
 
+### Step 3.7: RecommendationsModule — TF-IDF Music Recommendation Engine ⏳ NEXT
+
+> 📄 **Full deep dive:** [step3.7_recommendations_module.md](./step3.7_recommendations_module.md)
+
+**Goal**: Port and improve the legacy `recommend.js` TF-IDF recommendation engine to NestJS, reading user history and related tracks corpus from PostgreSQL instead of Firestore.
+
+#### Files to Create in `backend/src/recommendations/`
+
+| File | Purpose |
+|---|---|
+| `recommendations.module.ts` | Module importing PrismaModule, AuthModule, TracksModule |
+| `recommendations.controller.ts` | Protected controller: `POST /api/music/recommend`, `POST /api/music/cache-related-tracks` |
+| `recommendations.service.ts` | Orchestrates data fetching from PostgreSQL, calls TF-IDF engine, manages 1-hour in-memory cache |
+| `tfidf-engine.ts` | Pure computation class: weight calculation, TF-IDF vectorization (`natural`), cosine similarity, ranked selection |
+| `dto/get-recommendations.dto.ts` | Validates `topN` (optional int, default 10, max 30) |
+| `dto/cache-related-tracks.dto.ts` | Validates `keyword` string and `tracks` array for legacy frontend compatibility |
+
+#### Key Technical Decisions
+
+- **Algorithm**: Content-based TF-IDF using `natural` npm package (same as legacy, zero API cost)
+- **Data Sources**: User `listen_history` + `tracks` (genres/tags/artist) and `search_queries` cache as related corpus
+- **Weight Formula**: `likedWeight × (0.5 × recencyDecay + 0.5 × playCountWeight) × randomJitter`
+- **In-Memory Cache**: 1-hour TTL per user, invalidated on new track play
+- **Legacy Compat**: `POST /api/music/cache-related-tracks` upserts `SearchQuery` with `queryType = CURATED_KEYWORD`
+- **New Dependency**: `npm install natural` (pure JS NLP library, zero native bindings)
+
 ---
 
 ## 🗺️ Remaining Phase 3 Execution Roadmap
@@ -200,8 +226,8 @@ Below is the complete roadmap of all remaining tasks to complete Phase 3 NestJS 
 | **Step 3.3** | AuthModule | Google OAuth 2.0 Direct Token Verification & User Sync | ✅ Completed |
 | **Step 3.4** | TracksModule | YouTube search/details proxying, 24h search cache, quota tracking | ✅ Completed |
 | **Step 3.5** | ListenHistoryModule | Track play logging, play counts, pagination, liked track favorites | ✅ Completed |
-| **Step 3.6** | **PlaylistsModule** | Custom playlist CRUD, track additions, removals, & position reordering | ⏳ **NEXT** |
-| **Step 3.7** | **RecommendationsModule** | TF-IDF vector similarity recommendation engine ported from `recommend.js` using `natural` | 🔮 Future |
+| **Step 3.6** | PlaylistsModule | Custom playlist CRUD, track additions, removals, & position reordering | ✅ Completed |
+| **Step 3.7** | **RecommendationsModule** | TF-IDF recommendation engine ported from `recommend.js` using `natural` | ⏳ **NEXT** |
 | **Step 3.8** | **Health & Global Filters** | Centralized `AllExceptionsFilter`, global `ValidationPipe`, CORS, & Render `/healthcheck` | 🔮 Future |
 | **Step 3.9** | **E2E Cutover & Cleanup** | Verify full frontend connection to NestJS on port 5000 & legacy code removal | 🔮 Future |
 
@@ -232,6 +258,12 @@ Below is the complete roadmap of all remaining tasks to complete Phase 3 NestJS 
    - `GET /api/playlists/:id` -> returns playlist with ordered tracks.
    - `DELETE /api/playlists/:id/tracks/:trackId` -> removes track and re-sequences positions.
    - `DELETE /api/playlists/:id` -> deletes playlist and cascaded tracks.
+7. **RecommendationsModule Verification**:
+   - `POST /api/music/recommend` with user having 5+ listened tracks -> returns ranked recommendations.
+   - Repeat call within 1 hour -> returns cached results faster.
+   - `POST /api/music/cache-related-tracks` -> creates `SearchQuery` with `queryType = CURATED_KEYWORD`.
+   - User with empty history -> returns empty array with appropriate message.
+
 
 
 
