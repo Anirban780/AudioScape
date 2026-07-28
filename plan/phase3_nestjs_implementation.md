@@ -144,43 +144,66 @@ flowchart TD
 #### Environment Variable Used
 - `YOUTUBE_API_KEY` (already in `backend/.env`)
 
-### Step 3.5: ListenHistoryModule — User Play Logging & Favorites Management ⏳ NEXT
+### Step 3.5: ListenHistoryModule — User Play Logging & Favorites Management ✅ COMPLETED
 
 **Goal**: Implement NestJS `ListenHistoryModule` inside `backend/src/history/` to manage track listening history, play counts, playback source attribution, and liked track favorites backed by Prisma `listen_history` & `tracks` models.
 
-#### Files to Create in `backend/src/history/`
+### Step 3.6: PlaylistsModule — Custom Playlist CRUD & Track Management ⏳ NEXT
+
+**Goal**: Implement NestJS `PlaylistsModule` inside `backend/src/playlists/` to provide custom playlist CRUD operations, track additions/removals, and track reordering backed by Prisma `playlists` & `playlist_tracks` relational models.
+
+#### Files to Create in `backend/src/playlists/`
 
 | File | Purpose |
 |---|---|
-| `history.module.ts` | NestJS Module registering HistoryController & HistoryService, importing PrismaModule & AuthModule |
-| `history.controller.ts` | Route Controller under `/api/music` handling protected history & favorites endpoints |
-| `history.service.ts` | Core business logic for upserting play history, retrieving history, toggling likes, & listing favorites |
-| `dto/record-listen.dto.ts` | DTO validating track play recording (`trackId` string, optional `source` enum, optional metadata) |
-| `dto/toggle-like.dto.ts` | DTO validating track like status toggle (`trackId` string, `liked` boolean) |
-| `dto/get-history-query.dto.ts` | DTO validating optional pagination parameters (`limit`, `page`) |
+| `playlists.module.ts` | NestJS Module declaring PlaylistsController & PlaylistsService, importing PrismaModule, AuthModule, & TracksModule |
+| `playlists.controller.ts` | Protected REST Controller under `/api/playlists` exposing playlist CRUD & track management endpoints |
+| `playlists.service.ts` | Core business service managing playlist creation, retrieval, updates, deletions, track ordering, & track removals |
+| `dto/create-playlist.dto.ts` | DTO validating playlist creation payload (`name` string required) |
+| `dto/update-playlist.dto.ts` | DTO validating playlist update payload (`name` string optional) |
+| `dto/add-playlist-track.dto.ts` | DTO validating track addition to playlist (`videoId` string required) |
+| `dto/reorder-tracks.dto.ts` | DTO validating track position reordering array (`trackId` string, `position` int) |
 
-#### HistoryService Core Responsibilities
+#### PlaylistsService Core Responsibilities
 
-1. **`recordTrackListen(userId, dto: RecordListenDto)`**:
-   - Ensures `Tracks` record exists in PostgreSQL (if missing, resolves track metadata via `TracksService`).
-   - Upserts `ListenHistory` row on unique constraint `[userId, trackId]`:
-     - **On Create**: Sets `playCount = 1`, `firstPlayedAt = NOW()`, `lastPlayedAt = NOW()`, `source`.
-     - **On Update**: Increments `playCount += 1`, updates `lastPlayedAt = NOW()`, updates `source`.
-   - Returns updated history record with joined track information.
+1. **`createPlaylist(userId, dto: CreatePlaylistDto)`**:
+   - Enforces unique playlist name per user (`@@unique([userId, name])`).
+   - Creates new `Playlist` record in PostgreSQL database.
+2. **`getUserPlaylists(userId)`**:
+   - Fetches all playlists owned by user with track count and preview thumbnail (from position 1 track).
+3. **`getPlaylistById(userId, playlistId)`**:
+   - Fetches single playlist by ID (verifying `userId` ownership).
+   - Includes ordered `tracks` (`PlaylistTrack` joined with `Tracks` ordered by `position asc`).
+4. **`updatePlaylist(userId, playlistId, dto: UpdatePlaylistDto)`**:
+   - Updates playlist name while enforcing user ownership.
+5. **`deletePlaylist(userId, playlistId)`**:
+   - Deletes playlist record (automatically cascades deletion to associated `playlist_tracks`).
+6. **`addTrackToPlaylist(userId, playlistId, dto: AddPlaylistTrackDto)`**:
+   - Verifies playlist ownership. Ensures track exists in `Tracks` table (auto-fetching via `TracksService` if missing).
+   - Calculates next position (`currentMaxPosition + 1`).
+   - Inserts `PlaylistTrack` row enforcing `@@unique([playlistId, trackId])`.
+7. **`removeTrackFromPlaylist(userId, playlistId, trackId)`**:
+   - Removes `PlaylistTrack` entry and automatically re-sequences remaining track positions (`position = 1..N`).
+8. **`reorderPlaylistTracks(userId, playlistId, dto: ReorderTracksDto)`**:
+   - Atomically updates positions for tracks within a playlist.
 
-2. **`getUserListenHistory(userId, query: GetHistoryQueryDto)`**:
-   - Queries `listen_history` where `userId = userId`, ordered by `lastPlayedAt DESC`.
-   - Supports limit (default 20, max 100) and page pagination.
-   - Includes full `track` details joined for player state hydration.
+---
 
-3. **`toggleTrackLike(userId, dto: ToggleLikeDto)`**:
-   - Upserts `listen_history` row for `[userId, trackId]`:
-     - Updates `liked` boolean status and `likedAt` timestamp (`NOW()` if liked, `null` if unliked).
-   - Returns updated liked state.
+## 🗺️ Remaining Phase 3 Execution Roadmap
 
-4. **`getUserFavorites(userId)`**:
-   - Queries `listen_history` where `userId = userId` AND `liked = true`, ordered by `likedAt DESC`.
-   - Returns array of liked tracks for frontend Favorites view.
+Below is the complete roadmap of all remaining tasks to complete Phase 3 NestJS Backend Migration:
+
+| Step | Module / Task | Description & Responsibilities | Status |
+|---|---|---|---|
+| **Step 3.1** | Foundation & Config | NestJS core packages, TypeScript config, app structure | ✅ Completed |
+| **Step 3.2** | Prisma & DB Layer | PrismaModule with Neon cloud primary & Local Docker fallback | ✅ Completed |
+| **Step 3.3** | AuthModule | Google OAuth 2.0 Direct Token Verification & User Sync | ✅ Completed |
+| **Step 3.4** | TracksModule | YouTube search/details proxying, 24h search cache, quota tracking | ✅ Completed |
+| **Step 3.5** | ListenHistoryModule | Track play logging, play counts, pagination, liked track favorites | ✅ Completed |
+| **Step 3.6** | **PlaylistsModule** | Custom playlist CRUD, track additions, removals, & position reordering | ⏳ **NEXT** |
+| **Step 3.7** | **RecommendationsModule** | TF-IDF vector similarity recommendation engine ported from `recommend.js` using `natural` | 🔮 Future |
+| **Step 3.8** | **Health & Global Filters** | Centralized `AllExceptionsFilter`, global `ValidationPipe`, CORS, & Render `/healthcheck` | 🔮 Future |
+| **Step 3.9** | **E2E Cutover & Cleanup** | Verify full frontend connection to NestJS on port 5000 & legacy code removal | 🔮 Future |
 
 ---
 
@@ -203,5 +226,12 @@ flowchart TD
    - `GET /api/music/history` -> returns user's listen history sorted by `lastPlayedAt` descending.
    - `POST /api/music/like` -> toggles `liked` boolean and updates `likedAt`.
    - `GET /api/music/favorites` -> returns user's liked tracks array.
+6. **PlaylistsModule Verification**:
+   - `POST /api/playlists` -> creates user playlist in PostgreSQL.
+   - `POST /api/playlists/:id/tracks` -> adds track to playlist, sets position 1.
+   - `GET /api/playlists/:id` -> returns playlist with ordered tracks.
+   - `DELETE /api/playlists/:id/tracks/:trackId` -> removes track and re-sequences positions.
+   - `DELETE /api/playlists/:id` -> deletes playlist and cascaded tracks.
+
 
 
