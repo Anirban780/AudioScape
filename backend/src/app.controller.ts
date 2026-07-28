@@ -18,6 +18,9 @@ export class AppController {
         getHistory: 'GET /api/music/history',
         toggleLike: 'POST /api/music/like',
         getFavorites: 'GET /api/music/favorites',
+        playlists: 'GET|POST /api/playlists',
+        playlistDetails: 'GET|PUT|DELETE /api/playlists/:id',
+        playlistTracks: 'POST|DELETE /api/playlists/:id/tracks',
       },
       timestamp: new Date().toISOString(),
     };
