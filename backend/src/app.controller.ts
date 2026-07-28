@@ -14,6 +14,10 @@ export class AppController {
         profile: 'GET /api/auth/me',
         youtubeSearch: 'GET /youtube/search?query=...',
         youtubeTrackDetails: 'GET /youtube/track/:videoId',
+        recordHistory: 'POST /api/music/history',
+        getHistory: 'GET /api/music/history',
+        toggleLike: 'POST /api/music/like',
+        getFavorites: 'GET /api/music/favorites',
       },
       timestamp: new Date().toISOString(),
     };

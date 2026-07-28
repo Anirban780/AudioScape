@@ -1,25 +1,20 @@
 import { Injectable, Logger, UnauthorizedException, NotFoundException } from '@nestjs/common';
-import { JwtService } from '@nestjs/jwt';
 import { OAuth2Client } from 'google-auth-library';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * ============================================================================
- * AUTHENTICATION SERVICE: BUSINESS LOGIC & GOOGLE OAUTH PIPELINE
+ * AUTHENTICATION SERVICE: GOOGLE OAUTH 2.0 PIPELINE
  * ============================================================================
  * @module AuthModule
  * 
  * PURPOSE:
- * Core business service managing Google OAuth token verification, user account
- * upsert/migration in PostgreSQL via Prisma, and issuing application access JWTs.
+ * Core authentication service executing Google ID Token verification directly with
+ * Google OAuth 2.0 servers and synchronizing user profiles in PostgreSQL via Prisma.
  *
  * WHY THIS IS NEEDED FOR PRODUCTION:
- * - Google Cryptographic Verification: Uses official `google-auth-library` to verify 
- *   Google ID token signatures directly with Google OAuth 2.0 public keys.
- * - Zero Data Loss User Migration: Seamlessly matches backfilled Firestore/Firebase users 
- *   by their verified Google `email` address. Updates user profile metadata while keeping
- *   all existing `playlists` and `listenHistory` relational data completely intact.
- * - Isolated Business Logic: Separates DB operations and token signing from HTTP controllers.
+ * - Single Sign-On (SSO): Uses Google ID Tokens as the primary authorization mechanism.
+ * - Zero Data Loss Migration: Matches legacy backfilled Firestore users by `email`.
  * ============================================================================
  */
 @Injectable()
@@ -27,24 +22,18 @@ export class AuthService {
   private readonly logger = new Logger(AuthService.name);
   private readonly googleClient: OAuth2Client;
 
-  constructor(
-    private readonly prisma: PrismaService,
-    private readonly jwtService: JwtService,
-  ) {
-    // Initialize Google OAuth2 Client with project Google Client ID from environment
+  constructor(private readonly prisma: PrismaService) {
     this.googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
   }
 
   /**
-   * Verifies Google ID token from client, matches or creates user record in PostgreSQL,
-   * and issues a signed application JWT.
+   * Cryptographically verifies Google ID Token and upserts user record in PostgreSQL.
    *
-   * @param idToken - Raw Google OAuth 2.0 ID Token string from frontend client
-   * @returns Object containing success message, signed application access_token, and user record
+   * @param idToken - Raw Google OAuth 2.0 ID Token string from client
+   * @returns Synchronized user record from PostgreSQL
    */
   async verifyAndSyncGoogleUser(idToken: string) {
     try {
-      // 1. Verify Google ID token signature and audience against Google OAuth2 endpoints
       const ticket = await this.googleClient.verifyIdToken({
         idToken,
         audience: process.env.GOOGLE_CLIENT_ID,
@@ -61,15 +50,14 @@ export class AuthService {
       const displayName = payload.name || payload.given_name || 'Google User';
       const photoUrl = payload.picture || null;
 
-      this.logger.log(`Google OAuth verified for: ${email} (Google ID: ${googleId})`);
+      this.logger.log(`Google OAuth verified for: ${email} (${googleId})`);
 
-      // 2. Query PostgreSQL to find existing user by email (matches backfilled legacy records) or authId
+      // Match existing user by email or authId
       let user = await this.prisma.user.findFirst({
         where: { OR: [{ email }, { authId: googleId }] },
       });
 
       if (user) {
-        // 3a. Existing User Found: Update profile metadata and timestamp while preserving PK (id)
         user = await this.prisma.user.update({
           where: { id: user.id },
           data: {
@@ -81,7 +69,6 @@ export class AuthService {
           },
         });
       } else {
-        // 3b. New User: Create new user record in PostgreSQL database
         user = await this.prisma.user.create({
           data: {
             authId: googleId,
@@ -93,16 +80,8 @@ export class AuthService {
         });
       }
 
-      // 4. Issue signed application access_token (7-day validity configured in AuthModule)
-      const accessToken = this.jwtService.sign({
-        sub: user.id,
-        authId: user.authId,
-        email: user.email,
-      });
-
       return {
         message: 'Google OAuth authentication successful',
-        accessToken,
         user,
       };
     } catch (error: any) {
@@ -112,11 +91,10 @@ export class AuthService {
   }
 
   /**
-   * Retrieves full user profile by internal PostgreSQL database UUID (`User.id`).
-   * Includes recent playlists and listen history records for client hydration.
+   * Retrieves full user profile with recent playlists and listen history by PostgreSQL UUID.
    *
    * @param userId - Internal PostgreSQL user UUID
-   * @returns Complete User profile record with relations
+   * @returns User record joined with relations
    */
   async getUserProfile(userId: string) {
     const user = await this.prisma.user.findUnique({
