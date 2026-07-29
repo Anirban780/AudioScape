@@ -1,5 +1,16 @@
 import { Controller, Get } from '@nestjs/common';
 
+/**
+ * ============================================================================
+ * HTTP CONTROLLER: ROOT APPLICATION INDEX & ENDPOINT DISCOVERY
+ * ============================================================================
+ * @module AppModule
+ * 
+ * PURPOSE:
+ * Serves root `/` GET route providing API operational metadata, version info,
+ * and discovery mapping of all available REST endpoints.
+ * ============================================================================
+ */
 @Controller()
 export class AppController {
   @Get()
@@ -9,7 +20,8 @@ export class AppController {
       status: 'online',
       version: '1.1.0',
       endpoints: {
-        authStatus: '/api/auth/status',
+        healthCheck: 'GET /healthcheck',
+        authStatus: 'GET /api/auth/status',
         authGoogle: 'POST /api/auth/google',
         profile: 'GET /api/auth/me',
         youtubeSearch: 'GET /youtube/search?query=...',
@@ -21,6 +33,8 @@ export class AppController {
         playlists: 'GET|POST /api/playlists',
         playlistDetails: 'GET|PUT|DELETE /api/playlists/:id',
         playlistTracks: 'POST|DELETE /api/playlists/:id/tracks',
+        recommendations: 'POST /api/music/recommend',
+        cacheRelatedTracks: 'POST /api/music/cache-related-tracks',
       },
       timestamp: new Date().toISOString(),
     };
