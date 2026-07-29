@@ -2,6 +2,7 @@ import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { ApiEndpoint } from '@prisma/client';
+import { YouTubeKeyManager } from './youtube-key-manager';
 
 /**
  * ============================================================================
@@ -13,7 +14,7 @@ import { ApiEndpoint } from '@prisma/client';
  * Proxies YouTube Data API v3 requests (search, track details, categories), implements
  * a high-performance PostgreSQL cache layer with 24-hour TTL expiry aligned with the
  * database schema (SearchQuery, QueryTrackResult, Tracks, Channel, ApiQuotaUsage),
- * and tracks daily API quota usage.
+ * and tracks daily API quota usage across dual key pools via YouTubeKeyManager.
  * ============================================================================
  */
 @Injectable()
@@ -21,17 +22,16 @@ export class TracksService {
   private readonly logger = new Logger(TracksService.name);
   private cachedMusicCategoryId: string | null = null;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly keyManager: YouTubeKeyManager,
+  ) {}
 
   /**
-   * Helper getter retrieving YouTube API Key from environment config.
+   * Helper retrieving active API key & key ID from YouTubeKeyManager pool.
    */
-  private get apiKey(): string {
-    const key = process.env.YOUTUBE_API_KEY;
-    if (!key) {
-      this.logger.error('YOUTUBE_API_KEY environment variable is not defined!');
-    }
-    return key || '';
+  private async getActiveKey() {
+    return await this.keyManager.getActiveApiKey();
   }
 
   /**
@@ -43,7 +43,8 @@ export class TracksService {
     }
 
     try {
-      const url = `https://www.googleapis.com/youtube/v3/videoCategories?part=snippet&regionCode=US&key=${this.apiKey}`;
+      const { key, keyId } = await this.getActiveKey();
+      const url = `https://www.googleapis.com/youtube/v3/videoCategories?part=snippet&regionCode=US&key=${key}`;
       const response = await axios.get(url);
       const items = response.data.items || [];
       const musicCategory = items.find(
@@ -51,7 +52,7 @@ export class TracksService {
       );
 
       this.cachedMusicCategoryId = musicCategory ? musicCategory.id : '10';
-      await this.recordQuotaUsage(ApiEndpoint.VIDEO_CATEGORIES_LIST, 1);
+      await this.keyManager.recordQuotaUsage(ApiEndpoint.VIDEO_CATEGORIES_LIST, 1, keyId);
       return this.cachedMusicCategoryId;
     } catch (error: any) {
       this.logger.warn(`Failed to fetch video categories: ${error.message}. Defaulting to category ID '10'.`);
@@ -152,14 +153,15 @@ export class TracksService {
     // STEP 2: Cache MISS — Query YouTube API `/v3/search`
     this.logger.log(`Cache MISS for search query: "${query}". Calling YouTube API...`);
     const musicCategoryId = await this.getMusicCategoryId();
+    const { key, keyId } = await this.getActiveKey();
 
     const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(
       query,
-    )}&maxResults=10&videoCategoryId=${musicCategoryId}&key=${this.apiKey}&pageToken=${pageToken}`;
+    )}&maxResults=10&videoCategoryId=${musicCategoryId}&key=${key}&pageToken=${pageToken}`;
 
     try {
       const response = await axios.get(searchUrl);
-      await this.recordQuotaUsage(ApiEndpoint.SEARCH_LIST, 100);
+      await this.keyManager.recordQuotaUsage(ApiEndpoint.SEARCH_LIST, 100, keyId);
 
       const items = response.data.items || [];
       const seenVideoIds = new Set<string>();
@@ -234,11 +236,12 @@ export class TracksService {
     }
 
     // STEP 2: Cache MISS — Query YouTube API `/v3/videos`
-    const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoId}&key=${this.apiKey}`;
+    const { key, keyId } = await this.getActiveKey();
+    const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoId}&key=${key}`;
 
     try {
       const response = await axios.get(url);
-      await this.recordQuotaUsage(ApiEndpoint.VIDEOS_LIST, 1);
+      await this.keyManager.recordQuotaUsage(ApiEndpoint.VIDEOS_LIST, 1, keyId);
 
       const items = response.data.items || [];
       if (!items.length) {
@@ -276,32 +279,8 @@ export class TracksService {
   /**
    * Telemetry helper logging YouTube API quota units consumed per date & endpoint into PostgreSQL.
    */
-  private async recordQuotaUsage(endpoint: ApiEndpoint, units: number) {
-    try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      await this.prisma.apiQuotaUsage.upsert({
-        where: {
-          date_endpoint: {
-            date: today,
-            endpoint,
-          },
-        },
-        update: {
-          unitsConsumed: { increment: units },
-          callCount: { increment: 1 },
-        },
-        create: {
-          date: today,
-          endpoint,
-          unitsConsumed: units,
-          callCount: 1,
-        },
-      });
-    } catch (err: any) {
-      this.logger.warn(`Failed to record API quota usage: ${err.message}`);
-    }
+  private async recordQuotaUsage(endpoint: ApiEndpoint, units: number, keyId: 'A' | 'B' = 'A') {
+    await this.keyManager.recordQuotaUsage(endpoint, units, keyId);
   }
 
   /**

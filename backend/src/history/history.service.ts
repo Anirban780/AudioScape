@@ -23,6 +23,8 @@ import { PlaybackSource } from '@prisma/client';
  * - Recommendation Data Pipeline: Logs play counts and timestamps that feed directly into the TF-IDF music recommendation engine.
  * ============================================================================
  */
+import { RecommendationsService } from '../recommendations/recommendations.service';
+
 @Injectable()
 export class HistoryService {
   private readonly logger = new Logger(HistoryService.name);
@@ -30,6 +32,7 @@ export class HistoryService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tracksService: TracksService,
+    private readonly recommendationsService: RecommendationsService,
   ) {}
 
   /**
@@ -105,6 +108,9 @@ export class HistoryService {
           track: true,
         },
       });
+
+      // Invalidate user in-memory recommendation cache on new track play
+      this.recommendationsService.invalidateUserCache(userId);
 
       this.logger.log(` Recorded track play: user=${userId}, track=${videoId}, count=${historyRecord.playCount}`);
       return {

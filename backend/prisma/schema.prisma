@@ -180,11 +180,12 @@ model ApiQuotaUsage {
   id            String      @id @default(uuid())
   date          DateTime    @db.Date
   endpoint      ApiEndpoint
+  apiKeyId      String      @default("A") @map("api_key_id")
   unitsConsumed Int         @default(0) @map("units_consumed")
   callCount     Int         @default(0) @map("call_count")
   updatedAt     DateTime    @updatedAt @map("updated_at")
 
-  @@unique([date, endpoint])
+  @@unique([date, endpoint, apiKeyId])
   @@map("api_quota_usage")
 }
 

@@ -3,6 +3,7 @@ import { HistoryService } from './history.service';
 import { HistoryController } from './history.controller';
 import { AuthModule } from '../auth/auth.module';
 import { TracksModule } from '../tracks/tracks.module';
+import { RecommendationsModule } from '../recommendations/recommendations.module';
 
 /**
  * ============================================================================
@@ -12,11 +13,11 @@ import { TracksModule } from '../tracks/tracks.module';
  * 
  * PURPOSE:
  * Encapsulates listening history logging, play counter increments, and favorite track management.
- * Imports `AuthModule` (for `GoogleAuthGuard`) and `TracksModule` (for track detail resolution).
+ * Imports `AuthModule`, `TracksModule`, and `RecommendationsModule` (for cache invalidation).
  * ============================================================================
  */
 @Module({
-  imports: [AuthModule, TracksModule],
+  imports: [AuthModule, TracksModule, RecommendationsModule],
   controllers: [HistoryController],
   providers: [HistoryService],
   exports: [HistoryService],

@@ -296,35 +296,38 @@ export class PlaylistsService {
       throw new ConflictException('This track is already in the playlist');
     }
 
-    // Ensure Track row exists in database
+    // Ensure Track row exists in database (outside transaction — may call YouTube API)
     await this.ensureTrackExists(videoId, title, artist, thumbnailUrl);
 
-    // Determine highest position currently in playlist
-    const lastTrack = await this.prisma.playlistTrack.findFirst({
-      where: { playlistId },
-      orderBy: { position: 'desc' },
+    // Wrap position calculation + insert in a transaction to prevent duplicate positions
+    // under concurrent requests
+    const playlistTrack = await this.prisma.$transaction(async (tx) => {
+      // Re-read max position inside transaction so concurrent inserts don't collide
+      const lastTrack = await tx.playlistTrack.findFirst({
+        where: { playlistId },
+        orderBy: { position: 'desc' },
+      });
+
+      const nextPosition = lastTrack ? lastTrack.position + 1 : 1;
+
+      const created = await tx.playlistTrack.create({
+        data: {
+          playlistId,
+          trackId: videoId,
+          position: nextPosition,
+        },
+        include: { track: true },
+      });
+
+      await tx.playlist.update({
+        where: { id: playlistId },
+        data: { updatedAt: new Date() },
+      });
+
+      return created;
     });
 
-    const nextPosition = lastTrack ? lastTrack.position + 1 : 1;
-
-    const playlistTrack = await this.prisma.playlistTrack.create({
-      data: {
-        playlistId,
-        trackId: videoId,
-        position: nextPosition,
-      },
-      include: {
-        track: true,
-      },
-    });
-
-    // Touch playlist updatedAt timestamp
-    await this.prisma.playlist.update({
-      where: { id: playlistId },
-      data: { updatedAt: new Date() },
-    });
-
-    this.logger.log(` Added track ${videoId} to playlist ${playlistId} at position ${nextPosition}`);
+    this.logger.log(` Added track ${videoId} to playlist ${playlistId}`);
     return {
       message: 'Track added to playlist successfully',
       playlistTrack,
@@ -344,10 +347,7 @@ export class PlaylistsService {
 
     const existing = await this.prisma.playlistTrack.findUnique({
       where: {
-        playlistId_trackId: {
-          playlistId,
-          trackId,
-        },
+        playlistId_trackId: { playlistId, trackId },
       },
     });
 
@@ -355,40 +355,40 @@ export class PlaylistsService {
       throw new NotFoundException(`Track '${trackId}' not found in playlist '${playlistId}'`);
     }
 
-    // Remove track entry
-    await this.prisma.playlistTrack.delete({
-      where: {
-        playlistId_trackId: {
-          playlistId,
-          trackId,
+    // Wrap delete + re-sequence inside a transaction so concurrent removes
+    // never produce duplicate or skipped position numbers
+    await this.prisma.$transaction(async (tx) => {
+      await tx.playlistTrack.delete({
+        where: {
+          playlistId_trackId: { playlistId, trackId },
         },
-      },
+      });
+
+      // Read remaining tracks inside transaction — consistent snapshot
+      const remaining = await tx.playlistTrack.findMany({
+        where: { playlistId },
+        orderBy: { position: 'asc' },
+      });
+
+      // Batch all position updates in parallel within the same transaction
+      await Promise.all(
+        remaining.map((item, index) => {
+          const newPos = index + 1;
+          if (item.position === newPos) return Promise.resolve(); // skip no-ops
+          return tx.playlistTrack.update({
+            where: { id: item.id },
+            data: { position: newPos },
+          });
+        }),
+      );
+
+      await tx.playlist.update({
+        where: { id: playlistId },
+        data: { updatedAt: new Date() },
+      });
     });
 
-    // Re-sequence remaining track positions to maintain clean 1..N order
-    const remainingTracks = await this.prisma.playlistTrack.findMany({
-      where: { playlistId },
-      orderBy: { position: 'asc' },
-    });
-
-    for (let index = 0; index < remainingTracks.length; index++) {
-      const item = remainingTracks[index];
-      const newPos = index + 1;
-      if (item.position !== newPos) {
-        await this.prisma.playlistTrack.update({
-          where: { id: item.id },
-          data: { position: newPos },
-        });
-      }
-    }
-
-    // Touch playlist updatedAt timestamp
-    await this.prisma.playlist.update({
-      where: { id: playlistId },
-      data: { updatedAt: new Date() },
-    });
-
-    this.logger.log(` Removed track ${trackId} from playlist ${playlistId} and re-sequenced positions`);
+    this.logger.log(` Removed track ${trackId} from playlist ${playlistId} and re-sequenced`);
     return {
       message: 'Track removed from playlist successfully',
       playlistId,
@@ -407,23 +407,22 @@ export class PlaylistsService {
   async reorderPlaylistTracks(userId: string, playlistId: string, dto: ReorderTracksDto) {
     await this.verifyPlaylistOwnership(userId, playlistId);
 
-    const updates = dto.tracks;
-    for (const item of updates) {
-      await this.prisma.playlistTrack.updateMany({
-        where: {
-          playlistId,
-          trackId: item.trackId,
-        },
-        data: {
-          position: item.position,
-        },
-      });
-    }
+    // All position updates execute as a single atomic transaction
+    // so a partial reorder from a concurrent request cannot interleave
+    await this.prisma.$transaction(async (tx) => {
+      await Promise.all(
+        dto.tracks.map((item) =>
+          tx.playlistTrack.updateMany({
+            where: { playlistId, trackId: item.trackId },
+            data: { position: item.position },
+          }),
+        ),
+      );
 
-    // Touch playlist updatedAt timestamp
-    await this.prisma.playlist.update({
-      where: { id: playlistId },
-      data: { updatedAt: new Date() },
+      await tx.playlist.update({
+        where: { id: playlistId },
+        data: { updatedAt: new Date() },
+      });
     });
 
     this.logger.log(` Reordered tracks in playlist ${playlistId}`);
