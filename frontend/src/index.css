@@ -48,35 +48,38 @@
   /* Midnight Studio (Dark Theme Tokens) */
   --background: hsl(225 47% 4%);
   --foreground: hsl(220 14% 90%);
-  --card: hsl(223 30% 9%);
+  --card: hsl(223 30% 12%);
   --card-foreground: hsl(220 14% 90%);
-  --popover: hsl(221 28% 13%);
+  --popover: hsl(221 28% 15%);
   --popover-foreground: hsl(220 14% 90%);
   --primary: hsl(257 91% 76%);
   --primary-foreground: hsl(225 47% 4%);
   --secondary: hsl(330 81% 60%);
   --secondary-foreground: hsl(0 0% 100%);
   --tertiary: hsl(221 83% 53%);
-  --muted: hsl(223 22% 16%);
+  --muted: hsl(223 22% 20%);
   --muted-foreground: hsl(215 14% 65%);
   --accent: hsl(257 91% 20%);
   --accent-foreground: hsl(257 91% 76%);
   --destructive: hsl(346 84% 61%);
   --destructive-foreground: hsl(0 0% 100%);
-  --border: hsl(222 22% 16%);
-  --input: hsl(222 22% 16%);
+  --border: hsl(222 20% 30%);
+  --input: hsl(222 20% 30%);
   --ring: hsl(257 91% 76%);
 
   --color-primary: #A78BFA;
   --color-secondary: #EC4899;
   --color-tertiary: #2563EB;
   --color-surface-base: #05070E;
-  --color-surface-raised: #0F131C;
-  --color-surface-overlay: #171C29;
+  --color-surface-raised: #121724;
+  --color-surface-overlay: #1B2234;
   --color-on-surface: #E5E7EB;
   --color-on-surface-variant: #9CA3AF;
-  --color-border-default: #1F2430;
-  --color-border-strong: #2A3140;
+  /* Enhanced border contrast for Midnight Studio dark mode
+     WHY: Provides distinct visual boundaries around cards, sidebar, header,
+     and search containers against dark backgrounds. */
+  --color-border-default: #37435D;
+  --color-border-strong: #4C5B7C;
   --color-text-on-primary: #05070E;
   --color-text-on-secondary: #FFFFFF;
   --color-state-active: rgba(167, 139, 250, 0.20);

@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
 import { fetchLastPlayed } from "@/utils/api";
-import { useTheme } from "@/ThemeProvider";
 import placeholder from "@/assets/placeholder.jpg";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, ChevronLeft } from "lucide-react";
@@ -8,6 +7,25 @@ import MusicCard from "@/components/Cards/MusicCard";
 import usePlayerStore from "@/store/usePlayerStore";
 import toast from "react-hot-toast";
 
+/**
+ * ============================================================================
+ * RECENTLY PLAYED CAROUSEL (RecentlyPlayed.jsx)
+ * ============================================================================
+ * 
+ * WHAT THIS FILE DOES:
+ * Horizontal scroll-snap carousel displaying the user's recent listening history
+ * fetched from Firebase Firestore.
+ * 
+ * WHY IT WAS DESIGNED THIS WAY:
+ * 1. Stitch Design Tokens: Replaced hardcoded `bg-blue-600` and `bg-gray-200` with
+ *    `bg-[var(--color-primary)]` and `bg-[var(--color-surface-raised)]`.
+ * 2. Deduplicated History Array: Uses a `Map` key lookup on `song.id` to guarantee
+ *    no duplicate song cards appear in the listening history carousel.
+ * 
+ * HOW IT WORKS:
+ * - Queries `fetchLastPlayed(userId)` on mount and filters duplicates.
+ * - Manages scroll-snap position and pagination ("Load More").
+ */
 const RecentlyPlayed = ({ userId }) => {
   const [recentlyPlayed, setRecentlyPlayed] = useState([]);
   const [visibleSongs, setVisibleSongs] = useState(8);
@@ -54,13 +72,16 @@ const RecentlyPlayed = ({ userId }) => {
   if (!recentlyPlayed.length) return null;
 
   return (
-    <div className="w-full max-w-6xl mx-auto px-3 py-6 ml-4 relative">
-      <h2 className="text-2xl font-semibold mb-6">Recently Played</h2>
+    <div className="w-full relative px-2">
+      <h2 className="text-2xl font-bold mb-5 flex items-center gap-2">
+        <span>🕒</span> Recently Played
+      </h2>
+
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="grid grid-flow-col auto-cols-[minmax(200px,1fr)] gap-5 overflow-x-auto scrollbar-hide scroll-smooth"
-        style={{ scrollSnapType: "x mandatory", paddingBottom: "10px" }}
+        className="grid grid-flow-col auto-cols-[minmax(180px,1fr)] sm:auto-cols-[minmax(200px,1fr)] gap-5 overflow-x-auto scrollbar-hide scroll-smooth py-2"
+        style={{ scrollSnapType: "x mandatory" }}
       >
         {recentlyPlayed.slice(0, visibleSongs).map((song, index) => (
           <div
@@ -73,44 +94,50 @@ const RecentlyPlayed = ({ userId }) => {
               artist={song.artist}
               image={song.thumbnail || placeholder}
               onClick={() => {
-                usePlayerStore.getState().setTrack(song)
+                usePlayerStore.getState().setTrack(song);
                 toast.success("Track selected successfully");
               }}
             />
           </div>
         ))}
+
         {visibleSongs < recentlyPlayed.length && (
           <div
             onClick={handleLoadMore}
-            className="flex flex-col items-center justify-center cursor-pointer group rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700 w-[140px] mx-2 transition-all duration-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+            className="flex flex-col items-center justify-center cursor-pointer group rounded-2xl border border-[var(--color-border-default)] bg-[var(--color-surface-raised)] hover:bg-[var(--color-state-hover)] w-[160px] transition-all duration-300 shadow-md"
             style={{ scrollSnapAlign: "start" }}
           >
-            <ChevronRight
-              size={32}
-              className="text-gray-600 group-hover:text-gray-800 dark:text-gray-300 dark:group-hover:text-white"
-            />
-            <p className="mt-2 text-sm font-semibold text-gray-600 group-hover:text-gray-800 dark:text-gray-300 dark:group-hover:text-white">
+            <div className="p-3 rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] group-hover:scale-110 transition-transform">
+              <ChevronRight size={24} />
+            </div>
+            <p className="mt-3 text-sm font-semibold text-[var(--color-on-surface)]">
               Load More
             </p>
           </div>
         )}
       </div>
 
+      {/* Left Scroll Navigation Button */}
       {showScrollLeft && (
         <Button
           onClick={handleScrollLeft}
-          className="absolute left-0 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 shadow-md rounded-full p-2 z-10"
+          size="icon"
+          className="absolute left-2 top-1/2 -translate-y-1/2 bg-[var(--color-primary)] text-[var(--color-text-on-primary)] hover:opacity-90 shadow-xl rounded-full z-10"
+          aria-label="Scroll left"
         >
-          <ChevronLeft size={20} className="text-white" />
+          <ChevronLeft size={20} />
         </Button>
       )}
 
+      {/* Right Scroll Navigation Button */}
       {showScrollRight && (
         <Button
           onClick={handleScrollRight}
-          className="absolute right-0 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 shadow-md rounded-full p-2 z-10"
+          size="icon"
+          className="absolute right-2 top-1/2 -translate-y-1/2 bg-[var(--color-primary)] text-[var(--color-text-on-primary)] hover:opacity-90 shadow-xl rounded-full z-10"
+          aria-label="Scroll right"
         >
-          <ChevronRight size={20} className="text-white" />
+          <ChevronRight size={20} />
         </Button>
       )}
     </div>

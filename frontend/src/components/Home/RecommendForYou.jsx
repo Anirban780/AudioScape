@@ -7,6 +7,25 @@ import MusicCard from "@/components/Cards/MusicCard";
 import usePlayerStore from "@/store/usePlayerStore";
 import toast from "react-hot-toast";
 
+/**
+ * ============================================================================
+ * RECOMMENDATIONS CAROUSEL (RecommendForYou.jsx)
+ * ============================================================================
+ * 
+ * WHAT THIS FILE DOES:
+ * Renders a horizontal scroll-snap carousel of AI-personalized track recommendations
+ * for the authenticated user.
+ * 
+ * WHY IT WAS DESIGNED THIS WAY:
+ * 1. Stitch Design Tokens: Replaced hardcoded `bg-blue-600` and `bg-gray-200` with
+ *    `bg-[var(--color-primary)]` and `bg-[var(--color-surface-raised)]`.
+ * 2. TF-IDF Backend Integration: Queries `getRecommendations(15)` from `@/utils/api`
+ *    which calculates content similarity scores based on listening history.
+ * 
+ * HOW IT WORKS:
+ * - `handleScroll`: Monitors scroll position to toggle visibility of left/right arrow buttons.
+ * - `handleLoadMore`: Expands `visibleSongs` state by 5 tracks.
+ */
 const RecommendForYou = ({ userId }) => {
     const [recommendedSongs, setRecommendedSongs] = useState([]);
     const [visibleSongs, setVisibleSongs] = useState(5);
@@ -53,13 +72,16 @@ const RecommendForYou = ({ userId }) => {
     if (!recommendedSongs.length) return null;
 
     return (
-        <div className="w-full max-w-6xl mx-auto px-3 py-6 ml-4 relative">
-            <h2 className="text-2xl font-semibold mb-6">Recommend for You</h2>
+        <div id="recommendations-section" className="w-full relative px-2">
+            <h2 className="text-2xl font-bold mb-5 flex items-center gap-2">
+                <span>✨</span> Recommended for You
+            </h2>
+            
             <div
                 ref={scrollRef}
                 onScroll={handleScroll}
-                className="grid grid-flow-col auto-cols-[minmax(200px,1fr)] gap-5 overflow-x-auto scrollbar-hide scroll-smooth"
-                style={{ scrollSnapType: "x mandatory", paddingBottom: "10px" }}
+                className="grid grid-flow-col auto-cols-[minmax(180px,1fr)] sm:auto-cols-[minmax(200px,1fr)] gap-5 overflow-x-auto scrollbar-hide scroll-smooth py-2"
+                style={{ scrollSnapType: "x mandatory" }}
             >
                 {recommendedSongs.slice(0, visibleSongs).map((song, index) => (
                     <div 
@@ -78,38 +100,44 @@ const RecommendForYou = ({ userId }) => {
                         />
                     </div>
                 ))}
+
                 {visibleSongs < recommendedSongs.length && (
                     <div
                         onClick={handleLoadMore}
-                        className="flex flex-col items-center justify-center cursor-pointer group rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700 w-[140px] mx-2 transition-all duration-300 hover:bg-gray-300 dark:hover:bg-gray-600"
+                        className="flex flex-col items-center justify-center cursor-pointer group rounded-2xl border border-[var(--color-border-default)] bg-[var(--color-surface-raised)] hover:bg-[var(--color-state-hover)] w-[160px] transition-all duration-300 shadow-md"
                         style={{ scrollSnapAlign: "start" }}
                     >
-                        <ChevronRight
-                            size={32}
-                            className="text-gray-600 group-hover:text-gray-800 dark:text-gray-300 dark:group-hover:text-white"
-                        />
-                        <p className="mt-2 text-sm font-semibold text-gray-600 group-hover:text-gray-800 dark:text-gray-300 dark:group-hover:text-white">
+                        <div className="p-3 rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] group-hover:scale-110 transition-transform">
+                            <ChevronRight size={24} />
+                        </div>
+                        <p className="mt-3 text-sm font-semibold text-[var(--color-on-surface)]">
                             Load More
                         </p>
                     </div>
                 )}
             </div>
 
+            {/* Left Scroll Navigation Button */}
             {showScrollLeft && (
                 <Button
                     onClick={handleScrollLeft}
-                    className="absolute left-0 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 shadow-md rounded-full p-2 z-10"
+                    size="icon"
+                    className="absolute left-2 top-1/2 -translate-y-1/2 bg-[var(--color-primary)] text-[var(--color-text-on-primary)] hover:opacity-90 shadow-xl rounded-full z-10"
+                    aria-label="Scroll left"
                 >
-                    <ChevronLeft size={20} className="text-white" />
+                    <ChevronLeft size={20} />
                 </Button>
             )}
 
+            {/* Right Scroll Navigation Button */}
             {showScrollRight && (
                 <Button
                     onClick={handleScrollRight}
-                    className="absolute right-0 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 shadow-md rounded-full p-2 z-10"
+                    size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 bg-[var(--color-primary)] text-[var(--color-text-on-primary)] hover:opacity-90 shadow-xl rounded-full z-10"
+                    aria-label="Scroll right"
                 >
-                    <ChevronRight size={20} className="text-white" />
+                    <ChevronRight size={20} />
                 </Button>
             )}
         </div>

@@ -9,9 +9,29 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
-import { Settings, History, HelpCircle, LogOut, User } from "lucide-react";
+import { HelpCircle, LogOut, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
+/**
+ * ============================================================================
+ * USER AVATAR & AUTH MENU (UserMenu.jsx)
+ * ============================================================================
+ * 
+ * WHAT THIS FILE DOES:
+ * Renders the top-right user profile avatar dropdown menu (for authenticated users)
+ * or a Google Sign-In button (for guest visitors).
+ * 
+ * WHY IT WAS DESIGNED THIS WAY:
+ * 1. Stitch Surface Tokens: Replaced hardcoded `bg-gray-900` / `bg-white` with
+ *    `bg-[var(--color-surface-overlay)]`, `border-[var(--color-border-default)]`, and
+ *    `hover:bg-[var(--color-state-hover)]`.
+ * 2. High-res Avatar Resolution: Appends `?sz=200` parameter to Google OAuth photo URLs
+ *    to prevent pixelated avatar images.
+ * 
+ * HOW IT WORKS:
+ * - Reads `user`, `signInWithGoogle`, and `logout` from `useAuth()`.
+ * - Toggles dropdown content displaying user name, email, navigation links, and logout action.
+ */
 const UserMenu = () => {
   const { user, signInWithGoogle, logout } = useAuth();
   const [avatarUrl, setAvatarUrl] = useState("");
@@ -22,10 +42,6 @@ const UserMenu = () => {
       const url = user.photoURL.includes("?")
         ? `${user.photoURL}&sz=200`
         : `${user.photoURL}?sz=200`;
-
-      const img = new Image();
-      img.src = url;
-      img.onload = () => setAvatarUrl(url);
 
       setAvatarUrl(url);
     } else {
@@ -39,17 +55,17 @@ const UserMenu = () => {
   };
 
   return (
-    <div className="flex items-center space-x-4">
+    <div className="flex items-center space-x-3">
       {user ? (
         <DropdownMenu>
-          <DropdownMenuTrigger>
-            <Avatar className="w-10 h-10 cursor-pointer hover:opacity-80 transition-opacity duration-200">
+          <DropdownMenuTrigger className="outline-none">
+            <Avatar className="w-9 h-9 border border-[var(--color-border-default)] cursor-pointer hover:opacity-80 transition-opacity">
               <AvatarImage
                 src={avatarUrl}
                 alt="User Profile"
                 onError={() => setAvatarUrl("")}
               />
-              <AvatarFallback className="bg-gray-300 dark:bg-gray-600 text-black dark:text-white">
+              <AvatarFallback className="bg-[var(--color-primary)] text-[var(--color-text-on-primary)] font-semibold text-xs">
                 {user.displayName?.charAt(0) || "U"}
               </AvatarFallback>
             </Avatar>
@@ -57,70 +73,61 @@ const UserMenu = () => {
 
           <DropdownMenuContent
             align="end"
-            className="mt-2 min-w-max max-w-sm rounded-lg border border-gray-200 bg-white shadow-lg 
-                     dark:border-gray-700 dark:bg-gray-900"
+            className="mt-2 min-w-[220px] rounded-2xl border border-[var(--color-border-default)] bg-[var(--color-surface-overlay)] text-[var(--color-on-surface)] shadow-2xl p-2 z-50"
           >
-            <div className="flex items-center px-4 py-3 space-x-3">
-              <Avatar className="w-12 h-12 flex-shrink-0">
+            {/* Profile Info Header */}
+            <div className="flex items-center p-3 space-x-3 rounded-xl bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] mb-2">
+              <Avatar className="w-10 h-10 flex-shrink-0">
                 <AvatarImage src={avatarUrl} alt="User Profile" />
-                <AvatarFallback className="bg-gray-500 text-white">
+                <AvatarFallback className="bg-[var(--color-primary)] text-white font-semibold">
                   {user.displayName?.charAt(0) || "U"}
                 </AvatarFallback>
               </Avatar>
-              <div className="min-w-0">
-                <p className="font-medium text-gray-800 dark:text-white truncate max-w-[12rem]">
-                  {user.displayName}
+              <div className="min-w-0 flex-1">
+                <p className="font-semibold text-sm truncate">
+                  {user.displayName || "User"}
                 </p>
-                <p className="text-sm text-gray-500 dark:text-gray-400 break-words max-w-[12rem]">
+                <p className="text-xs text-[var(--color-on-surface-variant)] truncate">
                   {user.email}
                 </p>
               </div>
             </div>
 
-            <DropdownMenuSeparator className="my-1 border-gray-200 dark:border-gray-700" />
+            <DropdownMenuSeparator className="my-1 bg-[var(--color-border-default)]" />
 
+            {/* Menu Links */}
             <DropdownMenuItem 
-              className="menu-item ml-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="flex items-center gap-2 px-3 py-2 text-sm rounded-xl cursor-pointer hover:bg-[var(--color-state-hover)] transition-colors"
               onClick={() => navigate("/profile")}
             >
-              <User size={18} />
-              Profile
+              <User size={16} />
+              <span>Profile</span>
             </DropdownMenuItem>
 
             <DropdownMenuItem 
-              className="menu-item ml-2"
-            >
-              <History size={18} />
-              History
-            </DropdownMenuItem>
-
-            <DropdownMenuItem 
-              className="menu-item ml-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="flex items-center gap-2 px-3 py-2 text-sm rounded-xl cursor-pointer hover:bg-[var(--color-state-hover)] transition-colors"
               onClick={() => navigate("/help")}
             >
-              <HelpCircle size={18} />
-              Help & Feedback
+              <HelpCircle size={16} />
+              <span>Help & Feedback</span>
             </DropdownMenuItem>
 
-            <DropdownMenuSeparator className="my-1 border-gray-200 dark:border-gray-700" />
+            <DropdownMenuSeparator className="my-1 bg-[var(--color-border-default)]" />
 
+            {/* Logout Action */}
             <DropdownMenuItem
               onClick={handleLogout}
-              className="px-4 py-2 flex items-center gap-2 text-red-600 hover:bg-red-100 
-                         dark:text-red-400 dark:hover:bg-red-900 rounded-md transition cursor-pointer"
+              className="flex items-center gap-2 px-3 py-2 text-sm rounded-xl text-red-500 hover:bg-red-500/10 cursor-pointer transition-colors"
             >
-              <LogOut size={18} />
-              <p className="dark:hover:text-white">Log out</p>
+              <LogOut size={16} />
+              <span>Log out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ) : (
         <Button
           onClick={signInWithGoogle}
-          variant="outline"
-          className="w-full sm:w-auto px-4 py-2 text-sm sm:text-base font-medium transition-all duration-300 
-             border rounded-lg bg-gray-200 text-black border-gray-300 hover:bg-slate-300 
-             dark:bg-gray-700 dark:text-white dark:border-gray-500 dark:hover:bg-gray-800"
+          className="px-4 py-2 text-sm font-semibold rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] hover:opacity-90 transition-all shadow-md"
         >
           Login
         </Button>

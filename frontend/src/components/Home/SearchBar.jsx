@@ -1,14 +1,36 @@
 import { Search } from "lucide-react";
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Input } from "@/components/ui/input";
-import { useTheme } from "@/ThemeProvider";
 import axios from "axios";
 import placeholder from "@/assets/placeholder.jpg";
 import { getBackendURL } from "@/utils/api";
 import toast from "react-hot-toast";
 
+/**
+ * ============================================================================
+ * SEARCH BAR COMPONENT (SearchBar.jsx)
+ * ============================================================================
+ * 
+ * WHAT THIS FILE DOES:
+ * Live search bar with debounced input query handling, backend YouTube API integration,
+ * infinite scroll pagination, and track selection dropdown menu.
+ * 
+ * WHY IT WAS DESIGNED THIS WAY:
+ * 1. Stitch Design Token Integration: Replaced hardcoded `bg-gray-800` / `bg-gray-200` with
+ *    semantic surface tokens (`bg-[var(--color-surface-raised)]`, `bg-[var(--color-surface-overlay)]`,
+ *    `border-[var(--color-border-default)]`).
+ * 2. API Quota Conservation: Uses a 500ms debouncer (`debouncedSearch`) to prevent firing
+ *    unnecessary API calls on every keystroke.
+ * 3. Infinite Scroll: Uses `IntersectionObserver` to automatically fetch subsequent search pages
+ *    when scrolling down the search results dropdown.
+ * 
+ * HOW IT WORKS:
+ * - `handleInputChange`: Updates `query` state and calls debounced search API helper.
+ * - `fetchSearchResults`: Queries backend `/youtube/search?query=...` endpoint.
+ * - `handleTrackSelect`: Fetches full track metadata for selected YouTube video ID and passes it
+ *   to `onSelectTrack` callback (which updates `usePlayerStore`).
+ */
 const SearchBar = ({ onSelectTrack }) => {
-  const { theme } = useTheme();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -35,7 +57,7 @@ const SearchBar = ({ onSelectTrack }) => {
 
     } catch (error) {
       console.error("Error fetching search results:", error);
-      toast.error("Search is currently unavailable. Please try next day");
+      toast.error("Search is currently unavailable. Please try again");
 
     } finally {
       setLoading(false);
@@ -74,7 +96,7 @@ const SearchBar = ({ onSelectTrack }) => {
 
     if (observer.current) observerInstance.observe(observer.current);
     return () => observerInstance.disconnect();
-  }, [pageToken, query]);
+  }, [pageToken, query, loading]);
 
   const handleTrackSelect = async (track) => {
     if (!track.videoId) {
@@ -107,15 +129,13 @@ const SearchBar = ({ onSelectTrack }) => {
   };
 
   return (
-    <div className="relative w-full max-w-lg mx-auto px-2 sm:px-4">
-      <div
-        className={`flex items-center rounded-md p-2 transition-colors duration-300 
-      ${theme === "dark" ? "bg-gray-800 text-white" : "bg-gray-200 text-black"}`}
-      >
-        <Search size={20} className={theme === "dark" ? "text-gray-400" : "text-gray-600"} />
+    <div className="relative w-full max-w-lg mx-auto">
+      {/* Search Input Box */}
+      <div className="flex items-center rounded-xl p-2 bg-[var(--color-surface-base)] border border-[var(--color-border-default)] focus-within:border-[var(--color-primary)] transition-all shadow-inner">
+        <Search size={18} className="ml-2 text-[var(--color-on-surface-variant)] shrink-0" />
         <Input
           type="text"
-          placeholder="Search for songs..."
+          placeholder="Search songs, artists, genres..."
           value={query}
           onChange={handleInputChange}
           onFocus={() => setIsFocused(true)}
@@ -124,32 +144,35 @@ const SearchBar = ({ onSelectTrack }) => {
               setIsFocused(false);
             }
           }}
-          className={`ml-2 outline-none w-full transition-colors duration-300 text-sm sm:text-base
-        ${theme === "dark" ? "bg-gray-700 text-white placeholder-gray-400" : "bg-gray-200 text-black placeholder-gray-600"}`}
+          className="ml-2 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 text-sm placeholder:text-[var(--color-on-surface-variant)]/60 text-[var(--color-on-surface)]"
         />
       </div>
 
+      {/* Live Search Results Dropdown Panel */}
       {isFocused && results.length > 0 && (
         <div
           ref={dropdownRef}
-          className={`absolute left-0 w-full mt-2 p-2 rounded-md shadow-lg max-h-80 overflow-y-auto transition-opacity duration-300 z-50
-        ${theme === "dark" ? "bg-gray-900 text-white" : "bg-white text-black"}`}
+          className="absolute left-0 right-0 w-full mt-2 p-2 rounded-2xl shadow-2xl max-h-80 overflow-y-auto z-50 bg-[var(--color-surface-overlay)] border border-[var(--color-border-strong)] transition-all"
         >
           {results.map((track, index) => (
             <div
               key={`${track.videoId}-${index}`}
-              className="flex items-center p-2 hover:bg-gray-300 dark:hover:bg-gray-700 cursor-pointer rounded"
+              className="flex items-center p-2.5 hover:bg-[var(--color-state-hover)] cursor-pointer rounded-xl transition-colors"
               onMouseDown={() => handleTrackSelect(track)}
             >
-              <img src={track.thumbNail || placeholder} alt="Thumbnail" className="w-10 h-10 sm:w-12 sm:h-12 rounded-md mr-3 flex-shrink-0" />
-              <div className="flex flex-col">
-                <p className="font-semibold text-sm sm:text-base line-clamp-1">{track.title}</p>
-                <p className="text-xs sm:text-sm text-gray-500 line-clamp-1">{track.channelTitle}</p>
+              <img 
+                src={track.thumbNail || placeholder} 
+                alt="Thumbnail" 
+                className="w-11 h-11 rounded-lg object-cover mr-3 flex-shrink-0 shadow-sm" 
+              />
+              <div className="flex flex-col min-w-0 flex-1">
+                <p className="font-semibold text-sm line-clamp-1 text-[var(--color-on-surface)]">{track.title}</p>
+                <p className="text-xs text-[var(--color-on-surface-variant)] line-clamp-1 mt-0.5">{track.channelTitle}</p>
               </div>
             </div>
           ))}
-          {loading && <p className="mt-2 text-center font-semibold">Loading more...</p>}
-          <div ref={observer} className="h-10"></div>
+          {loading && <p className="p-3 text-center text-xs font-medium text-[var(--color-on-surface-variant)]">Loading more...</p>}
+          <div ref={observer} className="h-4"></div>
         </div>
       )}
     </div>

@@ -6,6 +6,27 @@ import { Maximize2, X } from 'lucide-react';
 import ProgressBar from './ProgressBar';
 import PlayerControls from './PlayerControls';
 
+/**
+ * ============================================================================
+ * FLOATING MINI PLAYER (MiniPlayer.jsx)
+ * ============================================================================
+ * 
+ * WHAT THIS FILE DOES:
+ * Floating, draggable mini player window (`react-rnd`) rendered at the bottom-right
+ * of the screen during active audio playback.
+ * 
+ * WHY IT WAS DESIGNED THIS WAY:
+ * 1. Stitch Glassmorphic Overlay: Replaced hardcoded `bg-gray-900 border-white` with
+ *    `bg-[var(--color-surface-overlay)]/90 backdrop-blur-md` and `border-[var(--color-border-strong)]`
+ *    for a sleek, premium floating glass widget look.
+ * 2. Draggable Window Handle: Uses `react-rnd` with header handle `mini-player-header` so
+ *    users can reposition the player anywhere on screen without covering workspace elements.
+ * 3. Responsive Touch Boundaries: Bound to `window` with min-width constraints.
+ * 
+ * HOW IT WORKS:
+ * - Polls `player.getCurrentTime()` every 1s to update `progress` in Zustand store.
+ * - Invokes `setIsFullScreen(true)` to transition into FullScreenPlayer view mode.
+ */
 const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
   const {
     isPlaying,
@@ -74,10 +95,10 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
   return (
     <Rnd
       default={{
-        x: window.innerWidth - 400,
-        y: window.innerHeight - 300,
+        x: typeof window !== 'undefined' ? window.innerWidth - 400 : 800,
+        y: typeof window !== 'undefined' ? window.innerHeight - 280 : 500,
         width: 380,
-        height: 260,
+        height: 250,
       }}
       minWidth={300}
       minHeight={200}
@@ -85,31 +106,38 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
       dragHandleClassName="mini-player-header"
       className="z-50"
     >
-      <div className="rounded-xl shadow-lg w-full h-full p-4 flex flex-col justify-between transition-all duration-200 bg-gray-900 text-white border-3 border-white">
-        <div className="flex justify-between items-center mini-player-header cursor-move">
-          <div className="flex items-center gap-4">
+      {/* Floating Glassmorphic Container */}
+      <div className="rounded-2xl shadow-2xl w-full h-full p-4 flex flex-col justify-between transition-all duration-200 bg-[var(--color-surface-overlay)]/90 backdrop-blur-md text-[var(--color-on-surface)] border border-[var(--color-border-strong)]">
+        {/* Header Bar (Draggable Handle) */}
+        <div className="flex justify-between items-center mini-player-header cursor-move select-none">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <img
               src={track?.thumbnail || placeholder}
-              alt={track?.name}
-              className="w-16 h-16 rounded object-cover"
+              alt={track?.name || "Track artwork"}
+              className="w-14 h-14 rounded-xl object-cover shadow-md flex-shrink-0"
             />
-            <div>
-              <p className="text-sm font-medium line-clamp-1">{track?.name}</p>
-              <p className="mt-1 text-xs text-gray-400 line-clamp-1">{track?.artist}</p>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold truncate text-[var(--color-on-surface)]">
+                {track?.name || "No track active"}
+              </p>
+              <p className="text-xs text-[var(--color-on-surface-variant)] truncate mt-0.5">
+                {track?.artist || "Unknown artist"}
+              </p>
             </div>
           </div>
 
-          <div className="flex flex-col items-center gap-2">
+          <div className="flex items-center gap-1 ml-2">
             <button
               onClick={() => setIsFullScreen(true)}
               onTouchEnd={(e) => {
                 e.preventDefault();
                 setIsFullScreen(true);
               }}
-              aria-label="Expand to full screen"
-              className="p-1 hover:bg-gray-200 hover:text-black rounded-xl"
+              aria-label="Expand to full screen player"
+              title="Expand player"
+              className="p-1.5 hover:bg-[var(--color-state-hover)] text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)] rounded-lg transition-colors"
             >
-              <Maximize2 size={18} />
+              <Maximize2 size={16} />
             </button>
             <button
               onClick={handleClose}
@@ -118,13 +146,15 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
                 handleClose();
               }}
               aria-label="Close mini player"
-              className="p-1 hover:bg-red-600 rounded-xl"
+              title="Close player"
+              className="p-1.5 hover:bg-red-500/20 text-red-500 rounded-lg transition-colors"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
         </div>
 
+        {/* Progress Seeker */}
         <ProgressBar
           progress={progress}
           duration={duration}
@@ -134,7 +164,8 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
           ref={progressRef}
         />
 
-        <div className="flex sm:flex-row justify-center items-center sm:justify-between gap-4 sm:gap-0 mx-auto mt-2">
+        {/* Controls Toolbar */}
+        <div className="flex justify-between items-center w-full mt-1">
           <PlayerControls
             isPlaying={isPlaying}
             togglePlayPause={togglePlayPause}

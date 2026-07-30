@@ -6,12 +6,31 @@ import {
     createPlaylist,
 } from "@/utils/playlists";
 import { X } from "lucide-react";
-import { useTheme } from "@/ThemeProvider";
 import usePlaylistStore from "@/store/usePlaylistStore";
 import toast from "react-hot-toast";
 
+/**
+ * ============================================================================
+ * PLAYLIST MODAL DIALOG (PlaylistModal.jsx)
+ * ============================================================================
+ * 
+ * WHAT THIS FILE DOES:
+ * Global modal dialog for adding selected tracks to existing playlists or
+ * creating new playlists in Firebase Firestore.
+ * 
+ * WHY IT WAS DESIGNED THIS WAY:
+ * 1. Stitch Surface Tokens & Zero-Green Rule: Replaced hardcoded `bg-neutral-900` and green
+ *    `bg-green-600` buttons with `bg-[var(--color-surface-overlay)]` and `bg-[var(--color-primary)]`.
+ * 2. Store-Driven Visibility: Rendered at root level in App.jsx and toggles visibility via
+ *    `isModalOpen` state in `usePlaylistStore`.
+ * 3. Single / Batch Support: Handles both individual tracks (`selectedSong`) and array batches
+ *    (`selectedTracks`).
+ * 
+ * HOW IT WORKS:
+ * - `handleToggle`: Toggles track inclusion in an existing playlist (adds if missing, removes if present).
+ * - `handleCreate`: Creates a new playlist with given title and automatically attaches selected track(s).
+ */
 const PlaylistModal = ({ userId }) => {
-    const { theme } = useTheme();
     const { selectedSong, selectedTracks, isModalOpen, closeModal } = usePlaylistStore();
 
     const [playlists, setPlaylists] = useState([]);
@@ -78,37 +97,36 @@ const PlaylistModal = ({ userId }) => {
 
     if (!isModalOpen || tracksToHandle.length === 0) return null;
 
-    const baseBg =
-        theme === "dark" ? "bg-neutral-900 text-white" : "bg-white text-black";
-    const border = theme === "dark" ? "border-neutral-700" : "border-gray-300";
-    const inputBg =
-        theme === "dark" ? "bg-neutral-800 text-white" : "bg-gray-100 text-black";
-
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-            <div className={`w-[320px] rounded-xl shadow-lg p-5 relative ${baseBg} ${border}`}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="w-full max-w-sm rounded-2xl shadow-2xl p-6 relative bg-[var(--color-surface-overlay)] text-[var(--color-on-surface)] border border-[var(--color-border-strong)] transition-all">
+                {/* Close Button */}
                 <button
-                    className="absolute top-2 right-3 p-1 rounded-full hover:bg-red-500"
+                    className="absolute top-4 right-4 p-1.5 rounded-full hover:bg-[var(--color-state-hover)] transition-colors"
                     onClick={closeModal}
+                    aria-label="Close modal"
                 >
                     <X size={18} />
                 </button>
 
-                <h2 className="text-lg font-semibold mb-4 text-center">
+                <h2 className="text-xl font-bold mb-5 text-center tracking-tight">
                     Save to Playlist
                 </h2>
 
-                <div className="mb-2">
-                    <h3 className="text-sm font-medium mb-2 opacity-80">Create a New Playlist</h3>
+                {/* Create New Playlist Input */}
+                <div className="mb-5">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">
+                        Create New Playlist
+                    </h3>
                     <div className="flex gap-2">
                         <input
-                            className={`flex-1 px-3 py-2 rounded-md text-sm outline-none ${inputBg} ${border}`}
-                            placeholder="New playlist name"
+                            className="flex-1 px-3 py-2 rounded-xl text-sm outline-none bg-[var(--color-surface-base)] text-[var(--color-on-surface)] border border-[var(--color-border-default)] focus:border-[var(--color-primary)] transition-all"
+                            placeholder="Playlist name..."
                             value={newName}
                             onChange={(e) => setNewName(e.target.value)}
                         />
                         <button
-                            className="px-3 py-2 rounded-md bg-green-600 text-white text-sm hover:bg-green-700"
+                            className="px-4 py-2 rounded-xl bg-[var(--color-primary)] text-[var(--color-text-on-primary)] text-sm font-semibold hover:opacity-90 transition-all shadow-md"
                             onClick={handleCreate}
                         >
                             Create
@@ -116,24 +134,26 @@ const PlaylistModal = ({ userId }) => {
                     </div>
                 </div>
 
-                <div className="mt-4">
-                    <h3 className="text-sm font-medium mb-2 opacity-80">Your Playlists</h3>
+                {/* User's Existing Playlists Checklist */}
+                <div>
+                    <h3 className="text-xs font-semibold uppercase tracking-wider mb-2 opacity-70">
+                        Your Playlists
+                    </h3>
                     {loading ? (
-                        <p className="text-center text-sm opacity-70">Loading...</p>
+                        <p className="text-center text-sm opacity-70 py-4">Loading playlists...</p>
                     ) : playlists.length === 0 ? (
-                        <p className="text-center text-sm opacity-70">No playlists yet.</p>
+                        <p className="text-center text-sm opacity-70 py-4">No playlists found. Create one above!</p>
                     ) : (
-                        <div className="max-h-[260px] overflow-y-auto space-y-2 pr-1">
+                        <div className="max-h-[220px] overflow-y-auto space-y-1.5 pr-1">
                             {playlists.map((pl) => (
                                 <label
                                     key={pl.id}
-                                    className={`flex items-center justify-between rounded-md px-3 py-2 cursor-pointer transition-colors ${theme === "dark" ? "hover:bg-neutral-800" : "hover:bg-gray-100"
-                                        }`}
+                                    className="flex items-center justify-between rounded-xl px-3 py-2.5 cursor-pointer hover:bg-[var(--color-state-hover)] transition-colors border border-transparent hover:border-[var(--color-border-default)]"
                                 >
-                                    <span className="text-sm">{pl.name}</span>
+                                    <span className="text-sm font-medium">{pl.name}</span>
                                     <input
                                         type="checkbox"
-                                        className="form-checkbox h-4 w-5 accent-black"
+                                        className="h-4 w-4 accent-[var(--color-primary)] rounded cursor-pointer"
                                         checked={tracksToHandle.every((track) => isInPlaylist(pl, track))}
                                         onChange={() => handleToggle(pl)}
                                     />

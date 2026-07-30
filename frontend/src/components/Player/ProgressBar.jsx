@@ -1,5 +1,25 @@
 import React, { useState, useEffect, useRef } from "react";
 
+/**
+ * ============================================================================
+ * PROGRESS BAR TRACK SEEKER (ProgressBar.jsx)
+ * ============================================================================
+ * 
+ * WHAT THIS FILE DOES:
+ * Interactive progress bar slider displaying track elapsed time, total duration,
+ * active fill track, and scrub handle for audio seeking.
+ * 
+ * WHY IT WAS DESIGNED THIS WAY:
+ * 1. Stitch Primary Token & Zero Green: Replaced legacy `bg-green-500` fill with
+ *    primary brand token `bg-[var(--color-primary)]`.
+ * 2. Touch & Mouse Support: Implements drag-seeking listeners supporting both
+ *    mouse clicks (`onMouseDown`) and touch events (`onTouchStart`).
+ * 
+ * HOW IT WORKS:
+ * - `handleInteraction`: Calculates scrub position percentage from event clientX relative
+ *   to bounding rect, updates `progress` state, and calls `player.seekTo()` on release.
+ * - Formats time in MM:SS via `formatTime` helper.
+ */
 const formatTime = (time) => {
     const minutes = Math.floor((time || 0) / 60);
     const seconds = Math.floor((time || 0) % 60).toString().padStart(2, "0");
@@ -39,16 +59,19 @@ const ProgressBar = React.forwardRef(({ progress, duration, player, isReady, set
             document.removeEventListener("touchmove", onMove);
             document.removeEventListener("touchend", onUp);
         };
-    }, [isDragging]);
+    }, [isDragging, duration, isReady, player, setProgress]);
+
+    const percentage = duration > 0 ? Math.min(100, Math.max(0, (progress / duration) * 100)) : 0;
 
     return (
-        <div className="space-y-2">
+        <div className="space-y-1.5 w-full">
+            {/* Clickable Track Bar */}
             <div
                 ref={(node) => { 
                     localRef.current = node;
                     if (typeof ref === 'function') ref(node);
                 }}
-                className="relative h-1 bg-gray-800 rounded-full cursor-pointer group"
+                className="relative h-1.5 bg-[var(--color-border-default)] rounded-full cursor-pointer group py-1 -my-1"
                 onMouseDown={(e) => {
                     setIsDragging(true);
                     handleInteraction(e.clientX);
@@ -58,17 +81,25 @@ const ProgressBar = React.forwardRef(({ progress, duration, player, isReady, set
                     handleInteraction(e.touches[0].clientX);
                 }}
             >
-                <div className="absolute h-full bg-green-500 rounded-full" style={{ width: `${(progress / duration) * 100}%` }} />
+                {/* Active Filled Progress Bar */}
+                <div 
+                    className="absolute top-1 h-1.5 bg-[var(--color-primary)] rounded-full transition-all duration-100" 
+                    style={{ width: `${percentage}%` }} 
+                />
+                
+                {/* Draggable Handle Thumb */}
                 <div
-                    className="absolute w-3 h-3 bg-white rounded-full -top-1 shadow-md group-hover:scale-125 transition"
+                    className="absolute w-3.5 h-3.5 bg-white rounded-full top-0 shadow-md group-hover:scale-125 transition-transform"
                     style={{
-                        left: `${(progress / duration) * 100}%`,
+                        left: `${percentage}%`,
                         transform: 'translateX(-50%)',
-                        opacity: isDragging || progress > 0 ? 1 : 0,
+                        opacity: isDragging || percentage > 0 ? 1 : 0,
                     }}
                 />
             </div>
-            <div className="flex justify-between text-xs text-gray-400">
+
+            {/* Time Indicators */}
+            <div className="flex justify-between text-xs text-[var(--color-on-surface-variant)] font-medium">
                 <span>{formatTime(progress)}</span>
                 <span>{formatTime(duration)}</span>
             </div>
