@@ -12,6 +12,9 @@ node_modules
 dist
 dist-ssr
 *.local
+DOCKER_PACKAGE_GUIDE.md
+.devcontainer
+.github
 
 # Editor directories and files
 .vscode/*

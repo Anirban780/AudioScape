@@ -1,0 +1,81 @@
+### ============================================================================
+### AUDIOSCAPE NESTJS BACKEND API TEST SUITE (.http format)
+### ============================================================================
+### Usage: Open in VS Code with "REST Client" extension or use as curl reference.
+### Base URL: http://localhost:5000
+
+@baseUrl = http://localhost:5000
+@googleIdToken = YOUR_GOOGLE_ID_TOKEN_HERE
+
+### 1. Root Endpoint Discovery
+GET {{baseUrl}}/
+
+### 2. Health & Database Ping Check
+GET {{baseUrl}}/healthcheck
+
+### 3. Auth Module Status
+GET {{baseUrl}}/api/auth/status
+
+### 4. Google Auth Sync (Requires valid Google ID Token)
+POST {{baseUrl}}/api/auth/google
+Content-Type: application/json
+
+{
+  "idToken": "{{googleIdToken}}"
+}
+
+### 5. Protected Profile Check (Requires Bearer Google ID Token)
+GET {{baseUrl}}/api/auth/me
+Authorization: Bearer {{googleIdToken}}
+
+### 6. YouTube Music Search Proxy (With PostgreSQL 24h Caching)
+GET {{baseUrl}}/youtube/search?query=lofi+hip+hop
+
+### 7. YouTube Track Details Proxy (With PostgreSQL Cache)
+GET {{baseUrl}}/youtube/track/dQw4w9WgXcQ
+
+### 8. YouTube Category Lookup
+GET {{baseUrl}}/youtube/categories
+
+### 9. Log Track Listen History (Protected)
+POST {{baseUrl}}/api/music/history
+Authorization: Bearer {{googleIdToken}}
+Content-Type: application/json
+
+{
+  "videoId": "dQw4w9WgXcQ",
+  "source": "SEARCH",
+  "title": "Never Gonna Give You Up",
+  "artist": "Rick Astley"
+}
+
+### 10. Get User Listen History (Protected)
+GET {{baseUrl}}/api/music/history?page=1&limit=10
+Authorization: Bearer {{googleIdToken}}
+
+### 11. Toggle Liked Favorite Track (Protected)
+POST {{baseUrl}}/api/music/like
+Authorization: Bearer {{googleIdToken}}
+Content-Type: application/json
+
+{
+  "videoId": "dQw4w9WgXcQ",
+  "liked": true
+}
+
+### 12. Get User Liked Favorites (Protected)
+GET {{baseUrl}}/api/music/favorites
+Authorization: Bearer {{googleIdToken}}
+
+### 13. Create Custom Playlist (Protected)
+POST {{baseUrl}}/api/playlists
+Authorization: Bearer {{googleIdToken}}
+Content-Type: application/json
+
+{
+  "name": "My Testing Playlist"
+}
+
+### 14. Get User Playlists (Protected)
+GET {{baseUrl}}/api/playlists
+Authorization: Bearer {{googleIdToken}}

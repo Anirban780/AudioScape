@@ -11,14 +11,16 @@ export default defineConfig({
   ],
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./utils"),
-      "utils": path.resolve(__dirname, "./utils"),
+      "@/assets": path.resolve(__dirname, "./frontend/assets"),
+      "@": path.resolve(__dirname, "./frontend/src"),
     },
   },
   build: {
-    outDir: "dist", // Ensure Vercel serves the correct folder
+    outDir: "dist",
   },
   server: {
-    host: true,
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: true,
   },
 })

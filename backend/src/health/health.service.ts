@@ -49,7 +49,7 @@ export class HealthService {
     return {
       status: dbStatus === 'connected' ? 'ok' : 'degraded',
       service: 'AudioScape NestJS Backend',
-      version: '1.1.0',
+      version: '2.0.0',
       environment: process.env.NODE_ENV || 'development',
       timestamp: new Date().toISOString(),
       uptimeSeconds,
