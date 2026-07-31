@@ -1,6 +1,9 @@
-// utils/youtube.js
 import { getBackendURL } from "./api";
 
+/**
+ * Fetches search results from NestJS YouTube proxy controller (/youtube/search)
+ * and caches results in localStorage for 30 minutes.
+ */
 const fetchAndCacheYoutubeMusic = async (query) => {
   try {
     const API_URL = await getBackendURL();
@@ -13,22 +16,30 @@ const fetchAndCacheYoutubeMusic = async (query) => {
     const data = await response.json();
     const rawTracks = data.tracks || [];
 
-    const tracks = rawTracks.map(item => ({
+    const tracks = rawTracks.map((item) => ({
       id: item.videoId || item.id,
+      videoId: item.videoId || item.id,
       name: item.title || item.name || "Unknown Title",
+      title: item.title || item.name || "Unknown Title",
       artist: item.channelTitle || item.artist || "Unknown Artist",
+      channelTitle: item.channelTitle || item.artist || "Unknown Artist",
       thumbnail: item.thumbNail || item.thumbnail || "",
+      thumbNail: item.thumbNail || item.thumbnail || "",
       channelId: item.channelId || "Unknown",
     }));
 
     const CACHE_KEY = `yt_music_cache_${query}`;
-    localStorage.setItem(
-      CACHE_KEY,
-      JSON.stringify({
-        timestamp: Date.now(),
-        data: tracks,
-      })
-    );
+    try {
+      localStorage.setItem(
+        CACHE_KEY,
+        JSON.stringify({
+          timestamp: Date.now(),
+          data: tracks,
+        })
+      );
+    } catch (e) {
+      // Catch quota errors gracefully (e.g. Incognito)
+    }
 
     return tracks;
   } catch (error) {
@@ -37,24 +48,26 @@ const fetchAndCacheYoutubeMusic = async (query) => {
   }
 };
 
+/**
+ * High-level helper fetching YouTube music search results with local caching.
+ */
 export const fetchYoutubeMusic = async (query, maxResults = 20) => {
-  const CACHE_KEY = `yt_music_cache_${query}`;
+  if (!query || !query.trim()) return [];
+
+  const CACHE_KEY = `yt_music_cache_${query.trim()}`;
   const CACHE_EXPIRY_MS = 1000 * 60 * 30; // 30 minutes
-  const cached = localStorage.getItem(CACHE_KEY);
 
-  if (cached) {
-    const parsed = JSON.parse(cached);
-    const now = Date.now();
-
-    if (now - parsed.timestamp < CACHE_EXPIRY_MS) {
-      console.log("✅ Using cached data for:", query);
-      return parsed.data; // Return cached data if it's still valid
-    } else {
-      console.log("⏰ Cache expired for:", query);
-      return await fetchAndCacheYoutubeMusic(query);
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Date.now() - parsed.timestamp < CACHE_EXPIRY_MS) {
+        return parsed.data;
+      }
     }
-  } else {
-    console.log("🔄 No cached data found for:", query);
-    return await fetchAndCacheYoutubeMusic(query);
+  } catch (e) {
+    // Ignore cache parsing errors
   }
+
+  return await fetchAndCacheYoutubeMusic(query.trim());
 };

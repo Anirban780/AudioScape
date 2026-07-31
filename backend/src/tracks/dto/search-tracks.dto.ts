@@ -31,4 +31,13 @@ export class SearchTracksDto {
   @IsString({ message: 'pageToken must be a valid string' })
   @IsOptional()
   pageToken?: string;
+
+  /**
+   * Optional flag to restrict search strictly to local PostgreSQL database (skipping YouTube API quota usage).
+   * Used during live user typing before explicit Enter submission.
+   * @example "true"
+   */
+  @IsString({ message: 'dbOnly must be a valid string' })
+  @IsOptional()
+  dbOnly?: string;
 }
