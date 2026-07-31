@@ -33,7 +33,8 @@ export class TracksController {
    */
   @Get('search')
   async searchTracks(@Query() dto: SearchTracksDto) {
-    return this.tracksService.searchTracks(dto.query, dto.pageToken);
+    const dbOnly = dto.dbOnly === 'true' || dto.dbOnly === '1';
+    return this.tracksService.searchTracks(dto.query, dto.pageToken, dbOnly);
   }
 
   /**

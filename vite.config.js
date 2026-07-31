@@ -21,4 +21,16 @@ export default defineConfig({
   server: {
     host: true,
   },
+  test: {
+    // Use jsdom to emulate browser APIs (localStorage, DOM, IntersectionObserver stub)
+    globals: true,
+    environment: 'jsdom',
+    // Wire up @testing-library/jest-dom matchers (toBeInTheDocument, etc.) for all test files
+    setupFiles: ['@testing-library/jest-dom'],
+    // Re-expose the same path aliases as production so vi.mock paths resolve correctly
+    alias: {
+      '@':    path.resolve(__dirname, './utils'),
+      'utils': path.resolve(__dirname, './utils'),
+    },
+  },
 })
