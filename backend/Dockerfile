@@ -12,6 +12,9 @@ RUN apk add --no-cache openssl
 # Copy source code
 COPY . .
 
+# Generate Prisma Client
+RUN npx prisma generate
+
 # Expose backend port
 EXPOSE 5000
 

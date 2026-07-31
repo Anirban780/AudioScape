@@ -5,7 +5,7 @@
   "main": "src/main.ts",
   "scripts": {
     "start": "ts-node src/main.ts",
-    "dev": "nodemon --watch 'src/**/*.ts' --exec ts-node src/main.ts",
+    "dev": "prisma generate && nodemon --watch 'src/**/*.ts' --exec ts-node src/main.ts",
     "start:dev": "nodemon --watch 'src/**/*.ts' --exec ts-node src/main.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

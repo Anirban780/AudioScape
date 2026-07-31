@@ -1,146 +1,107 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { fetchLastPlayed } from "@/utils/api";
 import placeholder from "@/assets/placeholder.jpg";
-import { Button } from "@/components/ui/button";
-import { ChevronRight, ChevronLeft } from "lucide-react";
-import MusicCard from "@/components/Cards/MusicCard";
+import { Play } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
 import toast from "react-hot-toast";
 
 /**
  * ============================================================================
- * RECENTLY PLAYED CAROUSEL (RecentlyPlayed.jsx)
+ * RECENTLY PLAYED ALBUM GRID (RecentlyPlayed.jsx)
  * ============================================================================
  * 
  * WHAT THIS FILE DOES:
- * Horizontal scroll-snap carousel displaying the user's recent listening history
+ * Displays a responsive 5-column album card grid of the user's recent listening history
  * fetched from Firebase Firestore.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Stitch Design Tokens: Replaced hardcoded `bg-blue-600` and `bg-gray-200` with
- *    `bg-[var(--color-primary)]` and `bg-[var(--color-surface-raised)]`.
- * 2. Deduplicated History Array: Uses a `Map` key lookup on `song.id` to guarantee
- *    no duplicate song cards appear in the listening history carousel.
+ * 1. Stitch Grid Layout: Replaced auto-scrolling row with Stitch's clean 5-column
+ *    grid layout (`grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6`) matching
+ *    the Midnight Studio & Fragrant Glassy Dashboard designs.
+ * 2. Vibrant Hover Overlay: Image zoom scale on hover (`group-hover:scale-110`) with a
+ *    glowing circular play button CTA (`vibrant-glow`).
+ * 3. Array Deduplication: Uses `Map` key lookup on `song.id` to guarantee unique cards.
  * 
  * HOW IT WORKS:
- * - Queries `fetchLastPlayed(userId)` on mount and filters duplicates.
- * - Manages scroll-snap position and pagination ("Load More").
+ * - Queries `fetchLastPlayed(userId)` on mount.
+ * - Clicking any card invokes `usePlayerStore.getState().setTrack(song)` to immediately start playback.
  */
+
 const RecentlyPlayed = ({ userId }) => {
   const [recentlyPlayed, setRecentlyPlayed] = useState([]);
-  const [visibleSongs, setVisibleSongs] = useState(8);
-  const [showScrollRight, setShowScrollRight] = useState(false);
-  const [showScrollLeft, setShowScrollLeft] = useState(false);
-  const scrollRef = useRef(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (userId) {
-      fetchLastPlayed(userId).then((songs) => {
-        const uniqueSongs = Array.from(
-          new Map(songs.map((song) => [song.id, song])).values()
-        );
-        setRecentlyPlayed(uniqueSongs);
-        setTimeout(() => handleScroll(), 100);
-      });
+      setLoading(true);
+      fetchLastPlayed(userId)
+        .then((songs) => {
+          const uniqueSongs = Array.from(
+            new Map(songs.map((song) => [song.id || song.videoId, song])).values()
+          );
+          setRecentlyPlayed(uniqueSongs);
+        })
+        .catch((err) => {
+          console.error("Error fetching recent tracks:", err);
+        })
+        .finally(() => setLoading(false));
     }
   }, [userId]);
 
-  const handleScroll = () => {
-    if (scrollRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
-      setShowScrollLeft(scrollLeft > 10);
-      setShowScrollRight(scrollLeft + clientWidth < scrollWidth - 10);
-    }
-  };
-
-  const handleScrollRight = () => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollBy({ left: 300, behavior: "smooth" });
-    }
-  };
-
-  const handleScrollLeft = () => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollBy({ left: -300, behavior: "smooth" });
-    }
-  };
-
-  const handleLoadMore = () => {
-    setVisibleSongs((prev) => prev + 8);
-  };
-
-  if (!recentlyPlayed.length) return null;
+  if (!userId || (!loading && !recentlyPlayed.length)) {
+    return null;
+  }
 
   return (
-    <div className="w-full relative px-2">
-      <h2 className="text-2xl font-bold mb-5 flex items-center gap-2">
-        <span>🕒</span> Recently Played
-      </h2>
-
-      <div
-        ref={scrollRef}
-        onScroll={handleScroll}
-        className="grid grid-flow-col auto-cols-[minmax(180px,1fr)] sm:auto-cols-[minmax(200px,1fr)] gap-5 overflow-x-auto scrollbar-hide scroll-smooth py-2"
-        style={{ scrollSnapType: "x mandatory" }}
-      >
-        {recentlyPlayed.slice(0, visibleSongs).map((song, index) => (
-          <div
-            key={`${song.id}-${index}`}
-            style={{ scrollSnapAlign: "start" }}
-          >
-            <MusicCard
-              id={song.id}
-              name={song.name}
-              artist={song.artist}
-              image={song.thumbnail || placeholder}
-              onClick={() => {
-                usePlayerStore.getState().setTrack(song);
-                toast.success("Track selected successfully");
-              }}
-            />
-          </div>
-        ))}
-
-        {visibleSongs < recentlyPlayed.length && (
-          <div
-            onClick={handleLoadMore}
-            className="flex flex-col items-center justify-center cursor-pointer group rounded-2xl border border-[var(--color-border-default)] bg-[var(--color-surface-raised)] hover:bg-[var(--color-state-hover)] w-[160px] transition-all duration-300 shadow-md"
-            style={{ scrollSnapAlign: "start" }}
-          >
-            <div className="p-3 rounded-full bg-[var(--color-primary)]/10 text-[var(--color-primary)] group-hover:scale-110 transition-transform">
-              <ChevronRight size={24} />
-            </div>
-            <p className="mt-3 text-sm font-semibold text-[var(--color-on-surface)]">
-              Load More
-            </p>
-          </div>
-        )}
+    <section className="mb-10 sm:mb-12">
+      {/* Section Header */}
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl sm:text-2xl font-bold text-[var(--color-on-surface)] tracking-tight">
+          Recently Played
+        </h2>
+        <span className="text-[var(--color-on-surface-variant)] text-xs font-bold tracking-wider hover:text-[var(--color-primary)] cursor-pointer transition-colors uppercase">
+          SEE ALL
+        </span>
       </div>
 
-      {/* Left Scroll Navigation Button */}
-      {showScrollLeft && (
-        <Button
-          onClick={handleScrollLeft}
-          size="icon"
-          className="absolute left-2 top-1/2 -translate-y-1/2 bg-[var(--color-primary)] text-[var(--color-text-on-primary)] hover:opacity-90 shadow-xl rounded-full z-10"
-          aria-label="Scroll left"
-        >
-          <ChevronLeft size={20} />
-        </Button>
-      )}
+      {/* 5-Column Album Cards Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
+        {recentlyPlayed.slice(0, 10).map((song, index) => (
+          <div
+            key={`${song.id || song.videoId}-${index}`}
+            onClick={() => {
+              usePlayerStore.getState().setTrack(song);
+              usePlayerStore.getState().setIsPlaying(true);
+              toast.success(`Playing: ${song.name || song.title}`);
+            }}
+            className="group relative cursor-pointer"
+          >
+            {/* Card Image Container */}
+            <div className="aspect-square rounded-2xl overflow-hidden bg-[var(--color-surface-raised)] mb-3 border-2 border-[var(--color-border-default)] relative shadow-lg">
+              <img
+                src={song.thumbnail || placeholder}
+                alt={song.name || song.title}
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+              />
+              {/* Glowing Play Overlay */}
+              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] flex items-center justify-center shadow-[0_0_20px_rgba(167,139,250,0.5)] transform scale-95 group-hover:scale-100 transition-transform">
+                  <Play size={22} fill="currentColor" className="ml-0.5" />
+                </div>
+              </div>
+            </div>
 
-      {/* Right Scroll Navigation Button */}
-      {showScrollRight && (
-        <Button
-          onClick={handleScrollRight}
-          size="icon"
-          className="absolute right-2 top-1/2 -translate-y-1/2 bg-[var(--color-primary)] text-[var(--color-text-on-primary)] hover:opacity-90 shadow-xl rounded-full z-10"
-          aria-label="Scroll right"
-        >
-          <ChevronRight size={20} />
-        </Button>
-      )}
-    </div>
+            {/* Track Info */}
+            <h4 className="font-bold text-sm text-[var(--color-on-surface)] truncate group-hover:text-[var(--color-primary)] transition-colors">
+              {song.name || song.title || "Untitled Track"}
+            </h4>
+            <p className="text-xs text-[var(--color-on-surface-variant)] truncate mt-0.5">
+              {song.artist || "Unknown Artist"}
+            </p>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 };
 

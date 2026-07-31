@@ -11,47 +11,39 @@ import RecommendForYou from "@/components/Home/RecommendForYou";
  * ============================================================================
  * 
  * WHAT THIS FILE DOES:
- * Primary dashboard view for authenticated AudioScape users.
- * Displays the hero banner stream, recently played listening history carousel,
- * and AI-personalized track recommendations.
+ * Primary Stitch Dashboard view for authenticated AudioScape users.
+ * Assembles:
+ * 1. Stitch Hero Spotlight Grid (`HeroSection.jsx`): Main active track spotlight & Focus Flow.
+ * 2. Recently Played Album Grid (`RecentlyPlayed.jsx`): Responsive 5-column album card grid.
+ * 3. Featured Daily Mix & Recommendations (`RecommendForYou.jsx`): Wide featured mix banner.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. AppLayout Shell Unification: Wraps content cleanly in `<AppLayout>` to inherit
- *    the global sidebar, sticky search header, theme toggle, and bottom player padding.
- * 2. Surface Token Hierarchy: Replaced hardcoded `bg-white dark:bg-gray-800` with
- *    semantic surface tokens (`bg-[var(--color-surface-raised)]`) to align with Stitch theme rules.
+ * 1. Stitch Midnight Studio & Fragrant Glassy Alignment: Rebuild matches screens
+ *    `721d44993cd748aca88d8a328189655e` & `8ac7f54565f9488ebb1bc86ad5bfe597`.
+ * 2. Unified AppLayout Shell: Inherits sticky glassmorphic top header, sidebar navigation,
+ *    theme mode switcher, and bottom player dock clearance.
+ * 3. Zero-Green Brand Palette: All primary actions use `var(--color-primary)` & `var(--color-secondary)`.
  * 
  * HOW IT WORKS:
- * - Reads `user` object from `useAuth()`.
- * - Renders HeroSection streaming showcase.
- * - Conditionally renders `RecentlyPlayed` and `RecommendForYou` passing `user.uid`.
+ * - Obtains `user` from `useAuth()`.
+ * - Passes `user.uid` to `RecentlyPlayed` and `RecommendForYou` to fetch Firestore history and TF-IDF recommendations.
  */
+
 const HomePage = () => {
   const { user } = useAuth();
 
   return (
     <AppLayout>
-      {/* Hero Banner Section */}
-      <div className="w-full bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] rounded-2xl shadow-lg p-4 sm:p-6 flex flex-col relative">
-        <h1 className="text-lg sm:text-xl md:text-2xl font-bold mb-4 flex items-center gap-2">
-          <span>🌐</span> Now Streaming 🎧
-        </h1>
+      <div className="w-full max-w-[1280px] mx-auto py-2">
+        {/* Stitch 2-Column Hero Spotlight */}
         <HeroSection />
+
+        {/* Recently Played Album Grid */}
+        {user && <RecentlyPlayed userId={user.uid} />}
+
+        {/* Featured Daily Mix & AI Recommendations */}
+        {user && <RecommendForYou userId={user.uid} />}
       </div>
-
-      {/* Recently Played Listening History */}
-      {user && (
-        <div className="mt-6">
-          <RecentlyPlayed userId={user.uid} />
-        </div>
-      )}
-
-      {/* Recommended Songs Grid */}
-      {user && (
-        <div className="mt-8">
-          <RecommendForYou userId={user.uid} />
-        </div>
-      )}
     </AppLayout>
   );
 };
