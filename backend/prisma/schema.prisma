@@ -136,6 +136,7 @@ model Tracks {
   listenHistory  ListenHistory[]
   playlistTracks PlaylistTrack[]
   queryResults   QueryTrackResult[]
+  pageResults    SearchQueryPageResult[]
 
   @@index([channelId])
   @@index([lastFetchedAt])
@@ -156,9 +157,40 @@ model SearchQuery {
   createdAt          DateTime  @default(now()) @map("created_at")
 
   results QueryTrackResult[]
+  pages   SearchQueryPage[]
 
   @@index([expiresAt])
   @@map("search_queries")
+}
+
+model SearchQueryPage {
+  id            String                  @id @default(uuid())
+  queryId       String                  @map("query_id")
+  pageToken     String?                 @map("page_token")          // null for page 0
+  nextPageToken String?                 @map("next_page_token")
+  pageIndex     Int                     @default(0) @map("page_index")
+  createdAt     DateTime                @default(now()) @map("created_at")
+
+  query         SearchQuery             @relation(fields: [queryId], references: [id], onDelete: Cascade)
+  results       SearchQueryPageResult[]
+
+  @@unique([queryId, pageToken])
+  @@map("search_query_pages")
+}
+
+model SearchQueryPageResult {
+  id           String          @id @default(uuid())
+  pageId       String          @map("page_id")
+  trackId      String          @map("track_id")
+  rankPosition Int             @map("rank_position")             // preserves page-specific YouTube rank order
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  page         SearchQueryPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  track        Tracks          @relation(fields: [trackId], references: [youtubeVideoId], onDelete: Cascade)
+
+  @@unique([pageId, trackId])
+  @@index([trackId])
+  @@map("search_query_page_results")
 }
 
 model QueryTrackResult {

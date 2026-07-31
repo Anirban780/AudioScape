@@ -3,8 +3,40 @@ const path = require("path");
 // Fallback dotenv loading if running from backend root
 require("dotenv").config({ path: path.join(__dirname, "../.env") });
 
-const { db } = require("../config/firebase");
-const prisma = require("../lib/prisma");
+const { PrismaClient } = require("@prisma/client");
+const admin = require("firebase-admin");
+
+const prisma = new PrismaClient();
+
+// Initialize Firebase Admin with credentials from environment variables (.env)
+if (!admin.apps.length) {
+    const projectId = process.env.FIREBASE_PROJECT_ID;
+    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const rawPrivateKey = process.env.FIREBASE_PRIVATE_KEY;
+    const privateKey = rawPrivateKey ? rawPrivateKey.replace(/\\n/g, "\n") : undefined;
+
+    if (projectId && clientEmail && privateKey) {
+        console.log(`🔐 Initializing Firebase Admin for project: ${projectId}`);
+        admin.initializeApp({
+            credential: admin.credential.cert({
+                projectId,
+                clientEmail,
+                privateKey,
+            }),
+        });
+    } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+        admin.initializeApp({
+            credential: admin.credential.cert(serviceAccount),
+        });
+    } else {
+        admin.initializeApp({
+            projectId: projectId || "audioscape-49565",
+        });
+    }
+}
+
+const db = admin.firestore();
 
 // Helper to convert Firestore timestamp or ISO string to JS Date
 function parseFirestoreDate(val) {

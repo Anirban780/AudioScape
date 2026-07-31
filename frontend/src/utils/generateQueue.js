@@ -1,7 +1,8 @@
-import { db } from "@/firebase/firebaseConfig";
-import { collection, doc, getDoc, getDocs, orderBy, limit, query } from "firebase/firestore";
-import { getRecommendations } from "./api";
+import { getRecommendations, fetchLastPlayed } from "./api";
 
+/**
+ * Shuffles an array and selects up to `count` items with artist diversity.
+ */
 const shuffleAndPick = (arr, count) => {
     const shuffled = [...arr];
 
@@ -14,7 +15,7 @@ const shuffleAndPick = (arr, count) => {
     const usedArtists = new Set();
 
     for (const track of shuffled) {
-        const artistKey = track.artist?.toLowerCase().trim() || "unknown";
+        const artistKey = (track.artist || track.channelTitle)?.toLowerCase().trim() || "unknown";
         if (!usedArtists.has(artistKey) || picked.length >= count - 2) {
             picked.push(track);
             usedArtists.add(artistKey);
@@ -25,44 +26,34 @@ const shuffleAndPick = (arr, count) => {
     return picked;
 };
 
+/**
+ * Dynamically generates a playback queue composed of AI recommendations
+ * and user recent listening history via NestJS backend services.
+ */
 export const generateQueue = async (keyword, uid, currentTrack) => {
-    if (!uid || !currentTrack) return [];
+    if (!currentTrack) return [];
 
     try {
-        let allRelated = [];
+        // Fetch recommendations from NestJS recommendation engine
+        const allRelated = await getRecommendations(15);
 
-        if (keyword && keyword.trim() !== "") {
-            const keywordDocRef = doc(db, "relatedTracksCache", keyword);
-            const keywordDocSnap = await getDoc(keywordDocRef);
+        // Fetch user's recent listening history from NestJS backend
+        const allRecent = uid ? await fetchLastPlayed(uid) : [];
+        const recentTrackIds = new Set(allRecent.map((t) => t.id || t.videoId));
 
-            if (keywordDocSnap.exists()) {
-                const data = keywordDocSnap.data();
-                allRelated = data.tracks || [];
-            }
-        } else {
-            allRelated = await getRecommendations(15);
-        }
+        const currentTrackId = currentTrack.id || currentTrack.videoId;
 
-        const historyRef = collection(db, "users", uid, "music_history");
-        const historyQuery = query(historyRef, orderBy("lastPlayedAt", "desc"), limit(20));
-        const recentSnap = await getDocs(historyQuery);
-
-        const allRecent = [];
-        const recentTrackIds = new Set();
-
-        recentSnap.forEach(doc => {
-            const track = doc.data();
-            allRecent.push(track);
-            recentTrackIds.add(track.id);
+        // Filter related tracks to exclude current track and recent listens
+        const filteredRelated = allRelated.filter((track) => {
+            const trackId = track.id || track.videoId;
+            return trackId !== currentTrackId && !recentTrackIds.has(trackId);
         });
 
-        const filteredRelated = allRelated.filter(
-            track => track.id !== currentTrack.id && !recentTrackIds.has(track.id)
-        );
-
+        // Shuffle candidate sets
         const shuffledRelated = shuffleAndPick(filteredRelated, filteredRelated.length);
         const shuffledRecent = shuffleAndPick(allRecent, allRecent.length);
 
+        // Count allocation logic
         let relatedCount = Math.min(6, shuffledRelated.length);
         let recentCount = Math.min(4, shuffledRecent.length);
 
@@ -74,31 +65,31 @@ export const generateQueue = async (keyword, uid, currentTrack) => {
             relatedCount = Math.min(6 + extra, shuffledRelated.length);
         }
 
-        const usedIds = new Set([currentTrack.id]);
+        const usedIds = new Set([currentTrackId]);
         const finalRelated = [];
         const finalRecent = [];
 
         for (const track of shuffledRelated) {
-            if (!usedIds.has(track.id)) {
-                usedIds.add(track.id);
+            const trackId = track.id || track.videoId;
+            if (!usedIds.has(trackId)) {
+                usedIds.add(trackId);
                 finalRelated.push(track);
                 if (finalRelated.length === relatedCount) break;
             }
         }
 
         for (const track of shuffledRecent) {
-            if (!usedIds.has(track.id)) {
-                usedIds.add(track.id);
+            const trackId = track.id || track.videoId;
+            if (!usedIds.has(trackId)) {
+                usedIds.add(trackId);
                 finalRecent.push(track);
                 if (finalRecent.length === recentCount) break;
             }
         }
 
-        const queue = [currentTrack, ...finalRelated, ...finalRecent];
-        return queue;
-
+        return [currentTrack, ...finalRelated, ...finalRecent];
     } catch (err) {
         console.error("Error generating queue:", err);
-        return [currentTrack];
+        return [currentTrack]; // Fallback to current track on error
     }
 };

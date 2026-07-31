@@ -1,144 +1,163 @@
-import { addDoc, arrayRemove, collection, deleteDoc, doc, getDocs, getDoc, updateDoc, query, setDoc, writeBatch, where } from "firebase/firestore"
-import { db } from "@/firebase/firebaseConfig"
+import { auth } from "../firebase/firebaseConfig";
+import { getBackendURL } from "./api";
 
+/**
+ * Helper to retrieve Firebase ID Token for NestJS Authorization header.
+ */
+async function getAuthHeader() {
+    if (!auth.currentUser) return {};
+    try {
+        const token = await auth.currentUser.getIdToken();
+        return { Authorization: `Bearer ${token}` };
+    } catch (err) {
+        console.error("Error getting auth token:", err);
+        return {};
+    }
+}
+
+/**
+ * Creates a new user playlist in NestJS backend.
+ */
 export const createPlaylist = async (userId, name) => {
-    const trimmedName = name.trim();
+    const trimmedName = name?.trim();
     if (!trimmedName) throw new Error("Playlist name cannot be empty");
 
-    const playlistsRef = collection(db, "users", userId, "playlists");
+    const headers = await getAuthHeader();
+    const API_URL = await getBackendURL();
 
-    const snapshot = await getDocs(playlistsRef);
-    const isDuplicate = snapshot.docs.some(doc =>
-        doc.data().name?.trim().toLowerCase() === trimmedName.toLowerCase()
-    );
-
-    if (isDuplicate) {
-        throw new Error("Playlist name already exists");
-    }
-
-    const docRef = await addDoc(playlistsRef, {
-        name,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        songs: []
+    const response = await fetch(`${API_URL}/api/playlists`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...headers,
+        },
+        body: JSON.stringify({ name: trimmedName }),
     });
 
-    await updateDoc(docRef, { id: docRef.id });
+    if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to create playlist");
+    }
 
-    return docRef;
+    const data = await response.json();
+    return data.playlist || data;
 };
 
+/**
+ * Fetches all playlists owned by the authenticated user from NestJS backend.
+ */
 export const getPlaylists = async (userId) => {
-    const snapshot = await getDocs(collection(db, 'users', userId, 'playlists'));
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-};
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
 
-export const cleanupPlaylistFromSongs = async (userId, playlistId) => {
-    const songsWithPl = query(
-        collection(db, "users", userId, "music_history"),
-        where("playlists", "array-contains", playlistId)
-    );
-
-    const snap = await getDocs(songsWithPl);
-    if (snap.empty) return;
-
-    const batch = writeBatch(db);
-
-    snap.forEach((docSnap) => {
-        const data = docSnap.data();
-        const newList = (data.playlists || []).filter((id) => id !== playlistId);
-
-        if (newList.length === 0) {
-            batch.delete(docSnap.ref);
-        } else {
-            batch.update(docSnap.ref, { playlists: arrayRemove(playlistId) });
-        }
-    });
-
-    await batch.commit();
-};
-
-export const deletePlaylist = async (userId, playlistId) => {
-    await deleteDoc(doc(db, 'users', userId, 'playlists', playlistId));
-    await cleanupPlaylistFromSongs(userId, playlistId);
-};
-
-export const addSongToPlaylist = async (userId, playlistId, song) => {
-    const playlistRef = doc(db, 'users', userId, 'playlists', playlistId);
-    const playlistSnap = await getDoc(playlistRef);
-
-    if (!playlistSnap.exists()) {
-        throw new Error('Playlist not found');
-    }
-
-    const playlistData = playlistSnap.data();
-    const songs = playlistData.songs || [];
-
-    const exists = songs.some((s) => s.id === song.id);
-    if (exists) return;
-
-    const updatedSongs = [...songs, { ...song, addedAt: new Date() }];
-    await updateDoc(playlistRef, {
-        songs: updatedSongs,
-        updatedAt: new Date(),
-    });
-
-    const musicHistoryRef = collection(db, "users", userId, "music_history");
-    const querySnapshot = await getDocs(musicHistoryRef);
-
-    let found = false;
-
-    querySnapshot.forEach((docSnap) => {
-        const trackData = docSnap.data();
-
-        if (trackData.id === song.id) {
-            found = true;
-            const updatedPlaylists = Array.from(
-                new Set([...(trackData.playlists || []), playlistId])
-            );
-
-            updateDoc(docSnap.ref, {
-                playlists: updatedPlaylists,
-                updatedAt: new Date(),
-            });
-        }
-    });
-
-    if (!found) {
-        const songRef = doc(db, "users", userId, "music_history", song.id);
-        await setDoc(songRef, {
-            ...song,
-            playlists: [playlistId],
-            savedAt: new Date(),
+        const response = await fetch(`${API_URL}/api/playlists`, {
+            method: "GET",
+            headers: { ...headers },
         });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch playlists: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const playlists = data.playlists || (Array.isArray(data) ? data : []);
+
+        return playlists.map((pl) => ({
+            id: pl.id,
+            name: pl.name,
+            songs: (pl.tracks || pl.songs || []).map((pt) => {
+                const track = pt.track || pt;
+                return {
+                    id: track.youtubeVideoId || track.videoId || track.id,
+                    videoId: track.youtubeVideoId || track.videoId || track.id,
+                    title: track.title || "Unknown Title",
+                    name: track.title || "Unknown Title",
+                    artist: track.artist || track.channelTitle || "Unknown Artist",
+                    thumbnail: track.thumbnailUrl || track.thumbNail || "",
+                    thumbNail: track.thumbnailUrl || track.thumbNail || "",
+                };
+            }),
+            createdAt: pl.createdAt,
+            updatedAt: pl.updatedAt,
+        }));
+    } catch (error) {
+        console.error("Error fetching user playlists:", error);
+        return [];
     }
 };
 
+/**
+ * No-op helper preserved for backwards compatibility.
+ * Database foreign keys in PostgreSQL perform automatic cascade cleanups.
+ */
+export const cleanupPlaylistFromSongs = async (userId, playlistId) => {
+    return Promise.resolve();
+};
+
+/**
+ * Deletes a playlist from NestJS backend by playlist ID.
+ */
+export const deletePlaylist = async (userId, playlistId) => {
+    if (!playlistId) return;
+
+    const headers = await getAuthHeader();
+    const API_URL = await getBackendURL();
+
+    const response = await fetch(`${API_URL}/api/playlists/${playlistId}`, {
+        method: "DELETE",
+        headers: { ...headers },
+    });
+
+    if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to delete playlist");
+    }
+};
+
+/**
+ * Adds a song to a user's playlist in NestJS backend.
+ */
+export const addSongToPlaylist = async (userId, playlistId, song) => {
+    const videoId = song?.id || song?.videoId;
+    if (!playlistId || !videoId) {
+        throw new Error("Playlist ID and Track Video ID are required");
+    }
+
+    const headers = await getAuthHeader();
+    const API_URL = await getBackendURL();
+
+    const response = await fetch(`${API_URL}/api/playlists/${playlistId}/tracks`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            ...headers,
+        },
+        body: JSON.stringify({ videoId }),
+    });
+
+    if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to add song to playlist");
+    }
+};
+
+/**
+ * Removes a song from a user's playlist in NestJS backend.
+ */
 export const removeSongFromPlaylist = async (userId, playlistId, songId) => {
-    const playlistRef = doc(db, 'users', userId, 'playlists', playlistId);
-    const playlistSnap = await getDoc(playlistRef);
-    if (!playlistSnap.exists()) throw new Error("Playlist not found");
+    if (!playlistId || !songId) return;
 
-    const data = playlistSnap.data();
-    const updatedSongs = (data.songs || []).filter((s) => s.id !== songId);
+    const headers = await getAuthHeader();
+    const API_URL = await getBackendURL();
 
-    await updateDoc(playlistRef, {
-        songs: updatedSongs,
-        updatedAt: new Date()
+    const response = await fetch(`${API_URL}/api/playlists/${playlistId}/tracks/${songId}`, {
+        method: "DELETE",
+        headers: { ...headers },
     });
 
-    const musicHistoryRef = collection(db, "users", userId, "music_history");
-    const querySnapshot = await getDocs(musicHistoryRef);
-
-    querySnapshot.forEach(async (docSnap) => {
-        const songData = docSnap.data();
-
-        if (songData.id === songId) {
-            const updatedPlaylists = (songData.playlists || []).filter(
-                (id) => id !== playlistId
-            );
-
-            await updateDoc(docSnap.ref, { playlists: updatedPlaylists });
-        }
-    });
+    if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.message || "Failed to remove song from playlist");
+    }
 };
