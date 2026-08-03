@@ -14,6 +14,9 @@ import { Type } from 'class-transformer';
  */
 export class GetRecommendationsDto {
   @IsOptional()
+  userId?: string;
+
+  @IsOptional()
   @Type(() => Number)
   @IsInt({ message: 'topN must be an integer' })
   @Min(1, { message: 'topN must be at least 1' })

@@ -12,6 +12,10 @@ import { IsNotEmpty, IsString, IsOptional } from 'class-validator';
  * ============================================================================
  */
 export class GenerateQueueDto {
+  @IsOptional()
+  @IsString()
+  userId?: string;
+
   @IsNotEmpty({ message: 'currentTrackId is required' })
   @IsString()
   currentTrackId: string;

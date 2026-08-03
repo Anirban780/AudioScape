@@ -11,9 +11,10 @@ This document details the simplified, production-grade architecture for migratin
    - Primary: Deployed **Neon PostgreSQL** (serverless pooled instance with SSL).
    - Fallback: **Local Docker PostgreSQL** container (`postgresql://postgres:postgrespassword@localhost:5432/audioscape`).
    - Visual GUI support via **Prisma Studio**.
-3. **Google OAuth 2.0 Authentication (Direct Google Token Verification)**:
-   - **Direct Google ID Token Verification**: Protected endpoints verify Google ID tokens directly via `google-auth-library` (`OAuth2Client.verifyIdToken`). Clients send `Authorization: Bearer <google_id_token>` directly. No custom backend JWT secret or secondary token signing required!
-   - **Seamless Existing User Migration**: Backfilled Firebase users are matched by their registered Google `email` address in PostgreSQL. Upon signing in with Google, their existing account (`playlists`, `listenHistory`, stats) is automatically linked.
+3. **Google OAuth 2.0 & Firebase Email Fallback Authentication**:
+   - **Direct Google ID Token Verification**: Protected endpoints verify Google ID tokens directly via `google-auth-library` (`OAuth2Client.verifyIdToken`). Clients send `Authorization: Bearer <google_id_token>` directly.
+   - **Legacy Firebase Email Fallback**: Resolves legacy/Firebase users without direct Google OAuth set up by matching their verified token `email` claim.
+   - **Seamless Account Linking**: Automatically links the verified `authId` to existing PostgreSQL user records matching the Gmail address. All historical `playlists`, `listenHistory`, and stats are preserved.
 4. **Data Integrity & Type Safety**:
    - Use Prisma Client for type-safe database access across all controllers.
    - Input validation via `class-validator` DTOs.
@@ -187,7 +188,7 @@ flowchart TD
 8. **`reorderPlaylistTracks(userId, playlistId, dto: ReorderTracksDto)`**:
    - Atomically updates positions for tracks within a playlist.
 
-### Step 3.7: RecommendationsModule — TF-IDF Music Recommendation Engine ⏳ NEXT
+### Step 3.7: RecommendationsModule — TF-IDF Music Recommendation Engine ✅ COMPLETED
 
 > 📄 **Full deep dive:** [step3.7_recommendations_module.md](./step3.7_recommendations_module.md)
 
@@ -244,7 +245,7 @@ Below is the complete roadmap and status of Phase 3 NestJS Backend Migration:
 | **Step 3.4** | TracksModule | YouTube search/details proxying, 24h search cache, quota tracking | ✅ Completed |
 | **Step 3.5** | ListenHistoryModule | Track play logging, play counts, pagination, liked track favorites | ✅ Completed |
 | **Step 3.6** | PlaylistsModule | Custom playlist CRUD, track additions, removals, & position reordering | ✅ Completed |
-| **Step 3.7** | RecommendationsModule | TF-IDF recommendation engine ported from `recommend.js` using `natural` | ⏳ Pending |
+| **Step 3.7** | RecommendationsModule | TF-IDF recommendation engine ported from `recommend.js` using `natural` | ✅ Completed |
 | **Step 3.8** | Health & Global Filters | Centralized `AllExceptionsFilter`, global `ValidationPipe`, CORS, & Render `/healthcheck` | ✅ Completed |
 | **Step 3.9** | E2E Cutover & Setup | Server bootstrap on port 5000, graceful shutdown hooks, & endpoint discovery | ✅ Completed |
 
