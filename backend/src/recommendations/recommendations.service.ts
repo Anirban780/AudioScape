@@ -180,20 +180,27 @@ export class RecommendationsService {
       // Upsert tracks & junction results
       for (let idx = 0; idx < tracks.length; idx++) {
         const item = tracks[idx];
+        const trackId = item.id || item.videoId;
+        if (!trackId) continue;
+
+        const title = item.name || item.title || 'Unknown Title';
+        const artist = item.artist || item.channelTitle || 'Unknown Artist';
+        const thumbnailUrl = item.thumbnail || item.thumbNail || null;
+
         await this.prisma.tracks.upsert({
-          where: { youtubeVideoId: item.id },
+          where: { youtubeVideoId: trackId },
           update: {
-            title: item.name,
-            artist: item.artist || 'Unknown Artist',
-            thumbnailUrl: item.thumbnail || null,
+            title,
+            artist,
+            thumbnailUrl,
             genre: item.genre || [],
             lastFetchedAt: new Date(),
           },
           create: {
-            youtubeVideoId: item.id,
-            title: item.name,
-            artist: item.artist || 'Unknown Artist',
-            thumbnailUrl: item.thumbnail || null,
+            youtubeVideoId: trackId,
+            title,
+            artist,
+            thumbnailUrl,
             genre: item.genre || [],
           },
         });
@@ -202,7 +209,7 @@ export class RecommendationsService {
           where: {
             queryId_trackId: {
               queryId: searchQuery.id,
-              trackId: item.id,
+              trackId,
             },
           },
           update: {
@@ -210,7 +217,7 @@ export class RecommendationsService {
           },
           create: {
             queryId: searchQuery.id,
-            trackId: item.id,
+            trackId,
             rankPosition: idx + 1,
           },
         });

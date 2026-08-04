@@ -1,14 +1,17 @@
-import React, { useEffect, useState } from 'react';
-import AppLayout from '@/components/Layout/AppLayout';
-import { useAuth } from '@/context/AuthContext';
-import { getExploreKeywords } from '@/utils/keywords';
-import { fetchYoutubeMusic } from '@/utils/youtube';
-import MusicCard from '@/components/Cards/MusicCard';
-import { RefreshCcw } from 'lucide-react';
-import { cacheRelatedTracks } from '@/utils/api';
-import usePlayerStore from "@/store/usePlayerStore";
-import toast from 'react-hot-toast';
-import Loader from '@/components/Home/Loader';
+import React, { useEffect, useState } from "react";
+import AppLayout from "@/components/Layout/AppLayout";
+import { useAuth } from "@/context/AuthContext";
+import { getExploreKeywords } from "@/utils/keywords";
+import { fetchYoutubeMusic } from "@/utils/youtube";
+import { cacheRelatedTracks } from "@/utils/api";
+import Loader from "@/components/Home/Loader";
+import toast from "react-hot-toast";
+
+import ExploreFilterPills from "@/components/Explore/ExploreFilterPills";
+import ExploreTrendingBanner from "@/components/Explore/ExploreTrendingBanner";
+import ExploreCategoryGrid from "@/components/Explore/ExploreCategoryGrid";
+import ExploreSection from "@/components/Explore/ExploreSection";
+import ExplorePlaylistsCarousel from "@/components/Explore/ExplorePlaylistsCarousel";
 
 /**
  * ============================================================================
@@ -16,25 +19,34 @@ import Loader from '@/components/Home/Loader';
  * ============================================================================
  * 
  * WHAT THIS FILE DOES:
- * Music discovery page that fetches YouTube music categories based on user's
- * listening history keywords or curated fallback genres (lofi, pop, indie, etc.).
+ * Assembles the primary Stitch Music Discovery & Search view. Features:
+ * 1. Genre & Mood Filter Pills (`ExploreFilterPills.jsx`): Interactive pill filters.
+ * 2. Trending Spotlight Hero Banner (`ExploreTrendingBanner.jsx`): Spotlight discovery mix.
+ * 3. Browse Categories 4-Column Grid (`ExploreCategoryGrid.jsx`): Visual genre tiles with gradients.
+ * 4. Keyword Music Track Sections (`ExploreSection.jsx`): 5-column responsive album grids.
+ * 5. Saved User Playlists Carousel (`ExplorePlaylistsCarousel.jsx`): User's saved playlists.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Keyword-based Personalisation: Queries `getExploreKeywords(uid)` to dynamically
- *    generate category feeds tailored to user taste.
- * 2. Caching Strategy: Caches fetched category tracks in local storage for 30 minutes
- *    (`CACHE_EXPIRY_MS`) to conserve YouTube Data API quota.
- * 3. AppLayout Unification: Uses AppLayout shell for global sidebar/header navigation
- *    and clean surface token styling.
+ * 1. Stitch Screen Alignment: Fully implements the design hierarchy from Stitch Explore screens
+ *    (`6aaba54d100944a28329f65c95eb684f`, `3c52c41b3d7e40b89b4e98157e63aaae`, & `e8bef34ec53d4382bba063b4a4d375d1`).
+ * 2. Personalised Discovery: Uses `getExploreKeywords(uid)` to dynamically fetch feeds matching taste.
+ * 3. Cache & Quota Optimization: Caches fetched category tracks in `localStorage` for 30 minutes.
  * 
  * HOW IT WORKS:
- * - Fetches up to 10 keyword sections in parallel via `fetchYoutubeMusic`.
- * - Manages track visibility pagination per section via `visibleTracks` state.
- * - Clicking any track card sets active track in `usePlayerStore`.
+ * - Fetches keyword sections via `fetchYoutubeMusic`.
+ * - Derived `featuredTrack` supplies the Trending Spotlight Hero Banner.
+ * - Selecting filter pills or category cards fetches and highlights targeted music feeds.
  */
 
 const curatedGenres = [
-  "lofi music", "pop hits", "indie rock", "anime music", "k-pop", "electronic", "jazz chill", "hip hop",
+  "lofi music",
+  "pop hits",
+  "indie rock",
+  "anime music",
+  "k-pop",
+  "electronic",
+  "jazz chill",
+  "hip hop",
 ];
 
 const CACHE_EXPIRY_MS = 1000 * 60 * 30; // 30 minutes cache
@@ -44,35 +56,41 @@ const ExplorePage = () => {
   const [exploreFeed, setExploreFeed] = useState([]);
   const [cache, setCache] = useState({});
   const [visibleTracks, setVisibleTracks] = useState({});
-  const { setTrack } = usePlayerStore();
   const [loading, setLoading] = useState(true);
+  const [activeGenre, setActiveGenre] = useState("All");
+
+  const userId = user?.uid || "";
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchExploreSections = async () => {
       setLoading(true);
 
       try {
-        let keywords = await getExploreKeywords(user?.uid);
+        let keywords = await getExploreKeywords(userId);
         if (!keywords || keywords.length === 0) {
           keywords = curatedGenres;
         }
 
         const now = Date.now();
-        const cachedFetchTime = localStorage.getItem('lastFetchTime');
-        const isCacheValid = cachedFetchTime && (now - parseInt(cachedFetchTime) < CACHE_EXPIRY_MS);
+        const cachedFetchTime = localStorage.getItem("lastFetchTime");
+        const isCacheValid = cachedFetchTime && now - parseInt(cachedFetchTime) < CACHE_EXPIRY_MS;
 
         const exploreData = await Promise.all(
-          keywords.slice(0, 10).map(async (keyword) => {
+          keywords.slice(0, 8).map(async (keyword) => {
             if (isCacheValid && cache[keyword]) {
               return { title: keyword, tracks: cache[keyword] };
             }
 
-            const tracks = await fetchYoutubeMusic(keyword, 20);
+            const tracks = await fetchYoutubeMusic(keyword, 15);
             setCache((prev) => ({ ...prev, [keyword]: tracks }));
             await cacheRelatedTracks(keyword, tracks);
             return { title: keyword, tracks };
           })
         );
+
+        if (!isMounted) return;
 
         setExploreFeed(exploreData);
 
@@ -81,92 +99,113 @@ const ExplorePage = () => {
           initialVisible[title] = 5;
         });
         setVisibleTracks(initialVisible);
-        localStorage.setItem('lastFetchTime', now.toString());
-
-        toast.success("Explore page contents fetched successfully");
+        localStorage.setItem("lastFetchTime", now.toString());
       } catch (err) {
         console.error("Explore fetch failed:", err);
-        toast.error("Explore page contents couldn't be fetched");
-        setExploreFeed([]);
+        if (isMounted) setExploreFeed([]);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
-    if (user?.uid) {
-      fetchExploreSections();
-    } else {
-      setLoading(false);
-      setExploreFeed([]);
-    }
-  }, [user]);
+    fetchExploreSections();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId]);
 
   const handleLoadMore = (title) => {
     setVisibleTracks((prev) => ({
       ...prev,
-      [title]: prev[title] + 5,
+      [title]: (prev[title] || 5) + 5,
     }));
   };
 
+  /**
+   * Filter Pill & Category Tile Selection Handler
+   */
+  const handleGenreSelect = async (genreQuery) => {
+    setActiveGenre(genreQuery);
+
+    if (genreQuery.toLowerCase() === "all") {
+      return;
+    }
+
+    // Check if section already exists in explore feed
+    const existingIndex = exploreFeed.findIndex(
+      (sec) => sec.title.toLowerCase() === genreQuery.toLowerCase()
+    );
+
+    if (existingIndex !== -1) {
+      // Scroll to existing section
+      const secElement = document.getElementById(`explore-sec-${existingIndex}`);
+      secElement?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+
+    // Otherwise fetch fresh music for this genre
+    toast.loading(`Loading ${genreQuery}...`, { id: "explore-genre" });
+    try {
+      const tracks = await fetchYoutubeMusic(genreQuery, 15);
+      setExploreFeed((prev) => [{ title: genreQuery, tracks }, ...prev]);
+      setVisibleTracks((prev) => ({ ...prev, [genreQuery]: 5 }));
+      toast.success(`Loaded ${genreQuery}`, { id: "explore-genre" });
+    } catch (e) {
+      toast.error(`Failed to load ${genreQuery}`, { id: "explore-genre" });
+    }
+  };
+
+  // Derive top featured track for Trending Spotlight Hero Banner
+  const featuredTrack = exploreFeed.length > 0 && exploreFeed[0].tracks.length > 0
+    ? exploreFeed[0].tracks[0]
+    : null;
+
   return (
     <AppLayout>
-      <div className="w-full">
-        <h1 className="text-3xl font-bold mb-6 text-center md:text-left">🔍 Explore Music 🎶</h1>
+      <div className="w-full max-w-[1280px] mx-auto py-2">
+        {/* Page Title */}
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--color-on-surface)] tracking-tight">
+            🔍 Explore Music 🎶
+          </h1>
+        </div>
 
+        {/* 1. Genre & Mood Filter Pills */}
+        <ExploreFilterPills
+          activeGenre={activeGenre}
+          onSelect={handleGenreSelect}
+        />
+
+        {/* 2. Trending Spotlight Hero Banner */}
+        <ExploreTrendingBanner featuredTrack={featuredTrack} loading={loading} />
+
+        {/* 3. Browse Categories 4-Column Grid */}
+        <ExploreCategoryGrid onCategoryClick={handleGenreSelect} />
+
+        {/* 4. Keyword Music Track Sections */}
         {loading ? (
           <Loader />
         ) : exploreFeed.length === 0 ? (
-          <div className="text-center text-lg opacity-70 mt-10">
-            No music content available. Try searching or check back later!
+          <div className="text-center text-sm text-[var(--color-on-surface-variant)] py-12 bg-[var(--color-surface-raised)] rounded-[24px] border border-[var(--color-border-default)] mb-10">
+            No music content available right now. Try searching or check back later!
           </div>
         ) : (
-          <div className="space-y-8">
+          <div className="space-y-6">
             {exploreFeed.map((section, index) => (
-              <div
-                key={`${section.title}-${index}`}
-                className="p-5 rounded-2xl border border-[var(--color-border-default)] bg-[var(--color-surface-raised)] shadow-md transition-all duration-300"
-              >
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-2xl font-semibold capitalize tracking-wide">{section.title}</h2>
-                </div>
-
-                {section.tracks.length === 0 ? (
-                  <p className="opacity-70 italic">No tracks available for {section.title}</p>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-                    {section.tracks
-                      .slice(0, visibleTracks[section.title] || 5)
-                      .map((track, index) => (
-                        <MusicCard
-                          key={`${track.id}-${index}`}
-                          id={track.id}
-                          name={track.name}
-                          artist={track.artist}
-                          image={track.thumbnail}
-                          onClick={() => {
-                            setTrack(track);
-                            toast.success("Track selected successfully");
-                          }}
-                        />
-                      ))}
-                  </div>
-                )}
-
-                {visibleTracks[section.title] < section.tracks.length && (
-                  <div className="flex justify-end mt-4">
-                    <button
-                      onClick={() => handleLoadMore(section.title)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--color-primary)] text-[var(--color-text-on-primary)] font-medium hover:opacity-90 transition-all shadow-md"
-                    >
-                      <RefreshCcw size={16} />
-                      <span>More</span>
-                    </button>
-                  </div>
-                )}
+              <div key={`${section.title}-${index}`} id={`explore-sec-${index}`}>
+                <ExploreSection
+                  section={section}
+                  visibleCount={visibleTracks[section.title] || 5}
+                  onLoadMore={() => handleLoadMore(section.title)}
+                />
               </div>
             ))}
           </div>
         )}
+
+        {/* 5. User Saved Playlists Carousel */}
+        {userId && <ExplorePlaylistsCarousel userId={userId} />}
       </div>
     </AppLayout>
   );
