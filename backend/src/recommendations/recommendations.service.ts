@@ -5,6 +5,7 @@ import { TfIdfEngine, UserHistoryItem, CandidateQueryGroup, RecommendedTrackResu
 import { TrackItemDto } from './dto/cache-related-tracks.dto';
 import { CURATED_GENRES } from './curated-genres';
 import { QueryType } from '@prisma/client';
+import { calculateTasteWeight } from './taste-weight.util';
 
 /**
  * ============================================================================
@@ -29,6 +30,8 @@ export class RecommendationsService {
 
   // In-memory cache mapping userId -> { tracks, expiresAt }
   private readonly recCache = new Map<string, { tracks: RecommendedTrackResult[]; expiresAt: number }>();
+  // In-memory cache mapping userId -> { data: Map<string, number>, expiresAt: number }
+  private readonly affinityCache = new Map<string, { data: Map<string, number>; expiresAt: number }>();
   private readonly CACHE_TTL_MS = 60 * 60 * 1000; // 1 Hour
 
   constructor(
@@ -37,14 +40,14 @@ export class RecommendationsService {
     private readonly tfidfEngine: TfIdfEngine,
   ) {}
 
-  /**
-   * Invalidates in-memory recommendation cache for a specific user.
-   * Called by HistoryService when a user records a new track play.
-   */
   invalidateUserCache(userId: string): void {
     if (this.recCache.has(userId)) {
       this.logger.log(`Invalidated recommendation cache for user: ${userId}`);
       this.recCache.delete(userId);
+    }
+    if (this.affinityCache.has(userId)) {
+      this.logger.log(`Invalidated category affinity cache for user: ${userId}`);
+      this.affinityCache.delete(userId);
     }
   }
 
@@ -247,57 +250,179 @@ export class RecommendationsService {
   }
 
   /**
-   * Generates or retrieves categorized explore music feed sections server-side.
+   * Computes category affinity weights for a user based on their listen history.
+   * Leverages relational joins (ListenHistory -> Tracks -> QueryTrackResult -> SearchQuery).
    * 
-   * @param userId - Optional user ID for history-driven explore keyword extraction
-   * @param limitPerCategory - Maximum number of tracks returned per explore category section (default: 5)
-   * @returns Categorized explore feed array
+   * WHY:
+   * Provides zero-overhead personalization. By checking which categories the user's listened
+   * tracks belonged to, we get a direct signal of their genre preferences without fuzzy text matching.
+   * 
+   * HOW:
+   * - Checks `affinityCache` to see if cached data is still fresh (1-hour TTL).
+   * - Gathers up to 100 history items for the user, including category links.
+   * - Calculates composite taste weight for each played track.
+   * - Accumulates weight per curated category keyword.
+   * - Stores results in in-memory cache and returns the affinity map.
+   */
+  async getCategoryAffinity(userId: string): Promise<Map<string, number>> {
+    const now = Date.now();
+    const cached = this.affinityCache.get(userId);
+    if (cached && cached.expiresAt > now) {
+      this.logger.log(`Affinity cache HIT for user: ${userId}`);
+      return cached.data;
+    }
+
+    const history = await this.prisma.listenHistory.findMany({
+      where: { userId },
+      take: 100,
+      orderBy: { lastPlayedAt: 'desc' },
+      include: {
+        track: {
+          include: {
+            queryResults: {
+              include: {
+                query: {
+                  select: {
+                    rawQuery: true,
+                    queryType: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const affinity = new Map<string, number>();
+    const nowLocalDate = new Date();
+
+    for (const h of history) {
+      const weight = calculateTasteWeight({
+        liked: h.liked,
+        lastPlayedAt: h.lastPlayedAt,
+        playCount: h.playCount,
+      }, nowLocalDate);
+
+      for (const qr of h.track.queryResults) {
+        if (qr.query.queryType !== QueryType.CURATED_KEYWORD) continue;
+        const key = qr.query.rawQuery.toLowerCase().trim();
+        affinity.set(key, (affinity.get(key) || 0) + weight);
+      }
+    }
+
+    this.affinityCache.set(userId, {
+      data: affinity,
+      expiresAt: now + this.CACHE_TTL_MS,
+    });
+
+    return affinity;
+  }
+
+  /**
+   * Generates or retrieves personalized categorized explore music feed sections.
+   * Blends user-personalized categories (exploit) with globally popular discovery categories (explore).
+   * 
+   * WHY:
+   * 1. A discovery feed must adapt to user tastes over time.
+   * 2. It must avoid becoming an echo chamber (filter bubble). Exploit/explore blend ensures variety.
+   * 3. Categories should load instantly from PostgreSQL without waiting on YouTube API responses.
+   * 
+   * HOW:
+   * - Computes user category affinity. If user is a cold start (< 3 plays or thin data), shuffles curated genres.
+   * - Exploit: Selects up to 6 categories with positive user affinity scores.
+   * - Explore: Selects 4 categories not in exploit pool, sorted by their global hitCount (popularity) in SearchQuery.
+   * - For each of the 10 selected categories:
+   *   1. Runs `ensureCategoryPopulated()` to ensure database is backfilled to 50 tracks.
+   *   2. Executes `searchTracks()` in dbOnly mode to fetch the local page-cache tracks.
+   *   3. Slices the result list to the requested client count.
+   * 
+   * @param userId - Optional user ID for personalization
+   * @param limitPerCategory - Max tracks returned per section (default: 5)
+   * @returns Array of explore feed categories with track items
    */
   async getExploreFeed(userId?: string, limitPerCategory: number = 5) {
-    // Inject randomness by shuffling the curated genres pool
-    const shuffledCurated = this.shuffleArray(CURATED_GENRES);
-    let keywords = shuffledCurated;
+    let keywords: string[] = [];
+
+    // Check cold-start status or execute personalization
+    let hasPersonalization = false;
+    let affinityMap = new Map<string, number>();
 
     if (userId) {
       try {
-        const userHistory = await this.prisma.listenHistory.findMany({
-          where: { userId },
-          orderBy: { lastPlayedAt: 'desc' },
-          take: 50,
-          include: { track: true },
-        });
-
-        const genreFreq: Record<string, number> = {};
-        for (const h of userHistory) {
-          const list = [...(h.track.genre || []), ...(h.track.tags || [])];
-          for (const word of list) {
-            const kw = word.toLowerCase().trim();
-            if (kw && kw.length > 2) {
-              genreFreq[kw] = (genreFreq[kw] || 0) + 1;
-            }
-          }
-        }
-
-        const sortedUserKeywords = Object.entries(genreFreq)
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
-          .map(([kw]) => kw);
-
-        if (sortedUserKeywords.length > 0) {
-          const combined = [...new Set([...sortedUserKeywords, ...shuffledCurated])];
-          keywords = combined;
+        const historyCount = await this.prisma.listenHistory.count({ where: { userId } });
+        if (historyCount >= 3) {
+          affinityMap = await this.getCategoryAffinity(userId);
+          hasPersonalization = affinityMap.size > 0;
         }
       } catch (err: any) {
-        this.logger.warn(`Failed to extract user explore keywords: ${err.message}`);
+        this.logger.warn(`Failed to retrieve category affinity for personalization: ${err.message}`);
       }
+    }
+
+    if (!hasPersonalization) {
+      // Cold-start fallback: Shuffle the entire curated pool and take 10
+      this.logger.log(`Cold start or anonymous request. Serving shuffled curated categories.`);
+      keywords = this.shuffleArray(CURATED_GENRES).slice(0, 10);
+    } else {
+      // Exploit vs Explore blend (6 personalized + 4 discovery)
+      const sortedAffinity = [...affinityMap.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([key]) => key);
+
+      // 1. Take up to 6 personalized categories (exploit)
+      const personalizedKeywords = sortedAffinity.slice(0, 6);
+
+      // 2. Load global popularity (hitCount) of categories to rank exploration
+      let popularKeywords: string[] = [];
+      try {
+        const popularQueries = await this.prisma.searchQuery.findMany({
+          where: { queryType: QueryType.CURATED_KEYWORD },
+          orderBy: { hitCount: 'desc' },
+          select: { rawQuery: true },
+          take: 50,
+        });
+        popularKeywords = popularQueries.map((q) => q.rawQuery.toLowerCase().trim());
+      } catch (err: any) {
+        this.logger.warn(`Failed to fetch popular categories for explore sorting: ${err.message}`);
+      }
+
+      // Filter remaining curated genres that are NOT in exploit list
+      const exploitSet = new Set(personalizedKeywords.map((k) => k.toLowerCase().trim()));
+      const remainingCurated = CURATED_GENRES.filter((c) => !exploitSet.has(c.toLowerCase().trim()));
+
+      // Sort remaining curated by global popularity index, fall back to shuffled list order
+      const remainingSorted = [...remainingCurated].sort((a, b) => {
+        const indexA = popularKeywords.indexOf(a.toLowerCase().trim());
+        const indexB = popularKeywords.indexOf(b.toLowerCase().trim());
+        
+        // Lower index in popularKeywords means higher popularity
+        const scoreA = indexA === -1 ? 999 : indexA;
+        const scoreB = indexB === -1 ? 999 : indexB;
+        return scoreA - scoreB;
+      });
+
+      // 3. Take remaining discovery categories (explore) to make a total of 10
+      const discoveryCount = 10 - personalizedKeywords.length;
+      const discoveryKeywords = remainingSorted.slice(0, discoveryCount);
+
+      keywords = [...personalizedKeywords, ...discoveryKeywords];
+      this.logger.log(
+        `Personalized blend selected: exploitCount=${personalizedKeywords.length}, exploreCount=${discoveryKeywords.length} [keywords: ${keywords.join(', ')}]`,
+      );
     }
 
     const exploreFeed: Array<{ title: string; tracks: Array<{ id: string; name: string; artist: string; thumbnail: string }> }> = [];
 
-    // Take top 10 keywords and fetch/slice top 5 tracks per section
-    for (const keyword of keywords.slice(0, 10)) {
+    // Pre-warm and fetch tracks for each selected category
+    for (const keyword of keywords) {
       try {
-        const searchResult = await this.tracksService.searchTracks(keyword);
+        // Step A: Ensure target count is populated in DB (DB-first, YouTube API backfill if needed)
+        await this.tracksService.ensureCategoryPopulated(keyword, 50);
+
+        // Step B: Query tracks from DB only to guarantee sub-20ms latency
+        const searchResult = await this.tracksService.searchTracks(keyword, '', true);
+
         const mappedTracks = (searchResult.tracks || [])
           .map((t) => ({
             id: t.videoId,
@@ -305,14 +430,14 @@ export class RecommendationsService {
             artist: t.channelTitle || 'Unknown Artist',
             thumbnail: t.thumbNail || '',
           }))
-          .slice(0, limitPerCategory); // Default topN: 5 tracks per section
+          .slice(0, limitPerCategory);
 
         exploreFeed.push({
           title: keyword,
           tracks: mappedTracks,
         });
       } catch (err: any) {
-        this.logger.warn(`Explore section search failed for '${keyword}': ${err.message}`);
+        this.logger.error(`Explore section processing failed for keyword '${keyword}': ${err.message}`);
         exploreFeed.push({
           title: keyword,
           tracks: [],

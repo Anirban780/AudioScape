@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as natural from 'natural';
+import { calculateTasteWeight } from './taste-weight.util';
 
 export interface UserHistoryItem {
   trackId: string;
@@ -95,7 +96,7 @@ export class TfIdfEngine {
     const userDocTokens: string[] = [];
 
     for (const item of userHistory) {
-      const weight = this.calculateTrackWeight(item, now);
+      const weight = calculateTasteWeight(item, now);
       const textTokens = [
         ...(item.track.genre || []),
         ...(item.track.tags || []),
@@ -214,19 +215,7 @@ export class TfIdfEngine {
    * Calculates mathematical weight of a listen history track based on liked status, recency decay, and play count.
    */
   private calculateTrackWeight(item: UserHistoryItem, now: Date): number {
-    const RECENCY_DECAY_DAYS = 30;
-    const RECENCY_DECAY_MS = RECENCY_DECAY_DAYS * 24 * 60 * 60 * 1000;
-
-    const likedWeight = item.liked ? 2.0 : 1.0;
-
-    const timeDiff = now.getTime() - new Date(item.lastPlayedAt).getTime();
-    const recencyWeight = Math.max(0.0, 1.0 - timeDiff / RECENCY_DECAY_MS);
-
-    const playCountWeight = Math.min(5.0, (item.playCount || 1) / 5.0);
-
-    const randomJitter = 0.9 + Math.random() * 0.2;
-
-    return likedWeight * (0.5 * recencyWeight + 0.5 * playCountWeight) * randomJitter;
+    return calculateTasteWeight(item, now);
   }
 
   /**
