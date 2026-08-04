@@ -292,3 +292,68 @@ export async function fetchKeywordsFromAI(history = []) {
 
     return [];
 }
+
+/**
+ * Fetches server-side explore feed sections from NestJS recommendations module.
+ * @returns {Promise<Array>} - An array of explore sections with tracks.
+ */
+export async function fetchExploreFeed() {
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
+
+        const response = await fetch(`${API_URL}/api/music/explore?limit=15`, {
+            method: "GET",
+            headers: { ...headers },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch explore feed: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        // Map backend schema (id, name, artist, thumbnail) to frontend schema (videoId, title, channelTitle, thumbNail)
+        return (data || []).map((section) => ({
+            title: section.title,
+            tracks: (section.tracks || []).map((t) => ({
+                id: t.id,
+                videoId: t.id,
+                title: t.name,
+                name: t.name,
+                artist: t.artist,
+                channelTitle: t.artist,
+                thumbnail: t.thumbnail,
+                thumbNail: t.thumbnail,
+            })),
+        }));
+    } catch (error) {
+        console.error("Error fetching explore feed:", error);
+        return [];
+    }
+}
+
+/**
+ * Fetches explore categories taxonomy from NestJS recommendations module.
+ */
+export async function fetchExploreCategories() {
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
+
+        const response = await fetch(`${API_URL}/api/music/categories`, {
+            method: "GET",
+            headers: { ...headers },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch explore categories: ${response.statusText}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Error fetching explore categories:", error);
+        return [];
+    }
+}
+

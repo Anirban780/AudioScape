@@ -81,4 +81,14 @@ export class RecommendationsController {
     const limitPerCategory = limit ? parseInt(limit, 10) : 5;
     return this.recommendationsService.getExploreFeed(userId, limitPerCategory);
   }
+
+  /**
+   * Retrieves the authoritative taxonomy of explore categories with frontend rendering metadata.
+   * @route GET `/api/music/categories`
+   * @header Authorization Bearer <google_id_token>
+   */
+  @Get('categories')
+  async getCategories() {
+    return this.recommendationsService.getCategories();
+  }
 }

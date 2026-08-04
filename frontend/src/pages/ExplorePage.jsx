@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from "react";
 import AppLayout from "@/components/Layout/AppLayout";
 import { useAuth } from "@/context/AuthContext";
-import { getExploreKeywords } from "@/utils/keywords";
 import { fetchYoutubeMusic } from "@/utils/youtube";
-import { cacheRelatedTracks } from "@/utils/api";
+import { cacheRelatedTracks, fetchExploreFeed } from "@/utils/api";
 import Loader from "@/components/Home/Loader";
 import toast from "react-hot-toast";
 
@@ -38,23 +37,9 @@ import ExplorePlaylistsCarousel from "@/components/Explore/ExplorePlaylistsCarou
  * - Selecting filter pills or category cards fetches and highlights targeted music feeds.
  */
 
-const curatedGenres = [
-  "lofi music",
-  "pop hits",
-  "indie rock",
-  "anime music",
-  "k-pop",
-  "electronic",
-  "jazz chill",
-  "hip hop",
-];
-
-const CACHE_EXPIRY_MS = 1000 * 60 * 30; // 30 minutes cache
-
 const ExplorePage = () => {
   const { user } = useAuth();
   const [exploreFeed, setExploreFeed] = useState([]);
-  const [cache, setCache] = useState({});
   const [visibleTracks, setVisibleTracks] = useState({});
   const [loading, setLoading] = useState(true);
   const [activeGenre, setActiveGenre] = useState("All");
@@ -68,27 +53,7 @@ const ExplorePage = () => {
       setLoading(true);
 
       try {
-        let keywords = await getExploreKeywords(userId);
-        if (!keywords || keywords.length === 0) {
-          keywords = curatedGenres;
-        }
-
-        const now = Date.now();
-        const cachedFetchTime = localStorage.getItem("lastFetchTime");
-        const isCacheValid = cachedFetchTime && now - parseInt(cachedFetchTime) < CACHE_EXPIRY_MS;
-
-        const exploreData = await Promise.all(
-          keywords.slice(0, 8).map(async (keyword) => {
-            if (isCacheValid && cache[keyword]) {
-              return { title: keyword, tracks: cache[keyword] };
-            }
-
-            const tracks = await fetchYoutubeMusic(keyword, 15);
-            setCache((prev) => ({ ...prev, [keyword]: tracks }));
-            await cacheRelatedTracks(keyword, tracks);
-            return { title: keyword, tracks };
-          })
-        );
+        const exploreData = await fetchExploreFeed();
 
         if (!isMounted) return;
 
@@ -99,7 +64,6 @@ const ExplorePage = () => {
           initialVisible[title] = 5;
         });
         setVisibleTracks(initialVisible);
-        localStorage.setItem("lastFetchTime", now.toString());
       } catch (err) {
         console.error("Explore fetch failed:", err);
         if (isMounted) setExploreFeed([]);

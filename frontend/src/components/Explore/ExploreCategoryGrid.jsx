@@ -1,5 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Compass } from "lucide-react";
+import { fetchExploreCategories } from "@/utils/api";
 
 /**
  * ============================================================================
@@ -19,11 +20,12 @@ import { Compass } from "lucide-react";
  *    ensuring visual richness without violating the zero-green rule.
  * 
  * HOW IT WORKS:
- * - Maps over `GENRE_CATEGORIES` list.
+ * - Fetches category configuration dynamically from `/api/music/categories`.
+ * - Maps over category list and falls back to local static array if backend is unavailable.
  * - Clicking a card invokes `onCategoryClick(category.query)` callback.
  */
 
-const GENRE_CATEGORIES = [
+const FALLBACK_CATEGORIES = [
   { name: "Lofi & Chill", query: "lofi music", gradient: "from-purple-700 via-indigo-600 to-blue-600", icon: "🎧" },
   { name: "Pop Hits", query: "pop hits", gradient: "from-pink-600 via-rose-500 to-purple-600", icon: "🎤" },
   { name: "Indie Rock", query: "indie rock", gradient: "from-blue-600 via-cyan-600 to-teal-700", icon: "🎸" },
@@ -35,6 +37,35 @@ const GENRE_CATEGORIES = [
 ];
 
 const ExploreCategoryGrid = ({ onCategoryClick }) => {
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const apiData = await fetchExploreCategories();
+        if (apiData && apiData.length > 0) {
+          const mapped = apiData.map((cat) => ({
+            name: cat.label,
+            query: cat.keyword,
+            gradient: cat.gradient,
+            icon: cat.icon,
+          }));
+          setCategories(mapped);
+        } else {
+          setCategories(FALLBACK_CATEGORIES);
+        }
+      } catch (err) {
+        console.error("Failed to load explore categories, using fallback:", err);
+        setCategories(FALLBACK_CATEGORIES);
+      }
+    };
+
+    loadCategories();
+  }, []);
+
+  // Render top 8 category tiles for the visual grid
+  const displayCategories = categories.length > 0 ? categories.slice(0, 8) : FALLBACK_CATEGORIES;
+
   return (
     <section className="mb-10 sm:mb-12">
       {/* Section Header */}
@@ -46,7 +77,7 @@ const ExploreCategoryGrid = ({ onCategoryClick }) => {
 
       {/* 4-Column Category Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-6">
-        {GENRE_CATEGORIES.map((category) => (
+        {displayCategories.map((category) => (
           <div
             key={category.name}
             onClick={() => onCategoryClick(category.query)}

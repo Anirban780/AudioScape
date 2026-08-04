@@ -3,7 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { TracksService } from '../tracks/tracks.service';
 import { TfIdfEngine, UserHistoryItem, CandidateQueryGroup, RecommendedTrackResult } from './tfidf-engine';
 import { TrackItemDto } from './dto/cache-related-tracks.dto';
-import { CURATED_GENRES } from './curated-genres';
+import { CURATED_GENRES, CURATED_CATEGORIES } from './curated-genres';
 import { QueryType } from '@prisma/client';
 import { calculateTasteWeight } from './taste-weight.util';
 
@@ -320,17 +320,69 @@ export class RecommendationsService {
   }
 
   /**
+   * Helper extracting meaningful stem words from a category keyword, removing common stopwords.
+   */
+  private extractStemTokens(str: string): string[] {
+    const STOPWORDS = new Set(['music', 'songs', 'playlist', 'hits', 'beats', 'covers', '2026', 'mix', 'chill']);
+    return str
+      .toLowerCase()
+      .replace(/[^\w\s]/g, '')
+      .split(/\s+/)
+      .filter((word) => word.length > 2 && !STOPWORDS.has(word));
+  }
+
+  /**
+   * Checks if candidate category shares primary stems or parent taxonomy cluster with already selected categories.
+   * Enforces Strategy A (stem token overlap) and Strategy C (max 1 category per parent cluster).
+   */
+  private isDuplicateOrOverlappingCategory(
+    candidateKeyword: string,
+    selectedCategoryKeywords: string[],
+  ): boolean {
+    const candidateCategory = CURATED_CATEGORIES.find(
+      (c) => c.keyword.toLowerCase().trim() === candidateKeyword.toLowerCase().trim(),
+    );
+
+    const candidateStems = this.extractStemTokens(candidateKeyword);
+
+    for (const selected of selectedCategoryKeywords) {
+      const selectedCategory = CURATED_CATEGORIES.find(
+        (c) => c.keyword.toLowerCase().trim() === selected.toLowerCase().trim(),
+      );
+
+      // Strategy C: Cluster Constraint Check (Max 1 per parent cluster)
+      if (
+        candidateCategory &&
+        selectedCategory &&
+        candidateCategory.cluster === selectedCategory.cluster
+      ) {
+        return true;
+      }
+
+      // Strategy A: Stem Token Overlap Check
+      const selectedStems = this.extractStemTokens(selected);
+      const hasSharedStem = candidateStems.some((stem) => selectedStems.includes(stem));
+      if (hasSharedStem) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /**
    * Generates or retrieves personalized categorized explore music feed sections.
    * Blends user-personalized categories (exploit) with globally popular discovery categories (explore).
+   * Enforces Strategy A & C deduplication (stem token matching & parent cluster constraints).
    * 
    * WHY:
    * 1. A discovery feed must adapt to user tastes over time.
-   * 2. It must avoid becoming an echo chamber (filter bubble). Exploit/explore blend ensures variety.
+   * 2. It must avoid becoming an echo chamber (filter bubble) or repeating near-duplicate categories (e.g. 6 lofi variants).
    * 3. Categories should load instantly from PostgreSQL without waiting on YouTube API responses.
    * 
    * HOW:
    * - Computes user category affinity. If user is a cold start (< 3 plays or thin data), shuffles curated genres.
-   * - Exploit: Selects up to 6 categories with positive user affinity scores.
+   * - Exploit: Selects up to 6 categories with positive user affinity scores, enforcing 1 category per cluster and stem deduplication.
    * - Explore: Selects 4 categories not in exploit pool, sorted by their global hitCount (popularity) in SearchQuery.
    * - For each of the 10 selected categories:
    *   1. Runs `ensureCategoryPopulated()` to ensure database is backfilled to 50 tracks.
@@ -365,13 +417,19 @@ export class RecommendationsService {
       this.logger.log(`Cold start or anonymous request. Serving shuffled curated categories.`);
       keywords = this.shuffleArray(CURATED_GENRES).slice(0, 10);
     } else {
-      // Exploit vs Explore blend (6 personalized + 4 discovery)
+      // Exploit vs Explore blend (6 personalized + 4 discovery) with Strategy A & C deduplication
       const sortedAffinity = [...affinityMap.entries()]
         .sort((a, b) => b[1] - a[1])
         .map(([key]) => key);
 
-      // 1. Take up to 6 personalized categories (exploit)
-      const personalizedKeywords = sortedAffinity.slice(0, 6);
+      // 1. Take up to 6 personalized categories (exploit), filtering duplicates via Strategy A & C
+      const personalizedKeywords: string[] = [];
+      for (const key of sortedAffinity) {
+        if (!this.isDuplicateOrOverlappingCategory(key, personalizedKeywords)) {
+          personalizedKeywords.push(key);
+        }
+        if (personalizedKeywords.length >= 6) break;
+      }
 
       // 2. Load global popularity (hitCount) of categories to rank exploration
       let popularKeywords: string[] = [];
@@ -387,9 +445,8 @@ export class RecommendationsService {
         this.logger.warn(`Failed to fetch popular categories for explore sorting: ${err.message}`);
       }
 
-      // Filter remaining curated genres that are NOT in exploit list
-      const exploitSet = new Set(personalizedKeywords.map((k) => k.toLowerCase().trim()));
-      const remainingCurated = CURATED_GENRES.filter((c) => !exploitSet.has(c.toLowerCase().trim()));
+      // Filter remaining curated genres that are NOT in exploit list and do not share cluster/stems
+      const remainingCurated = CURATED_GENRES.filter((c) => !personalizedKeywords.includes(c));
 
       // Sort remaining curated by global popularity index, fall back to shuffled list order
       const remainingSorted = [...remainingCurated].sort((a, b) => {
@@ -402,13 +459,28 @@ export class RecommendationsService {
         return scoreA - scoreB;
       });
 
-      // 3. Take remaining discovery categories (explore) to make a total of 10
-      const discoveryCount = 10 - personalizedKeywords.length;
-      const discoveryKeywords = remainingSorted.slice(0, discoveryCount);
+      // 3. Take discovery categories (explore) to reach 10 total categories, avoiding cluster overlap
+      const discoveryKeywords: string[] = [];
+      for (const candidate of remainingSorted) {
+        if (!this.isDuplicateOrOverlappingCategory(candidate, [...personalizedKeywords, ...discoveryKeywords])) {
+          discoveryKeywords.push(candidate);
+        }
+        if (personalizedKeywords.length + discoveryKeywords.length >= 10) break;
+      }
+
+      // Fallback: If strict cluster filtering leaves < 10 total categories, relax stem check to backfill up to 10
+      if (personalizedKeywords.length + discoveryKeywords.length < 10) {
+        for (const candidate of remainingSorted) {
+          if (!personalizedKeywords.includes(candidate) && !discoveryKeywords.includes(candidate)) {
+            discoveryKeywords.push(candidate);
+          }
+          if (personalizedKeywords.length + discoveryKeywords.length >= 10) break;
+        }
+      }
 
       keywords = [...personalizedKeywords, ...discoveryKeywords];
       this.logger.log(
-        `Personalized blend selected: exploitCount=${personalizedKeywords.length}, exploreCount=${discoveryKeywords.length} [keywords: ${keywords.join(', ')}]`,
+        `Personalized blend selected with Strategy A & C deduplication: exploitCount=${personalizedKeywords.length}, exploreCount=${discoveryKeywords.length} [keywords: ${keywords.join(', ')}]`,
       );
     }
 
@@ -432,8 +504,13 @@ export class RecommendationsService {
           }))
           .slice(0, limitPerCategory);
 
+        const categoryMeta = CURATED_CATEGORIES.find(
+          (c) => c.keyword.toLowerCase().trim() === keyword.toLowerCase().trim(),
+        );
+        const sectionTitle = categoryMeta ? categoryMeta.label : keyword;
+
         exploreFeed.push({
-          title: keyword,
+          title: sectionTitle,
           tracks: mappedTracks,
         });
       } catch (err: any) {
@@ -545,5 +622,12 @@ export class RecommendationsService {
     }
 
     return finalQueue;
+  }
+
+  /**
+   * Returns the authoritative list of explore categories with visual rendering metadata.
+   */
+  async getCategories() {
+    return CURATED_CATEGORIES;
   }
 }
