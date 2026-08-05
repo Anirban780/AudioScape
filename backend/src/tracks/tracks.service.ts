@@ -17,6 +17,13 @@ import { YouTubeKeyManager } from './youtube-key-manager';
  * and tracks daily API quota usage across dual key pools via YouTubeKeyManager.
  * ============================================================================
  */
+/**
+ * Configurable Cache TTL in days for curated explore categories.
+ * Modify this variable to adjust how long category search results remain fresh in PostgreSQL before re-fetching.
+ * Default: 7 days.
+ */
+export const CURATED_CATEGORY_CACHE_TTL_DAYS = 7;
+
 @Injectable()
 export class TracksService {
   private readonly logger = new Logger(TracksService.name);
@@ -392,8 +399,8 @@ export class TracksService {
     queryType: QueryType = QueryType.USER_SEARCH,
     pageIndex: number = 0,
   ) {
-    // 21-day TTL for CURATED_KEYWORD vs 24-hour TTL for USER_SEARCH
-    const ttlHours = queryType === QueryType.CURATED_KEYWORD ? 21 * 24 : 24;
+    // Configurable TTL for CURATED_KEYWORD (default: 7 days) vs 24-hour TTL for USER_SEARCH
+    const ttlHours = queryType === QueryType.CURATED_KEYWORD ? CURATED_CATEGORY_CACHE_TTL_DAYS * 24 : 24;
     const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
 
     // 1. Upsert SearchQuery root record
@@ -677,9 +684,9 @@ export class TracksService {
       }
     }
 
-    // 4. Update SearchQuery record with 21-day TTL and CURATED_KEYWORD queryType
-    const TTL_21_DAYS_MS = 21 * 24 * 60 * 60 * 1000;
-    const expiresAt = new Date(Date.now() + TTL_21_DAYS_MS);
+    // 4. Update SearchQuery record with configurable TTL (default: 7 days) and CURATED_KEYWORD queryType
+    const categoryTtlMs = CURATED_CATEGORY_CACHE_TTL_DAYS * 24 * 60 * 60 * 1000;
+    const expiresAt = new Date(Date.now() + categoryTtlMs);
 
     await this.prisma.searchQuery.update({
       where: { normalizedQuery },
@@ -692,7 +699,7 @@ export class TracksService {
     });
 
     this.logger.log(
-      `Successfully populated category "${keyword}": ${totalStored} tracks stored across ${pagesFetched} page fetch(es). 21-day TTL set to ${expiresAt.toISOString()}`,
+      `Successfully populated category "${keyword}": ${totalStored} tracks stored across ${pagesFetched} page fetch(es). ${CURATED_CATEGORY_CACHE_TTL_DAYS}-day TTL set to ${expiresAt.toISOString()}`,
     );
 
     return { trackCount: totalStored, fromCache: false };

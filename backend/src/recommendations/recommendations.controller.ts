@@ -91,4 +91,22 @@ export class RecommendationsController {
   async getCategories() {
     return this.recommendationsService.getCategories();
   }
+
+  /**
+   * Triggers background pre-warming of top Explore categories in PostgreSQL.
+   * Executed by platform schedulers (Vercel Cron, GitHub Actions, AWS EventBridge) or admin triggers.
+   * @route POST `/api/music/cron/refresh-explore-cache`
+   * @route GET `/api/music/cron/refresh-explore-cache`
+   */
+  @Post('cron/refresh-explore-cache')
+  async triggerRefreshExploreCachePost(@Query('max') max?: string) {
+    const maxCount = max ? parseInt(max, 10) : 20;
+    return this.recommendationsService.refreshExploreCache(maxCount);
+  }
+
+  @Get('cron/refresh-explore-cache')
+  async triggerRefreshExploreCacheGet(@Query('max') max?: string) {
+    const maxCount = max ? parseInt(max, 10) : 20;
+    return this.recommendationsService.refreshExploreCache(maxCount);
+  }
 }
