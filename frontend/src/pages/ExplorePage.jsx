@@ -2,11 +2,10 @@ import React, { useEffect, useState } from "react";
 import AppLayout from "@/components/Layout/AppLayout";
 import { useAuth } from "@/context/AuthContext";
 import { fetchYoutubeMusic } from "@/utils/youtube";
-import { cacheRelatedTracks, fetchExploreFeed } from "@/utils/api";
+import { fetchExploreFeed } from "@/utils/api";
 import Loader from "@/components/Home/Loader";
 import toast from "react-hot-toast";
 
-import ExploreFilterPills from "@/components/Explore/ExploreFilterPills";
 import ExploreTrendingBanner from "@/components/Explore/ExploreTrendingBanner";
 import ExploreCategoryGrid from "@/components/Explore/ExploreCategoryGrid";
 import ExploreSection from "@/components/Explore/ExploreSection";
@@ -14,27 +13,26 @@ import ExplorePlaylistsCarousel from "@/components/Explore/ExplorePlaylistsCarou
 
 /**
  * ============================================================================
- * EXPLORE MUSIC PAGE (ExplorePage.jsx)
+ * EXPLORE MUSIC PAGE (ExplorePage.jsx) - V2 Consolidated Discovery Architecture
  * ============================================================================
  * 
  * WHAT THIS FILE DOES:
  * Assembles the primary Stitch Music Discovery & Search view. Features:
- * 1. Genre & Mood Filter Pills (`ExploreFilterPills.jsx`): Interactive pill filters.
- * 2. Trending Spotlight Hero Banner (`ExploreTrendingBanner.jsx`): Spotlight discovery mix.
- * 3. Browse Categories 4-Column Grid (`ExploreCategoryGrid.jsx`): Visual genre tiles with gradients.
- * 4. Keyword Music Track Sections (`ExploreSection.jsx`): 5-column responsive album grids.
- * 5. Saved User Playlists Carousel (`ExplorePlaylistsCarousel.jsx`): User's saved playlists.
+ * 1. Trending Spotlight Hero Banner (`ExploreTrendingBanner.jsx`): Spotlight discovery mix.
+ * 2. Browse Categories 4-Column Grid (`ExploreCategoryGrid.jsx`): Visual genre tiles with gradients.
+ * 3. Categorized Music Track Sections (`ExploreSection.jsx`): 5-column responsive album grids.
+ * 4. Saved User Playlists Carousel (`ExplorePlaylistsCarousel.jsx`): User's saved playlists.
  * 
- * WHY IT WAS DESIGNED THIS WAY:
- * 1. Stitch Screen Alignment: Fully implements the design hierarchy from Stitch Explore screens
- *    (`6aaba54d100944a28329f65c95eb684f`, `3c52c41b3d7e40b89b4e98157e63aaae`, & `e8bef34ec53d4382bba063b4a4d375d1`).
- * 2. Personalised Discovery: Uses `getExploreKeywords(uid)` to dynamically fetch feeds matching taste.
- * 3. Cache & Quota Optimization: Caches fetched category tracks in `localStorage` for 30 minutes.
+ * WHY IT WAS DESIGNED THIS WAY (Phase 4 UI Consolidation):
+ * 1. Single Category UI Source of Truth: Consolidated genre discovery into `ExploreCategoryGrid.jsx`
+ *    and removed redundant filter pills (`ExploreFilterPills.jsx`) to eliminate UI duplication.
+ * 2. Server-Driven Personalised Discovery: Fetches personalized categorized feeds in a single backend call (`fetchExploreFeed()`).
+ * 3. Zero-Latency Page Loads: Served 100% DB-first from PostgreSQL with automated background pre-warming.
  * 
  * HOW IT WORKS:
- * - Fetches keyword sections via `fetchYoutubeMusic`.
+ * - Mounts and fetches initial 10-category explore feed via `fetchExploreFeed()`.
  * - Derived `featuredTrack` supplies the Trending Spotlight Hero Banner.
- * - Selecting filter pills or category cards fetches and highlights targeted music feeds.
+ * - Selecting category tiles in `ExploreCategoryGrid` scrolls to matching section or loads category feed.
  */
 
 const ExplorePage = () => {
@@ -42,7 +40,6 @@ const ExplorePage = () => {
   const [exploreFeed, setExploreFeed] = useState([]);
   const [visibleTracks, setVisibleTracks] = useState({});
   const [loading, setLoading] = useState(true);
-  const [activeGenre, setActiveGenre] = useState("All");
 
   const userId = user?.uid || "";
 
@@ -87,14 +84,10 @@ const ExplorePage = () => {
   };
 
   /**
-   * Filter Pill & Category Tile Selection Handler
+   * Category Tile Selection Handler
    */
-  const handleGenreSelect = async (genreQuery) => {
-    setActiveGenre(genreQuery);
-
-    if (genreQuery.toLowerCase() === "all") {
-      return;
-    }
+  const handleCategoryClick = async (genreQuery) => {
+    if (!genreQuery) return;
 
     // Check if section already exists in explore feed
     const existingIndex = exploreFeed.findIndex(
@@ -102,13 +95,13 @@ const ExplorePage = () => {
     );
 
     if (existingIndex !== -1) {
-      // Scroll to existing section
+      // Scroll smoothly to existing section
       const secElement = document.getElementById(`explore-sec-${existingIndex}`);
       secElement?.scrollIntoView({ behavior: "smooth" });
       return;
     }
 
-    // Otherwise fetch fresh music for this genre
+    // Otherwise fetch fresh music section for this category
     toast.loading(`Loading ${genreQuery}...`, { id: "explore-genre" });
     try {
       const tracks = await fetchYoutubeMusic(genreQuery, 15);
@@ -135,19 +128,13 @@ const ExplorePage = () => {
           </h1>
         </div>
 
-        {/* 1. Genre & Mood Filter Pills */}
-        <ExploreFilterPills
-          activeGenre={activeGenre}
-          onSelect={handleGenreSelect}
-        />
-
-        {/* 2. Trending Spotlight Hero Banner */}
+        {/* 1. Trending Spotlight Hero Banner */}
         <ExploreTrendingBanner featuredTrack={featuredTrack} loading={loading} />
 
-        {/* 3. Browse Categories 4-Column Grid */}
-        <ExploreCategoryGrid onCategoryClick={handleGenreSelect} />
+        {/* 2. Browse Categories 4-Column Grid */}
+        <ExploreCategoryGrid onCategoryClick={handleCategoryClick} />
 
-        {/* 4. Keyword Music Track Sections */}
+        {/* 3. Categorized Music Track Sections */}
         {loading ? (
           <Loader />
         ) : exploreFeed.length === 0 ? (
@@ -168,7 +155,7 @@ const ExplorePage = () => {
           </div>
         )}
 
-        {/* 5. User Saved Playlists Carousel */}
+        {/* 4. User Saved Playlists Carousel */}
         {userId && <ExplorePlaylistsCarousel userId={userId} />}
       </div>
     </AppLayout>
