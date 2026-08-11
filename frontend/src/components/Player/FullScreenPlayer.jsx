@@ -129,11 +129,7 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
         <div className="flex-1 flex flex-col items-center justify-center px-4 py-6 md:space-y-8 space-y-6">
           <div className="relative group">
             <img
-<<<<<<< HEAD
-              src={track?.thumbnail || placeholder}
-=======
               src={getValidThumbnailUrl(track?.thumbnail) || placeholder}
->>>>>>> staging
               alt={track?.name || "Track artwork"}
               className="w-[240px] h-[240px] sm:w-[320px] sm:h-[320px] md:w-[380px] md:h-[380px] object-cover rounded-2xl shadow-2xl border border-[var(--color-border-strong)] transition-transform duration-300 group-hover:scale-102"
             />

@@ -77,11 +77,7 @@ const TrackQueue = ({ queue, currentIndex, setCurrentIndex, setTrack, showQueue,
                                 onClick={() => handleQueueTrackClick(qTrack, index)}
                             >
                                 <img
-<<<<<<< HEAD
-                                    src={qTrack.thumbnail || placeholder}
-=======
                                     src={getValidThumbnailUrl(qTrack.thumbnail) || placeholder}
->>>>>>> staging
                                     alt={qTrack.name}
                                     className="w-12 h-12 object-cover rounded-lg shadow-sm shrink-0"
                                 />

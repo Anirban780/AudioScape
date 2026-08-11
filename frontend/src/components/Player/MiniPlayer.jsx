@@ -113,11 +113,7 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
         <div className="flex justify-between items-center mini-player-header cursor-move select-none">
           <div className="flex items-center gap-3 min-w-0 flex-1">
             <img
-<<<<<<< HEAD
-              src={track?.thumbnail || placeholder}
-=======
               src={getValidThumbnailUrl(track?.thumbnail) || placeholder}
->>>>>>> staging
               alt={track?.name || "Track artwork"}
               className="w-14 h-14 rounded-xl object-cover shadow-md flex-shrink-0"
             />
