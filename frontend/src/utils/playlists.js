@@ -1,5 +1,6 @@
 import { auth } from "../firebase/firebaseConfig";
 import { getBackendURL } from "./api";
+import { getValidThumbnailUrl } from "./youtubeUtils";
 
 /**
  * Helper to retrieve Firebase ID Token for NestJS Authorization header.
@@ -68,14 +69,15 @@ export const getPlaylists = async (userId) => {
             name: pl.name,
             songs: (pl.tracks || pl.songs || []).map((pt) => {
                 const track = pt.track || pt;
+                const thumb = getValidThumbnailUrl(track.thumbnailUrl || track.thumbNail || "") || "";
                 return {
                     id: track.youtubeVideoId || track.videoId || track.id,
                     videoId: track.youtubeVideoId || track.videoId || track.id,
                     title: track.title || "Unknown Title",
                     name: track.title || "Unknown Title",
                     artist: track.artist || track.channelTitle || "Unknown Artist",
-                    thumbnail: track.thumbnailUrl || track.thumbNail || "",
-                    thumbNail: track.thumbnailUrl || track.thumbNail || "",
+                    thumbnail: thumb,
+                    thumbNail: thumb,
                 };
             }),
             createdAt: pl.createdAt,

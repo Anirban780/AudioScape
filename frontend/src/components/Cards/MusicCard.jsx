@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { ListPlus, Play } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import usePlaylistStore from "@/store/usePlaylistStore";
+import { getValidThumbnailUrl } from "@/utils/youtubeUtils";
 
 /**
  * ============================================================================
@@ -18,6 +19,8 @@ import usePlaylistStore from "@/store/usePlaylistStore";
  *    Strictly enforces zero-green brand palette rule across all card play buttons.
  * 2. Independent Playlist Trigger: Clicking the '+' icon triggers `openModal(songData)` without
  *    bubbling up to start playing the track directly.
+ * 3. Endpoint Filtering Bypass: Uses `getValidThumbnailUrl` to dynamically rewrite blocked 'i.ytimg.com'
+ *    domains to 'img.youtube.com' during rendering.
  * 
  * HOW IT WORKS:
  * - `onClick(id)`: Invoked when clicking the card body to select/play track.
@@ -27,11 +30,13 @@ const MusicCard = ({ id, name, artist, image, onClick }) => {
   const [isHovered, setIsHovered] = useState(false);
   const { openModal } = usePlaylistStore();
 
+  const validImage = getValidThumbnailUrl(image);
+
   const songData = {
     id,
     name,
     artist,
-    thumbnail: image,
+    thumbnail: validImage,
   };
 
   return (
@@ -60,7 +65,7 @@ const MusicCard = ({ id, name, artist, image, onClick }) => {
           onMouseLeave={() => setIsHovered(false)}
         >
           <img
-            src={image}
+            src={validImage}
             alt={name}
             className={`w-full h-full object-cover transition-all duration-300 ${
               isHovered ? "scale-105 opacity-80" : "scale-100 opacity-100"

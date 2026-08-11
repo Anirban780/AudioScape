@@ -6,6 +6,7 @@ import { TrackItemDto } from './dto/cache-related-tracks.dto';
 import { CURATED_GENRES, CURATED_CATEGORIES } from './curated-genres';
 import { QueryType } from '@prisma/client';
 import { calculateTasteWeight } from './taste-weight.util';
+import { getValidThumbnailUrl } from '../utils/youtubeUtils';
 
 /**
  * ============================================================================
@@ -95,7 +96,7 @@ export class RecommendationsService {
         artist: rh.track.artist || rh.track.artistName || 'Unknown Artist',
         genre: rh.track.genre || [],
         tags: rh.track.tags || [],
-        thumbnailUrl: rh.track.thumbnailUrl,
+        thumbnailUrl: getValidThumbnailUrl(rh.track.thumbnailUrl) || '',
       },
     }));
 
@@ -123,7 +124,7 @@ export class RecommendationsService {
         youtubeVideoId: res.track.youtubeVideoId,
         title: res.track.title,
         artist: res.track.artist || res.track.artistName || 'Unknown Artist',
-        thumbnailUrl: res.track.thumbnailUrl,
+        thumbnailUrl: getValidThumbnailUrl(res.track.thumbnailUrl) || '',
         genre: res.track.genre || [],
         tags: res.track.tags || [],
       })),
@@ -500,7 +501,7 @@ export class RecommendationsService {
             id: t.videoId,
             name: t.title,
             artist: t.channelTitle || 'Unknown Artist',
-            thumbnail: t.thumbNail || '',
+            thumbnail: getValidThumbnailUrl(t.thumbNail) || '',
           }))
           .slice(0, limitPerCategory);
 
@@ -556,7 +557,7 @@ export class RecommendationsService {
       id: currentTrack.videoId || currentTrackId,
       name: currentTrack.title || 'Current Track',
       artist: currentTrack.channelTitle || currentTrack.artist || 'Unknown Artist',
-      thumbnail: currentTrack.thumbNail || currentTrack.thumbnail || '',
+      thumbnail: getValidThumbnailUrl(currentTrack.thumbNail || currentTrack.thumbnail) || '',
     };
 
     let relatedTracks: Array<{ id: string; name: string; artist: string; thumbnail: string }> = [];
@@ -598,7 +599,7 @@ export class RecommendationsService {
       id: h.track.youtubeVideoId,
       name: h.track.title,
       artist: h.track.artist || h.track.artistName || 'Unknown Artist',
-      thumbnail: h.track.thumbnailUrl || '',
+      thumbnail: getValidThumbnailUrl(h.track.thumbnailUrl) || '',
     }));
 
     // STEP 4: Balance and mix queue (6 related + 4 recent)

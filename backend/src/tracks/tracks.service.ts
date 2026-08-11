@@ -3,6 +3,7 @@ import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { ApiEndpoint, QueryType } from '@prisma/client';
 import { YouTubeKeyManager } from './youtube-key-manager';
+import { getValidThumbnailUrl } from '../utils/youtubeUtils';
 
 /**
  * ============================================================================
@@ -174,7 +175,7 @@ export class TracksService {
         const tracks = cachedPage.results.map((res) => ({
           videoId: res.track.youtubeVideoId,
           title: res.track.title,
-          thumbNail: res.track.thumbnailUrl || '',
+          thumbNail: getValidThumbnailUrl(res.track.thumbnailUrl || '') || '',
           channelTitle: res.track.artist || 'Unknown Artist',
         }));
 
@@ -213,7 +214,7 @@ export class TracksService {
           const tracks = localMatches.map((t) => ({
             videoId: t.videoId,
             title: t.title,
-            thumbNail: t.thumbNail || '',
+            thumbNail: getValidThumbnailUrl(t.thumbNail || '') || '',
             channelTitle: t.channelTitle || 'Unknown Artist',
           }));
 
@@ -294,7 +295,7 @@ export class TracksService {
         tracks: tracks.map((t) => ({
           videoId: t.videoId,
           title: t.title,
-          thumbNail: t.thumbNail,
+          thumbNail: getValidThumbnailUrl(t.thumbNail) || '',
           channelTitle: t.channelTitle,
         })),
         nextPageToken,
@@ -326,7 +327,7 @@ export class TracksService {
         return {
           videoId: existingTrack.youtubeVideoId,
           title: existingTrack.title,
-          thumbNail: existingTrack.thumbnailUrl || '',
+          thumbNail: getValidThumbnailUrl(existingTrack.thumbnailUrl || '') || '',
           channelTitle: existingTrack.artist || 'Unknown Artist',
           duration: existingTrack.duration,
           durationSeconds: existingTrack.durationSeconds,
@@ -358,7 +359,7 @@ export class TracksService {
       const result = {
         videoId: trackItem.id,
         title: trackItem.snippet?.title || 'Unknown Title',
-        thumbNail: trackItem.snippet?.thumbnails?.high?.url || trackItem.snippet?.thumbnails?.medium?.url || trackItem.snippet?.thumbnails?.default?.url || '',
+        thumbNail: getValidThumbnailUrl(trackItem.snippet?.thumbnails?.high?.url || trackItem.snippet?.thumbnails?.medium?.url || trackItem.snippet?.thumbnails?.default?.url || '') || '',
         channelTitle: trackItem.snippet?.channelTitle || 'Unknown Artist',
         duration: rawDuration,
         durationSeconds,

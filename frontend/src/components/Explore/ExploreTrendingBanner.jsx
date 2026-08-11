@@ -4,6 +4,7 @@ import { Play, Flame, Sparkles } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import toast from "react-hot-toast";
+import { getValidThumbnailUrl } from "@/utils/youtubeUtils";
 
 /**
  * ============================================================================
@@ -41,7 +42,7 @@ const ExploreTrendingBanner = ({ featuredTrack, loading }) => {
 
   const trackName = featuredTrack.name || featuredTrack.title || "Featured Soundscape";
   const artistName = featuredTrack.artist || featuredTrack.channelTitle || "Top Artist";
-  const artwork = featuredTrack.thumbnail || featuredTrack.thumbNail || placeholder;
+  const artwork = getValidThumbnailUrl(featuredTrack.thumbnail || featuredTrack.thumbNail) || placeholder;
 
   return (
     <div className="relative w-full h-[280px] sm:h-[320px] rounded-[32px] overflow-hidden border border-[var(--color-border-strong)] shadow-2xl mb-10 group bg-[var(--color-surface-raised)] flex items-center">
