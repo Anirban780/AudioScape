@@ -1,4 +1,5 @@
 import { getBackendURL } from "./api";
+import { getValidThumbnailUrl } from "./youtubeUtils";
 
 /**
  * Fetches search results from NestJS YouTube proxy controller (/youtube/search)
@@ -16,17 +17,22 @@ const fetchAndCacheYoutubeMusic = async (query) => {
     const data = await response.json();
     const rawTracks = data.tracks || [];
 
-    const tracks = rawTracks.map((item) => ({
-      id: item.videoId || item.id,
-      videoId: item.videoId || item.id,
-      name: item.title || item.name || "Unknown Title",
-      title: item.title || item.name || "Unknown Title",
-      artist: item.channelTitle || item.artist || "Unknown Artist",
-      channelTitle: item.channelTitle || item.artist || "Unknown Artist",
-      thumbnail: item.thumbNail || item.thumbnail || "",
-      thumbNail: item.thumbNail || item.thumbnail || "",
-      channelId: item.channelId || "Unknown",
-    }));
+    const tracks = rawTracks.map((item) => {
+      const rawThumb = item.thumbNail || item.thumbnail || "";
+      const sanitizedThumb = getValidThumbnailUrl(rawThumb) || "";
+
+      return {
+        id: item.videoId || item.id,
+        videoId: item.videoId || item.id,
+        name: item.title || item.name || "Unknown Title",
+        title: item.title || item.name || "Unknown Title",
+        artist: item.channelTitle || item.artist || "Unknown Artist",
+        channelTitle: item.channelTitle || item.artist || "Unknown Artist",
+        thumbnail: sanitizedThumb,
+        thumbNail: sanitizedThumb,
+        channelId: item.channelId || "Unknown",
+      };
+    });
 
     const CACHE_KEY = `yt_music_cache_${query}`;
     try {

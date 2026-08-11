@@ -1,78 +1,62 @@
-import React, { useEffect, useState } from 'react';
-import AppLayout from '@/components/Layout/AppLayout';
-import { useAuth } from '@/context/AuthContext';
-import { getExploreKeywords } from '@/utils/keywords';
-import { fetchYoutubeMusic } from '@/utils/youtube';
-import MusicCard from '@/components/Cards/MusicCard';
-import { RefreshCcw } from 'lucide-react';
-import { cacheRelatedTracks } from '@/utils/api';
-import usePlayerStore from "@/store/usePlayerStore";
-import toast from 'react-hot-toast';
-import Loader from '@/components/Home/Loader';
+import React, { useEffect, useState, useMemo } from "react";
+import AppLayout from "@/components/Layout/AppLayout";
+import { useAuth } from "@/context/AuthContext";
+import { fetchYoutubeMusic } from "@/utils/youtube";
+import { fetchExploreFeed } from "@/utils/api";
+import Loader from "@/components/Home/Loader";
+import toast from "react-hot-toast";
+import { Compass } from "lucide-react";
+
+import ExploreTrendingBanner from "@/components/Explore/ExploreTrendingBanner";
+import ExploreFilterBar from "@/components/Explore/ExploreFilterBar";
+import ExploreSection from "@/components/Explore/ExploreSection";
 
 /**
  * ============================================================================
- * EXPLORE MUSIC PAGE (ExplorePage.jsx)
+ * EXPLORE MUSIC PAGE (ExplorePage.jsx) - V2 Filtered Discovery Architecture
  * ============================================================================
  * 
  * WHAT THIS FILE DOES:
- * Music discovery page that fetches YouTube music categories based on user's
- * listening history keywords or curated fallback genres (lofi, pop, indie, etc.).
+ * Assembles the primary Stitch Music Discovery & Search view. Features:
+ * 1. Clean Vector Icon Page Header: `<Compass>` Lucide icon title.
+ * 2. Category Filter Bar (`ExploreFilterBar.jsx`): Compact category filter pills.
+ * 3. Spotlight Hero Banner Carousel (`ExploreTrendingBanner.jsx`):
+ *    - In "All" mode: Displays top #1 song from each category section (up to 8 tracks).
+ *    - In Filtered mode: Displays top 5 trending songs of the selected category.
+ * 4. Categorized Music Track Sections (`ExploreSection.jsx`): Filtered or full category sections.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Keyword-based Personalisation: Queries `getExploreKeywords(uid)` to dynamically
- *    generate category feeds tailored to user taste.
- * 2. Caching Strategy: Caches fetched category tracks in local storage for 30 minutes
- *    (`CACHE_EXPIRY_MS`) to conserve YouTube Data API quota.
- * 3. AppLayout Unification: Uses AppLayout shell for global sidebar/header navigation
- *    and clean surface token styling.
+ * 1. Declarative React Curation (`useMemo`): Replaced imperative if/else mutations with
+ *    declarative `useMemo` hooks for reactive, optimized track & section filtering.
+ * 2. Adjustable Hero Image Position: Passes `imageObjectPosition` prop ("center center" by default)
+ *    to easily shift background artwork up or down.
  * 
- * HOW IT WORKS:
- * - Fetches up to 10 keyword sections in parallel via `fetchYoutubeMusic`.
- * - Manages track visibility pagination per section via `visibleTracks` state.
- * - Clicking any track card sets active track in `usePlayerStore`.
+ * HOW TO MOVE THE HERO BANNER IMAGE UP OR DOWN:
+ * Edit line ~158 below or change `imageObjectPosition` value:
+ * - "center top" or "center 15%"  -> Moves image UP (shows top of picture)
+ * - "center center" or "center 50%" -> Default centered alignment
+ * - "center bottom" or "center 85%" -> Moves image DOWN (shows bottom of picture)
  */
-
-const curatedGenres = [
-  "lofi music", "pop hits", "indie rock", "anime music", "k-pop", "electronic", "jazz chill", "hip hop",
-];
-
-const CACHE_EXPIRY_MS = 1000 * 60 * 30; // 30 minutes cache
 
 const ExplorePage = () => {
   const { user } = useAuth();
   const [exploreFeed, setExploreFeed] = useState([]);
-  const [cache, setCache] = useState({});
   const [visibleTracks, setVisibleTracks] = useState({});
-  const { setTrack } = usePlayerStore();
   const [loading, setLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState("All");
+
+  const userId = user?.uid || "";
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchExploreSections = async () => {
       setLoading(true);
 
       try {
-        let keywords = await getExploreKeywords(user?.uid);
-        if (!keywords || keywords.length === 0) {
-          keywords = curatedGenres;
-        }
+        const exploreData = await fetchExploreFeed();
 
-        const now = Date.now();
-        const cachedFetchTime = localStorage.getItem('lastFetchTime');
-        const isCacheValid = cachedFetchTime && (now - parseInt(cachedFetchTime) < CACHE_EXPIRY_MS);
-
-        const exploreData = await Promise.all(
-          keywords.slice(0, 10).map(async (keyword) => {
-            if (isCacheValid && cache[keyword]) {
-              return { title: keyword, tracks: cache[keyword] };
-            }
-
-            const tracks = await fetchYoutubeMusic(keyword, 20);
-            setCache((prev) => ({ ...prev, [keyword]: tracks }));
-            await cacheRelatedTracks(keyword, tracks);
-            return { title: keyword, tracks };
-          })
-        );
+        if (!isMounted) return;
 
         setExploreFeed(exploreData);
 
@@ -81,88 +65,136 @@ const ExplorePage = () => {
           initialVisible[title] = 5;
         });
         setVisibleTracks(initialVisible);
-        localStorage.setItem('lastFetchTime', now.toString());
-
-        toast.success("Explore page contents fetched successfully");
       } catch (err) {
         console.error("Explore fetch failed:", err);
-        toast.error("Explore page contents couldn't be fetched");
-        setExploreFeed([]);
+        if (isMounted) setExploreFeed([]);
       } finally {
-        setLoading(false);
+        if (isMounted) setLoading(false);
       }
     };
 
-    if (user?.uid) {
-      fetchExploreSections();
-    } else {
-      setLoading(false);
-      setExploreFeed([]);
-    }
-  }, [user]);
+    fetchExploreSections();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [userId]);
 
   const handleLoadMore = (title) => {
     setVisibleTracks((prev) => ({
       ...prev,
-      [title]: prev[title] + 5,
+      [title]: (prev[title] || 5) + 5,
     }));
   };
 
+  /**
+   * Category Filter Selection Handler
+   */
+  const handleSelectCategory = async (categoryQuery) => {
+    if (!categoryQuery) return;
+    setActiveFilter(categoryQuery);
+
+    if (categoryQuery === "All") return;
+
+    // Check if section already exists in explore feed
+    const existingIndex = exploreFeed.findIndex(
+      (sec) => sec.title.toLowerCase().includes(categoryQuery.toLowerCase()) ||
+               categoryQuery.toLowerCase().includes(sec.title.toLowerCase())
+    );
+
+    if (existingIndex !== -1) return;
+
+    // Otherwise fetch fresh music section for this category
+    toast.loading(`Loading ${categoryQuery}...`, { id: "explore-genre" });
+    try {
+      const tracks = await fetchYoutubeMusic(categoryQuery, 15);
+      setExploreFeed((prev) => [{ title: categoryQuery, tracks }, ...prev]);
+      setVisibleTracks((prev) => ({ ...prev, [categoryQuery]: 5 }));
+      toast.success(`Loaded ${categoryQuery}`, { id: "explore-genre" });
+    } catch (e) {
+      toast.error(`Failed to load ${categoryQuery}`, { id: "explore-genre" });
+    }
+  };
+
+  /**
+   * Declarative Trending Tracks Derivation (useMemo):
+   * - "All" mode: Top 1 song from each category section (up to 8 tracks)
+   * - Filtered mode: Top 5 songs from the selected category section
+   */
+  const trendingTracks = useMemo(() => {
+    if (activeFilter === "All") {
+      return exploreFeed
+        .map((sec) => sec.tracks?.[0] && { ...sec.tracks[0], categoryName: sec.title })
+        .filter(Boolean)
+        .slice(0, 8);
+    }
+
+    const matchingSec = exploreFeed.find(
+      (sec) => sec.title.toLowerCase().includes(activeFilter.toLowerCase()) ||
+               activeFilter.toLowerCase().includes(sec.title.toLowerCase())
+    );
+
+    return (matchingSec?.tracks || []).slice(0, 5).map((t) => ({
+      ...t,
+      categoryName: matchingSec?.title || activeFilter,
+    }));
+  }, [exploreFeed, activeFilter]);
+
+  /**
+   * Declarative Section Filtering (useMemo)
+   */
+  const displayedSections = useMemo(() => {
+    if (activeFilter === "All") return exploreFeed;
+
+    return exploreFeed.filter(
+      (sec) => sec.title.toLowerCase().includes(activeFilter.toLowerCase()) ||
+               activeFilter.toLowerCase().includes(sec.title.toLowerCase())
+    );
+  }, [exploreFeed, activeFilter]);
+
   return (
     <AppLayout>
-      <div className="w-full">
-        <h1 className="text-3xl font-bold mb-6 text-center md:text-left">🔍 Explore Music 🎶</h1>
+      <div className="w-full max-w-[1280px] mx-auto py-2">
+        
+        {/* Page Title */}
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--color-on-surface)] tracking-tight flex items-center gap-2.5">
+            <Compass className="text-[var(--color-primary)] flex-shrink-0" size={28} />
+            <span>Explore Music</span>
+          </h1>
+        </div>
 
+        {/* 1. Category Filter Boxes (Compact Pill Bar) */}
+        <ExploreFilterBar
+          activeCategory={activeFilter}
+          onSelectCategory={handleSelectCategory}
+        />
+
+        {/* 2. Trending Spotlight Hero Banner (Full-Width HD, Auto Slow-Pan & Carousel) */}
+        <ExploreTrendingBanner
+          trendingTracks={trendingTracks}
+          activeCategory={activeFilter}
+          loading={loading}
+          enablePanAnimation={true} // Enables automatic top-to-bottom slow pan vertical image animation
+          imageObjectPosition="center center"
+        />
+
+        {/* 3. Categorized Music Track Sections */}
         {loading ? (
           <Loader />
-        ) : exploreFeed.length === 0 ? (
-          <div className="text-center text-lg opacity-70 mt-10">
-            No music content available. Try searching or check back later!
+        ) : displayedSections.length === 0 ? (
+          <div className="text-center text-sm text-[var(--color-on-surface-variant)] py-12 bg-[var(--color-surface-raised)] rounded-[24px] border border-[var(--color-border-default)] mb-10">
+            No tracks found for "{activeFilter}". Try selecting "All" or picking another category!
           </div>
         ) : (
-          <div className="space-y-8">
-            {exploreFeed.map((section, index) => (
-              <div
-                key={`${section.title}-${index}`}
-                className="p-5 rounded-2xl border border-[var(--color-border-default)] bg-[var(--color-surface-raised)] shadow-md transition-all duration-300"
-              >
-                <div className="flex justify-between items-center mb-4">
-                  <h2 className="text-2xl font-semibold capitalize tracking-wide">{section.title}</h2>
-                </div>
-
-                {section.tracks.length === 0 ? (
-                  <p className="opacity-70 italic">No tracks available for {section.title}</p>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-                    {section.tracks
-                      .slice(0, visibleTracks[section.title] || 5)
-                      .map((track, index) => (
-                        <MusicCard
-                          key={`${track.id}-${index}`}
-                          id={track.id}
-                          name={track.name}
-                          artist={track.artist}
-                          image={track.thumbnail}
-                          onClick={() => {
-                            setTrack(track);
-                            toast.success("Track selected successfully");
-                          }}
-                        />
-                      ))}
-                  </div>
-                )}
-
-                {visibleTracks[section.title] < section.tracks.length && (
-                  <div className="flex justify-end mt-4">
-                    <button
-                      onClick={() => handleLoadMore(section.title)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--color-primary)] text-[var(--color-text-on-primary)] font-medium hover:opacity-90 transition-all shadow-md"
-                    >
-                      <RefreshCcw size={16} />
-                      <span>More</span>
-                    </button>
-                  </div>
-                )}
+          <div className="space-y-6">
+            {displayedSections.map((section, index) => (
+              <div key={`${section.title}-${index}`} id={`explore-sec-${index}`}>
+                <ExploreSection
+                  section={section}
+                  visibleCount={visibleTracks[section.title] || 5}
+                  onLoadMore={() => handleLoadMore(section.title)}
+                />
               </div>
             ))}
           </div>

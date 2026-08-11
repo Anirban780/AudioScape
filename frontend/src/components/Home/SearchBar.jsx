@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import axios from "axios";
 import placeholder from "@/assets/placeholder.jpg";
 import { getBackendURL } from "@/utils/api";
+import { getValidThumbnailUrl } from "@/utils/youtubeUtils";
 import toast from "react-hot-toast";
 
 /**
@@ -294,7 +295,7 @@ const SearchBar = ({ onSelectTrack }) => {
       id: track.videoId,
       name: track.title,
       artist: track.channelTitle || "Unknown Artist",
-      thumbnail: track.thumbNail || placeholder,
+      thumbnail: getValidThumbnailUrl(track.thumbNail) || placeholder,
     });
 
     setIsFocused(false);

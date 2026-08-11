@@ -54,6 +54,12 @@ export class GoogleAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+    
+    // Allow background cron pre-warming endpoints to be called by platform schedulers
+    if (request.path && request.path.includes('/cron/')) {
+      return true;
+    }
+
     const authHeader = request.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {

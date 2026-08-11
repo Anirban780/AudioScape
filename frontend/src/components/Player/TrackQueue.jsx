@@ -2,6 +2,7 @@ import React from "react";
 import clsx from "clsx";
 import { X, Music } from "lucide-react";
 import placeholder from "@/assets/placeholder.jpg";
+import { getValidThumbnailUrl } from "@/utils/youtubeUtils";
 
 /**
  * ============================================================================
@@ -76,7 +77,11 @@ const TrackQueue = ({ queue, currentIndex, setCurrentIndex, setTrack, showQueue,
                                 onClick={() => handleQueueTrackClick(qTrack, index)}
                             >
                                 <img
+<<<<<<< HEAD
                                     src={qTrack.thumbnail || placeholder}
+=======
+                                    src={getValidThumbnailUrl(qTrack.thumbnail) || placeholder}
+>>>>>>> staging
                                     alt={qTrack.name}
                                     className="w-12 h-12 object-cover rounded-lg shadow-sm shrink-0"
                                 />

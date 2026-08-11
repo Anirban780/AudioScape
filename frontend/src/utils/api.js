@@ -1,4 +1,5 @@
 import { auth } from "../firebase/firebaseConfig";
+import { getValidThumbnailUrl } from "./youtubeUtils";
 
 const LOCAL_API_URL = "http://localhost:5000";
 const PROD_API_URL = import.meta.env.VITE_PROD_BACKEND_URL || import.meta.env.VITE_BACKEND_URL;
@@ -87,6 +88,7 @@ export async function fetchLastPlayed(userId) {
 
         return rawHistory.map((item) => {
             const track = item.track || item;
+            const thumb = getValidThumbnailUrl(track.thumbnailUrl || item.thumbNail || item.thumbnail || "") || "";
             return {
                 id: track.youtubeVideoId || item.videoId || item.id,
                 videoId: track.youtubeVideoId || item.videoId || item.id,
@@ -94,8 +96,8 @@ export async function fetchLastPlayed(userId) {
                 name: track.title || item.title || "Unknown Title",
                 artist: track.artist || item.channelTitle || item.artist || "Unknown Artist",
                 channelTitle: track.artist || item.channelTitle || item.artist || "Unknown Artist",
-                thumbnail: track.thumbnailUrl || item.thumbNail || item.thumbnail || "",
-                thumbNail: track.thumbnailUrl || item.thumbNail || item.thumbnail || "",
+                thumbnail: thumb,
+                thumbNail: thumb,
                 lastPlayedAt: item.lastPlayedAt || item.playedAt || new Date(),
                 liked: item.liked || false,
             };
@@ -128,6 +130,7 @@ export async function fetchUserLikedSongs(userId) {
 
         return rawFavorites.map((item) => {
             const track = item.track || item;
+            const thumb = getValidThumbnailUrl(track.thumbnailUrl || item.thumbNail || item.thumbnail || "") || "";
             return {
                 id: track.youtubeVideoId || item.videoId || item.id,
                 videoId: track.youtubeVideoId || item.videoId || item.id,
@@ -135,8 +138,8 @@ export async function fetchUserLikedSongs(userId) {
                 name: track.title || item.title || "Unknown Title",
                 artist: track.artist || item.channelTitle || item.artist || "Unknown Artist",
                 channelTitle: track.artist || item.channelTitle || item.artist || "Unknown Artist",
-                thumbnail: track.thumbnailUrl || item.thumbNail || item.thumbnail || "",
-                thumbNail: track.thumbnailUrl || item.thumbNail || item.thumbnail || "",
+                thumbnail: thumb,
+                thumbNail: thumb,
                 liked: true,
             };
         });
@@ -247,16 +250,19 @@ export const getRecommendations = async (topN = 10) => {
         const data = await response.json();
         const recommendations = data.recommendations || data.tracks || (Array.isArray(data) ? data : []);
 
-        return recommendations.map((item) => ({
-            id: item.videoId || item.id,
-            videoId: item.videoId || item.id,
-            title: item.title || item.name || "Unknown Title",
-            name: item.title || item.name || "Unknown Title",
-            artist: item.channelTitle || item.artist || "Unknown Artist",
-            channelTitle: item.channelTitle || item.artist || "Unknown Artist",
-            thumbnail: item.thumbNail || item.thumbnail || "",
-            thumbNail: item.thumbNail || item.thumbnail || "",
-        }));
+        return recommendations.map((item) => {
+            const thumb = getValidThumbnailUrl(item.thumbNail || item.thumbnail || "") || "";
+            return {
+                id: item.videoId || item.id,
+                videoId: item.videoId || item.id,
+                title: item.title || item.name || "Unknown Title",
+                name: item.title || item.name || "Unknown Title",
+                artist: item.channelTitle || item.artist || "Unknown Artist",
+                channelTitle: item.channelTitle || item.artist || "Unknown Artist",
+                thumbnail: thumb,
+                thumbNail: thumb,
+            };
+        });
     } catch (err) {
         console.error("Recommendation error:", err);
         return [];
@@ -292,3 +298,71 @@ export async function fetchKeywordsFromAI(history = []) {
 
     return [];
 }
+
+/**
+ * Fetches server-side explore feed sections from NestJS recommendations module.
+ * @returns {Promise<Array>} - An array of explore sections with tracks.
+ */
+export async function fetchExploreFeed() {
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
+
+        const response = await fetch(`${API_URL}/api/music/explore?limit=15`, {
+            method: "GET",
+            headers: { ...headers },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch explore feed: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        
+        // Map backend schema (id, name, artist, thumbnail) to frontend schema (videoId, title, channelTitle, thumbNail)
+        return (data || []).map((section) => ({
+            title: section.title,
+            tracks: (section.tracks || []).map((t) => {
+                const thumb = getValidThumbnailUrl(t.thumbnail || t.thumbNail || "") || "";
+                return {
+                    id: t.id,
+                    videoId: t.id,
+                    title: t.name,
+                    name: t.name,
+                    artist: t.artist,
+                    channelTitle: t.artist,
+                    thumbnail: thumb,
+                    thumbNail: thumb,
+                };
+            }),
+        }));
+    } catch (error) {
+        console.error("Error fetching explore feed:", error);
+        return [];
+    }
+}
+
+/**
+ * Fetches explore categories taxonomy from NestJS recommendations module.
+ */
+export async function fetchExploreCategories() {
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
+
+        const response = await fetch(`${API_URL}/api/music/categories`, {
+            method: "GET",
+            headers: { ...headers },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch explore categories: ${response.statusText}`);
+        }
+
+        return await response.json();
+    } catch (error) {
+        console.error("Error fetching explore categories:", error);
+        return [];
+    }
+}
+

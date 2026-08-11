@@ -1,8 +1,9 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
-import { ApiEndpoint } from '@prisma/client';
+import { ApiEndpoint, QueryType } from '@prisma/client';
 import { YouTubeKeyManager } from './youtube-key-manager';
+import { getValidThumbnailUrl } from '../utils/youtubeUtils';
 
 /**
  * ============================================================================
@@ -17,6 +18,13 @@ import { YouTubeKeyManager } from './youtube-key-manager';
  * and tracks daily API quota usage across dual key pools via YouTubeKeyManager.
  * ============================================================================
  */
+/**
+ * Configurable Cache TTL in days for curated explore categories.
+ * Modify this variable to adjust how long category search results remain fresh in PostgreSQL before re-fetching.
+ * Default: 7 days.
+ */
+export const CURATED_CATEGORY_CACHE_TTL_DAYS = 7;
+
 @Injectable()
 export class TracksService {
   private readonly logger = new Logger(TracksService.name);
@@ -126,12 +134,15 @@ export class TracksService {
 
     // STEP 1: Check Relational SearchQueryPage Database Cache
     try {
-      const pageTokenKey = targetPageToken || '';
+      const pageTokenFilter = targetPageToken
+        ? { pageToken: targetPageToken }
+        : { OR: [{ pageToken: '' }, { pageToken: null }] };
+
       const cachedQuery = await this.prisma.searchQuery.findUnique({
         where: { normalizedQuery },
         include: {
           pages: {
-            where: { pageToken: { in: [pageTokenKey, targetPageToken].filter((v): v is string | null => v !== undefined) } },
+            where: pageTokenFilter,
             include: {
               results: {
                 orderBy: { rankPosition: 'asc' },
@@ -164,7 +175,7 @@ export class TracksService {
         const tracks = cachedPage.results.map((res) => ({
           videoId: res.track.youtubeVideoId,
           title: res.track.title,
-          thumbNail: res.track.thumbnailUrl || '',
+          thumbNail: getValidThumbnailUrl(res.track.thumbnailUrl || '') || '',
           channelTitle: res.track.artist || 'Unknown Artist',
         }));
 
@@ -203,7 +214,7 @@ export class TracksService {
           const tracks = localMatches.map((t) => ({
             videoId: t.videoId,
             title: t.title,
-            thumbNail: t.thumbNail || '',
+            thumbNail: getValidThumbnailUrl(t.thumbNail || '') || '',
             channelTitle: t.channelTitle || 'Unknown Artist',
           }));
 
@@ -247,7 +258,7 @@ export class TracksService {
 
     const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(
       query,
-    )}&maxResults=10&videoCategoryId=${musicCategoryId}&key=${key}&pageToken=${pageToken}`;
+    )}&maxResults=50&videoCategoryId=${musicCategoryId}&key=${key}&pageToken=${pageToken}`;
 
     try {
       const response = await axios.get(searchUrl);
@@ -284,7 +295,7 @@ export class TracksService {
         tracks: tracks.map((t) => ({
           videoId: t.videoId,
           title: t.title,
-          thumbNail: t.thumbNail,
+          thumbNail: getValidThumbnailUrl(t.thumbNail) || '',
           channelTitle: t.channelTitle,
         })),
         nextPageToken,
@@ -316,7 +327,7 @@ export class TracksService {
         return {
           videoId: existingTrack.youtubeVideoId,
           title: existingTrack.title,
-          thumbNail: existingTrack.thumbnailUrl || '',
+          thumbNail: getValidThumbnailUrl(existingTrack.thumbnailUrl || '') || '',
           channelTitle: existingTrack.artist || 'Unknown Artist',
           duration: existingTrack.duration,
           durationSeconds: existingTrack.durationSeconds,
@@ -348,7 +359,7 @@ export class TracksService {
       const result = {
         videoId: trackItem.id,
         title: trackItem.snippet?.title || 'Unknown Title',
-        thumbNail: trackItem.snippet?.thumbnails?.high?.url || trackItem.snippet?.thumbnails?.medium?.url || trackItem.snippet?.thumbnails?.default?.url || '',
+        thumbNail: getValidThumbnailUrl(trackItem.snippet?.thumbnails?.high?.url || trackItem.snippet?.thumbnails?.medium?.url || trackItem.snippet?.thumbnails?.default?.url || '') || '',
         channelTitle: trackItem.snippet?.channelTitle || 'Unknown Artist',
         duration: rawDuration,
         durationSeconds,
@@ -377,7 +388,8 @@ export class TracksService {
   }
 
   /**
-   * Helper saving search query, track results, rank positions, and page tokens into PostgreSQL database with 24h TTL.
+   * Helper saving search query, track results, rank positions, and page tokens into PostgreSQL database.
+   * Supports differentiated TTL: 24 hours for USER_SEARCH vs 21 days for CURATED_KEYWORD.
    */
   private async cacheSearchResultsInPostgres(
     rawQuery: string,
@@ -385,15 +397,19 @@ export class TracksService {
     tracks: Array<{ videoId: string; title: string; thumbNail: string; channelTitle: string; channelId?: string }>,
     pageToken: string | null = null,
     nextPageToken: string | null = null,
+    queryType: QueryType = QueryType.USER_SEARCH,
+    pageIndex: number = 0,
   ) {
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 24);
+    // Configurable TTL for CURATED_KEYWORD (default: 7 days) vs 24-hour TTL for USER_SEARCH
+    const ttlHours = queryType === QueryType.CURATED_KEYWORD ? CURATED_CATEGORY_CACHE_TTL_DAYS * 24 : 24;
+    const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
 
     // 1. Upsert SearchQuery root record
     const searchQuery = await this.prisma.searchQuery.upsert({
       where: { normalizedQuery },
       update: {
         rawQuery,
+        queryType,
         lastYoutubeFetchAt: new Date(),
         lastSearchedAt: new Date(),
         expiresAt,
@@ -402,6 +418,7 @@ export class TracksService {
       create: {
         normalizedQuery,
         rawQuery,
+        queryType,
         lastYoutubeFetchAt: new Date(),
         expiresAt,
         resultCount: tracks.length,
@@ -419,18 +436,21 @@ export class TracksService {
       },
       update: {
         nextPageToken,
+        pageIndex,
       },
       create: {
         queryId: searchQuery.id,
         pageToken: safePageToken,
         nextPageToken,
+        pageIndex,
       },
     });
 
-    // 3. Upsert individual Tracks rows & SearchQueryPageResult junction records
+    // 3. Upsert individual Tracks rows, SearchQueryPageResult junction records, and QueryTrackResult records
     for (let index = 0; index < tracks.length; index++) {
       const t = tracks[index];
       const validChannelId = await this.ensureChannelExists(t.channelId || null, t.channelTitle);
+      const overallRank = pageIndex * 50 + index + 1;
 
       await this.prisma.tracks.upsert({
         where: { youtubeVideoId: t.videoId },
@@ -466,7 +486,224 @@ export class TracksService {
           rankPosition: index + 1,
         },
       });
+
+      await this.prisma.queryTrackResult.upsert({
+        where: {
+          queryId_trackId: {
+            queryId: searchQuery.id,
+            trackId: t.videoId,
+          },
+        },
+        update: {
+          rankPosition: overallRank,
+        },
+        create: {
+          queryId: searchQuery.id,
+          trackId: t.videoId,
+          rankPosition: overallRank,
+        },
+      });
     }
+  }
+
+  /**
+   * Ingests a single page of YouTube search results for a query and stores it in PostgreSQL.
+   * Writes to Tracks, SearchQueryPage, SearchQueryPageResult, and QueryTrackResult tables.
+   *
+   * @param rawQuery - Unmodified search string
+   * @param normalizedQuery - Normalized search string for indexing
+   * @param pageToken - Optional YouTube page token (null/undefined for page 0)
+   * @param pageIndex - 0-indexed page number (0, 1, 2...)
+   * @param maxResults - Number of results to fetch per page (default: 50)
+   * @param queryType - QueryType enum (default: USER_SEARCH)
+   * @returns Object containing newTracksStored count and nextPageToken string or null
+   */
+  async fetchAndStoreSearchPage(
+    rawQuery: string,
+    normalizedQuery: string,
+    pageToken: string | null = null,
+    pageIndex: number = 0,
+    maxResults: number = 50,
+    queryType: QueryType = QueryType.USER_SEARCH,
+  ): Promise<{ newTracksStored: number; nextPageToken: string | null }> {
+    const musicCategoryId = await this.getMusicCategoryId();
+    const { key, keyId } = await this.getActiveKey();
+
+    const pageTokenParam = pageToken ? `&pageToken=${pageToken}` : '';
+    const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(
+      rawQuery,
+    )}&maxResults=${maxResults}&videoCategoryId=${musicCategoryId}&key=${key}${pageTokenParam}`;
+
+    try {
+      const response = await axios.get(searchUrl);
+      await this.keyManager.recordQuotaUsage(ApiEndpoint.SEARCH_LIST, 100, keyId);
+
+      const items = response.data.items || [];
+      const seenVideoIds = new Set<string>();
+
+      const tracks = items
+        .filter((item: any) => item.id?.videoId && !seenVideoIds.has(item.id.videoId))
+        .map((item: any) => {
+          seenVideoIds.add(item.id.videoId);
+          return {
+            videoId: item.id.videoId as string,
+            title: item.snippet.title as string,
+            thumbNail: (item.snippet.thumbnails?.default?.url ||
+              item.snippet.thumbnails?.high?.url ||
+              '') as string,
+            channelTitle: (item.snippet.channelTitle || 'Unknown Artist') as string,
+            channelId: (item.snippet.channelId || '') as string,
+          };
+        });
+
+      const nextPageToken = response.data.nextPageToken || null;
+
+      if (tracks.length > 0) {
+        await this.cacheSearchResultsInPostgres(
+          rawQuery,
+          normalizedQuery,
+          tracks,
+          pageToken,
+          nextPageToken,
+          queryType,
+          pageIndex,
+        );
+      }
+
+      return {
+        newTracksStored: tracks.length,
+        nextPageToken,
+      };
+    } catch (error: any) {
+      this.logger.error(`Error fetching search page from YouTube API for query "${rawQuery}": ${error.message}`);
+      throw new HttpException('Failed to fetch search results page from YouTube API', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+  }
+
+  /**
+   * Ensures a curated category keyword is backfilled in PostgreSQL up to `targetCount` tracks
+   * without re-spending quota on already-ingested pages.
+   *
+   * WHAT:
+   * Serves category tracks from PostgreSQL when fresh and populated, or incrementally ingests up to
+   * `maxPages` from YouTube starting from the last saved page token (`nextPageToken`).
+   *
+   * WHY:
+   * 1. Explore categories must be deep (~50 tracks) to support scrolling without running out of items.
+   * 2. Curated categories get a 21-day TTL (`CURATED_KEYWORD`) because evergreen genres like "Lofi"
+   *    or "Pop Hits" do not go stale in 24 hours.
+   * 3. Resuming from `SearchQueryPage.nextPageToken` prevents re-spending API quota on page 0.
+   * 4. Hard ceiling `maxPages` (default 3) prevents unbounded quota loops for niche keywords.
+   *
+   * HOW:
+   * - Queries `QueryTrackResult` count & `SearchQuery.expiresAt`.
+   * - If cached count >= targetCount and expiresAt > now, returns cached data immediately (0 quota units).
+   * - Else inspects `SearchQueryPage` for the highest `pageIndex` with a `nextPageToken`.
+   * - Iteratively calls `fetchAndStoreSearchPage` until target count is hit or maxPages is reached.
+   * - Updates `SearchQuery.expiresAt` to 21 days from now and `queryType` to `CURATED_KEYWORD`.
+   *
+   * @param keyword - Curated category search term (e.g. "lofi music")
+   * @param targetCount - Target number of tracks (default: 50)
+   * @param maxPages - Max page requests ceiling (default: 3)
+   * @returns Object containing trackCount and fromCache boolean
+   */
+  async ensureCategoryPopulated(
+    keyword: string,
+    targetCount: number = 50,
+    maxPages: number = 3,
+  ): Promise<{ trackCount: number; fromCache: boolean }> {
+    if (!keyword || !keyword.trim()) {
+      throw new HttpException('Keyword parameter is required for category population', HttpStatus.BAD_REQUEST);
+    }
+
+    const normalizedQuery = this.normalizeQuery(keyword);
+
+    // 1. Check existing DB query record and result count
+    const existingQuery = await this.prisma.searchQuery.findUnique({
+      where: { normalizedQuery },
+    });
+
+    const existingCount = existingQuery
+      ? await this.prisma.queryTrackResult.count({
+          where: { queryId: existingQuery.id },
+        })
+      : 0;
+
+    const isFresh = existingQuery?.expiresAt && existingQuery.expiresAt > new Date();
+
+    if (existingCount >= targetCount && isFresh) {
+      this.logger.log(
+        `Category Cache HIT: "${keyword}" already has ${existingCount} fresh tracks (TTL valid until ${existingQuery.expiresAt?.toISOString()}).`,
+      );
+      return { trackCount: existingCount, fromCache: true };
+    }
+
+    this.logger.log(
+      `Category Cache MISS/THIN: "${keyword}" has ${existingCount}/${targetCount} tracks (isFresh=${!!isFresh}). Ingesting from YouTube...`,
+    );
+
+    // 2. Determine resume starting pageIndex and pageToken
+    let pageIndex = 0;
+    let pageToken: string | null = null;
+    let totalStored = existingCount;
+
+    if (existingQuery) {
+      const lastPage = await this.prisma.searchQueryPage.findFirst({
+        where: { queryId: existingQuery.id },
+        orderBy: { pageIndex: 'desc' },
+      });
+
+      if (lastPage?.nextPageToken) {
+        pageToken = lastPage.nextPageToken;
+        pageIndex = lastPage.pageIndex + 1;
+        this.logger.log(
+          `Resuming category ingestion for "${keyword}" from pageIndex ${pageIndex} [pageToken: ${pageToken}]`,
+        );
+      }
+    }
+
+    // 3. Fetch pages up to targetCount or maxPages ceiling
+    let pagesFetched = 0;
+    while (totalStored < targetCount && pagesFetched < maxPages) {
+      const pageResult = await this.fetchAndStoreSearchPage(
+        keyword,
+        normalizedQuery,
+        pageToken,
+        pageIndex,
+        50,
+        QueryType.CURATED_KEYWORD,
+      );
+
+      totalStored += pageResult.newTracksStored;
+      pageToken = pageResult.nextPageToken;
+      pageIndex++;
+      pagesFetched++;
+
+      if (!pageToken) {
+        this.logger.log(`No further pageToken available from YouTube for keyword "${keyword}". Stopping iteration.`);
+        break;
+      }
+    }
+
+    // 4. Update SearchQuery record with configurable TTL (default: 7 days) and CURATED_KEYWORD queryType
+    const categoryTtlMs = CURATED_CATEGORY_CACHE_TTL_DAYS * 24 * 60 * 60 * 1000;
+    const expiresAt = new Date(Date.now() + categoryTtlMs);
+
+    await this.prisma.searchQuery.update({
+      where: { normalizedQuery },
+      data: {
+        queryType: QueryType.CURATED_KEYWORD,
+        expiresAt,
+        resultCount: totalStored,
+        lastYoutubeFetchAt: new Date(),
+      },
+    });
+
+    this.logger.log(
+      `Successfully populated category "${keyword}": ${totalStored} tracks stored across ${pagesFetched} page fetch(es). ${CURATED_CATEGORY_CACHE_TTL_DAYS}-day TTL set to ${expiresAt.toISOString()}`,
+    );
+
+    return { trackCount: totalStored, fromCache: false };
   }
 
   /**
