@@ -272,6 +272,30 @@ const usePlayerStore = create((set, get) => ({
         }
         return state;
     }),
+
+    // ------------------------------------------------------------------------
+    // UI & SIDEBAR GLOBAL STATE (Persisted across routes & reloads)
+    // ------------------------------------------------------------------------
+    isSidebarCollapsed: typeof window !== 'undefined' ? localStorage.getItem("audioscape_sidebar_collapsed") === "true" : false,
+
+    toggleSidebarCollapsed: () => set((state) => {
+        const next = !state.isSidebarCollapsed;
+        try {
+            localStorage.setItem("audioscape_sidebar_collapsed", String(next));
+        } catch (e) {
+            console.error("Failed saving sidebar state:", e);
+        }
+        return { isSidebarCollapsed: next };
+    }),
+
+    setSidebarCollapsed: (collapsed) => set(() => {
+        try {
+            localStorage.setItem("audioscape_sidebar_collapsed", String(collapsed));
+        } catch (e) {
+            console.error("Failed saving sidebar state:", e);
+        }
+        return { isSidebarCollapsed: collapsed };
+    }),
 }));
 
 export default usePlayerStore;

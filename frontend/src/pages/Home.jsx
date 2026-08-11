@@ -36,7 +36,7 @@ const HomePage = () => {
 
   return (
     <AppLayout>
-      <div className="w-full max-w-[1280px] mx-auto py-2">
+      <div className="w-full mx-auto py-2 animate-in fade-in duration-300">
         {/* 1. Stitch Visual Platform Hero Spotlight */}
         <HeroSection />
 

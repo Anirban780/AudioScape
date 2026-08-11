@@ -16,26 +16,22 @@ import toast from "react-hot-toast";
  * 
  * WHAT THIS FILE DOES:
  * Renders personalized AI music recommendations featuring:
- * 1. Auto-Rotating Daily Mix Banner Carousel: Wide high-contrast glassmorphic
- *    banner featuring full-width HD background artwork with automatic top-to-bottom
- *    slow-pan vertical animation (`animate-pan-vertical`), multi-stop gradient overlays,
- *    and manual slide controls.
- * 2. Fallback Discovery Feed: Automatically fetches curated music if the user is a guest
- *    or has no listen history yet, guaranteeing the section is ALWAYS visible.
- * 3. Recommendations Carousel/Grid: Responsive track cards powered by backend
- *    TF-IDF content similarity scoring.
+ * 1. Integrated Auto-Rotating Daily Mix Banner: Full-bleed background artwork where
+ *    track title, artist subtitle, badges, and action buttons merge directly on top of
+ *    the sliding image artwork with 100% bright visibility and zero boxed card separation.
+ * 2. Automatic Vertical Slow-Pan Motion: Preserves `animate-pan-vertical` motion.
+ * 3. Fallback Discovery Feed: Automatically fetches curated music if user is guest/new,
+ *    guaranteeing 100% section visibility.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Always-Visible Section: Replaced silent `return null` with fallback curated music feeds,
- *    ensuring the recommendation banner and grid never disappear.
- * 2. Full-Width HD Slow-Pan Banner: Matches the Explore and Home Hero banner design layout.
- * 3. Multi-Tier Resolution Fallbacks: Uses `getHighResThumbnailUrl` and `getNextFallbackThumbnailUrl`
- *    for crisp image rendering across all screen viewports.
+ * 1. Seamless Text & Artwork Integration: Aligns with HeroSection design by removing
+ *    dark background overlays and heavy card borders.
+ * 2. Ambient Drop Shadows: Employs `drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]` and soft gradient
+ *    fades (`from-black/80 via-black/35 to-transparent`) for maximum legibility.
  * 
  * HOW IT WORKS:
- * - Attempts to fetch personalized recommendations for `userId`.
- * - Falls back to `fetchExploreFeed()` / `fetchYoutubeMusic("pop hits")` if recommendations are empty.
- * - Rotates featured daily mix tracks with 6s interval.
+ * - Attempts to fetch recommendations for `userId` with multi-tier fallback.
+ * - Rotates featured daily mix tracks with 6s interval and smooth slow-pan animation.
  */
 
 const FALLBACK_RECOMMENDATIONS = [
@@ -64,7 +60,6 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
         }
 
         if (!Array.isArray(songs) || songs.length === 0) {
-          // Attempt fallback from Explore feed
           const exploreData = await fetchExploreFeed();
           if (exploreData && exploreData.length > 0 && exploreData[0].tracks) {
             songs = exploreData.flatMap((sec) => sec.tracks).slice(0, 15);
@@ -72,7 +67,6 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
         }
 
         if (!Array.isArray(songs) || songs.length === 0) {
-          // Attempt YouTube API fallback
           const ytSongs = await fetchYoutubeMusic("pop hits", 15);
           if (Array.isArray(ytSongs) && ytSongs.length > 0) {
             songs = ytSongs;
@@ -162,55 +156,55 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
         </span>
       </div>
 
-      {/* Featured Auto-Rotating Daily Mix Banner - Full-Width HD & Slow-Pan Design */}
+      {/* Featured Auto-Rotating Daily Mix Banner - Integrated Bright Slow-Pan Design */}
       {activeFeaturedTrack && (
         <div className="relative w-full h-[300px] sm:h-[350px] rounded-[32px] overflow-hidden border border-[var(--color-border-strong)] shadow-2xl mb-8 group bg-[var(--color-surface-raised)] flex items-center transition-all duration-500">
           
           {/* 1. Full-Width HD Background Artwork Image with Automatic Vertical Slow-Pan */}
           <img
-            key={`rec-banner-${trackId}-${bannerIndex}`}
+            key={`rec-banner-integrated-${trackId}-${bannerIndex}`}
             src={artwork}
             alt={trackName}
             onError={(e) => {
               e.target.onerror = null;
               e.target.src = getNextFallbackThumbnailUrl(e.target.src, trackId, placeholder);
             }}
-            className={`absolute inset-0 w-full h-full object-cover opacity-65 dark:opacity-60 transition-all duration-700 pointer-events-none ${
+            className={`absolute inset-0 w-full h-full object-cover pointer-events-none blur-[1px] ${
               enablePanAnimation ? "animate-pan-vertical" : ""
             }`}
           />
 
-          {/* 2. Gradient Overlays for Optimal Legibility & Atmosphere */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-surface-raised)] via-[var(--color-surface-raised)]/90 via-45% sm:via-40% to-transparent pointer-events-none" />
-          <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-surface-raised)]/90 via-transparent to-[var(--color-surface-raised)]/30 pointer-events-none" />
+          {/* 2. Soft Ambient Gradient Overlay (Blends text into background with zero dark layout covering) */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 via-50% to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent pointer-events-none" />
 
-          {/* 3. Hero Content Block */}
+          {/* 3. Integrated Hero Content Block */}
           <div className="relative z-10 h-full w-full flex flex-col justify-between p-6 sm:p-10 max-w-2xl">
             
-            {/* Top Badges */}
-            <div>
-              <div className="flex items-center gap-2.5 mb-3 flex-wrap">
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[var(--color-secondary)]/20 text-[var(--color-secondary)] border border-[var(--color-secondary)]/30 rounded-full font-bold text-[11px] tracking-wider uppercase shadow-xs">
+            {/* Top Integrated Text Content */}
+            <div className="max-w-xl">
+              <div className="flex items-center gap-2 mb-3 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/25 text-amber-300 border border-amber-500/40 rounded-full font-bold text-[11px] tracking-wider uppercase shadow-md backdrop-blur-xs">
                   <Sparkles size={13} /> DAILY MIX #{bannerIndex + 1}
                 </span>
-                <span className="text-[11px] font-bold text-[var(--color-primary)] tracking-wider uppercase flex items-center gap-1 bg-[var(--color-primary)]/15 px-3 py-1 rounded-full border border-[var(--color-primary)]/30 backdrop-blur-xs">
+                <span className="text-[11px] font-bold text-white tracking-wider uppercase flex items-center gap-1 bg-white/15 px-3 py-1 rounded-full border border-white/25 backdrop-blur-xs shadow-md">
                   AI RECOMMENDATION
                 </span>
               </div>
 
               {/* Track Title & Artist */}
-              <h2 className="text-2xl sm:text-4xl font-extrabold text-[var(--color-on-surface)] leading-tight mb-2 line-clamp-1 tracking-tight drop-shadow-md">
+              <h2 className="text-2xl sm:text-4xl font-extrabold text-white leading-tight mb-2 line-clamp-1 tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
                 {trackName}
               </h2>
-              <p className="text-sm sm:text-base text-[var(--color-on-surface-variant)] line-clamp-1 font-medium max-w-lg drop-shadow-xs">
-                Curated based on your taste profile with <span className="text-[var(--color-on-surface)] font-semibold">{artistName}</span>.
+              <p className="text-sm sm:text-base text-slate-200 line-clamp-1 font-medium max-w-lg drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)]">
+                Curated based on your taste profile with <span className="text-white font-bold">{artistName}</span>.
               </p>
             </div>
 
-            {/* Bottom CTA & Carousel Controls */}
+            {/* Bottom Side-by-Side Integrated Action Buttons */}
             <div className="flex items-center justify-between gap-4 flex-wrap mt-4">
               
-              {/* Action Buttons */}
+              {/* Play Daily Mix & Heart Actions */}
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => {
@@ -223,14 +217,14 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
                     usePlayerStore.getState().setIsPlaying(true);
                     toast.success(`Playing: ${trackName}`);
                   }}
-                  className="bg-[var(--color-primary)] text-[var(--color-text-on-primary)] px-7 py-3 rounded-full font-bold text-xs sm:text-sm tracking-wider hover:scale-105 active:scale-95 transition-all duration-300 shadow-lg flex items-center gap-2.5 cursor-pointer"
+                  className="bg-[var(--color-primary)] text-[var(--color-text-on-primary)] px-7 py-3 rounded-full font-bold text-xs sm:text-sm tracking-wider hover:scale-105 active:scale-95 transition-all duration-300 shadow-xl flex items-center gap-2.5 cursor-pointer"
                 >
                   <Play size={17} fill="currentColor" className="ml-0.5" />
                   <span>PLAY DAILY MIX</span>
                 </button>
                 <button
                   onClick={() => toast.success("Added to your favorites!")}
-                  className="w-10 h-10 rounded-full bg-[var(--color-surface-overlay)]/90 backdrop-blur-md border border-[var(--color-border-default)] flex items-center justify-center text-[var(--color-on-surface-variant)] hover:text-pink-500 hover:border-pink-500/40 transition-colors shadow-sm cursor-pointer"
+                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:text-pink-400 hover:border-pink-400/50 transition-colors shadow-md cursor-pointer"
                   title="Add to Favorites"
                 >
                   <Heart size={18} />
@@ -239,17 +233,17 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
 
               {/* Carousel Navigation (Dots & Arrows) */}
               {featuredTracks.length > 1 && (
-                <div className="flex items-center gap-3 bg-[var(--color-surface-overlay)]/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-[var(--color-border-default)] shadow-md">
+                <div className="flex items-center gap-3 bg-black/40 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 shadow-lg text-white">
                   <button
                     onClick={handlePrevBanner}
-                    className="p-1 rounded-full hover:bg-[var(--color-state-hover)] text-[var(--color-on-surface)] transition-colors cursor-pointer"
+                    className="p-1 rounded-full hover:bg-white/20 text-white transition-colors cursor-pointer"
                     title="Previous slide"
                     aria-label="Previous slide"
                   >
                     <ChevronLeft size={16} />
                   </button>
 
-                  {/* Dots */}
+                  {/* Slide Dots */}
                   <div className="flex items-center gap-1.5">
                     {featuredTracks.map((_, i) => (
                       <button
@@ -258,7 +252,7 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
                         className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
                           i === bannerIndex
                             ? "w-6 bg-[var(--color-primary)]"
-                            : "w-2 bg-[var(--color-on-surface-variant)]/40 hover:bg-[var(--color-on-surface-variant)]"
+                            : "w-2 bg-white/40 hover:bg-white"
                         }`}
                         aria-label={`Go to slide ${i + 1}`}
                       />
@@ -267,7 +261,7 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
 
                   <button
                     onClick={handleNextBanner}
-                    className="p-1 rounded-full hover:bg-[var(--color-state-hover)] text-[var(--color-on-surface)] transition-colors cursor-pointer"
+                    className="p-1 rounded-full hover:bg-white/20 text-white transition-colors cursor-pointer"
                     title="Next slide"
                     aria-label="Next slide"
                   >

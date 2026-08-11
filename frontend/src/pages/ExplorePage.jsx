@@ -154,7 +154,7 @@ const ExplorePage = () => {
 
   return (
     <AppLayout>
-      <div className="w-full max-w-[1280px] mx-auto py-2">
+      <div className="w-full mx-auto py-2 animate-in fade-in duration-300">
         
         {/* Page Title */}
         <div className="flex items-center justify-between mb-4">
@@ -181,7 +181,7 @@ const ExplorePage = () => {
 
         {/* 3. Categorized Music Track Sections */}
         {loading ? (
-          <Loader />
+          <Loader message="Curating Explore Discovery Feed..." />
         ) : displayedSections.length === 0 ? (
           <div className="text-center text-sm text-[var(--color-on-surface-variant)] py-12 bg-[var(--color-surface-raised)] rounded-[24px] border border-[var(--color-border-default)] mb-10">
             No tracks found for "{activeFilter}". Try selecting "All" or picking another category!
