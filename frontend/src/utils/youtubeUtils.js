@@ -43,3 +43,66 @@ export function getValidThumbnailUrl(originalUrl) {
 
   return originalUrl;
 }
+
+/**
+ * Converts any standard YouTube thumbnail URL (mqdefault, hqdefault, default)
+ * into its highest available HD resolution tier (maxresdefault or sddefault).
+ * 
+ * @param {string} url - Original thumbnail URL
+ * @param {string} videoId - YouTube Video ID fallback
+ * @returns {string} High-res YouTube thumbnail URL with sanitized domain
+ */
+export function getHighResThumbnailUrl(url, videoId) {
+  let target = url;
+  if (!target && videoId) {
+    target = `https://${TARGET_YOUTUBE_THUMBNAIL_DOMAIN}/vi/${videoId}/maxresdefault.jpg`;
+  } else if (typeof target === "string" && (target.includes("ytimg.com") || target.includes("youtube.com"))) {
+    target = target
+      .replace("/default.jpg", "/maxresdefault.jpg")
+      .replace("/mqdefault.jpg", "/maxresdefault.jpg")
+      .replace("/hqdefault.jpg", "/maxresdefault.jpg")
+      .replace("/sddefault.jpg", "/maxresdefault.jpg");
+  }
+  return getValidThumbnailUrl(target);
+}
+
+/**
+ * Ordered YouTube CDN thumbnail resolution tiers for graceful error degradation.
+ */
+const RESOLUTION_TIERS = [
+  "maxresdefault.jpg",
+  "sddefault.jpg",
+  "hqdefault.jpg",
+  "mqdefault.jpg",
+  "default.jpg",
+];
+
+/**
+ * Declarative resolution step-down helper for image error handling.
+ * Eliminates nested if/else statements in component render methods.
+ *
+ * @param {string} currentSrc - Current failing image src URL
+ * @param {string} videoId - YouTube Video ID fallback
+ * @param {string} placeholder - Fallback placeholder image asset
+ * @returns {string} Next lower resolution thumbnail URL or placeholder
+ */
+export function getNextFallbackThumbnailUrl(currentSrc, videoId, placeholderAsset) {
+  if (!currentSrc || typeof currentSrc !== "string") {
+    return placeholderAsset;
+  }
+
+  const domain = currentSrc.includes(TARGET_YOUTUBE_THUMBNAIL_DOMAIN)
+    ? TARGET_YOUTUBE_THUMBNAIL_DOMAIN
+    : BLOCKED_YOUTUBE_THUMBNAIL_DOMAIN;
+
+  const currentTierIndex = RESOLUTION_TIERS.findIndex((tier) => currentSrc.includes(tier));
+
+  if (currentTierIndex !== -1 && currentTierIndex < RESOLUTION_TIERS.length - 1) {
+    const nextTier = RESOLUTION_TIERS[currentTierIndex + 1];
+    return `https://${domain}/vi/${videoId}/${nextTier}`;
+  }
+
+  return placeholderAsset;
+}
+
+
