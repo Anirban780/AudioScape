@@ -2,21 +2,41 @@ import { IsNotEmpty, IsString, IsArray, IsOptional, ValidateNested } from 'class
 import { Type } from 'class-transformer';
 
 export class TrackItemDto {
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  id: string; // YouTube Video ID
-
-  @IsNotEmpty()
-  @IsString()
-  name: string; // Track title
+  id?: string; // YouTube Video ID alias 1
 
   @IsOptional()
   @IsString()
-  artist?: string;
+  videoId?: string; // YouTube Video ID alias 2
 
   @IsOptional()
   @IsString()
-  thumbnail?: string;
+  name?: string; // Track title alias 1
+
+  @IsOptional()
+  @IsString()
+  title?: string; // Track title alias 2
+
+  @IsOptional()
+  @IsString()
+  artist?: string; // Channel/artist title alias 1
+
+  @IsOptional()
+  @IsString()
+  channelTitle?: string; // Channel/artist title alias 2
+
+  @IsOptional()
+  @IsString()
+  thumbnail?: string; // Thumbnail URL alias 1
+
+  @IsOptional()
+  @IsString()
+  thumbNail?: string; // Thumbnail URL alias 2
+
+  @IsOptional()
+  @IsString()
+  channelId?: string;
 
   @IsOptional()
   @IsArray()

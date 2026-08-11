@@ -13,6 +13,7 @@ import { CreatePlaylistDto } from './dto/create-playlist.dto';
 import { UpdatePlaylistDto } from './dto/update-playlist.dto';
 import { AddPlaylistTrackDto } from './dto/add-playlist-track.dto';
 import { ReorderTracksDto } from './dto/reorder-tracks.dto';
+import { getValidThumbnailUrl } from '../utils/youtubeUtils';
 
 /**
  * ============================================================================
@@ -172,7 +173,7 @@ export class PlaylistsService {
         id: p.id,
         name: p.name,
         trackCount: p._count.tracks,
-        previewThumbnail: p.tracks[0]?.track?.thumbnailUrl || null,
+        previewThumbnail: getValidThumbnailUrl(p.tracks[0]?.track?.thumbnailUrl) || null,
         createdAt: p.createdAt,
         updatedAt: p.updatedAt,
       }));
@@ -209,7 +210,20 @@ export class PlaylistsService {
       },
     });
 
-    return playlist;
+    if (!playlist) return playlist;
+
+    return {
+      ...playlist,
+      tracks: playlist.tracks.map((pt) => ({
+        ...pt,
+        track: pt.track
+          ? {
+              ...pt.track,
+              thumbnailUrl: getValidThumbnailUrl(pt.track.thumbnailUrl) || null,
+            }
+          : pt.track,
+      })),
+    };
   }
 
   /**

@@ -18,7 +18,7 @@ export class AppController {
     return {
       message: 'AudioScape NestJS Backend API is running successfully',
       status: 'online',
-      version: '1.1.0',
+      version: '2.0.0',
       endpoints: {
         healthCheck: 'GET /healthcheck',
         authStatus: 'GET /api/auth/status',

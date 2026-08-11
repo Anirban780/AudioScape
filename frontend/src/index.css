@@ -1,0 +1,191 @@
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Aura Lumina (Light Theme Tokens) */
+  --background: hsl(255 33% 98%);
+  --foreground: hsl(223 21% 16%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(223 21% 16%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(223 21% 16%);
+  --primary: hsl(262 83% 58%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(336 78% 43%);
+  --secondary-foreground: hsl(0 0% 100%);
+  --tertiary: hsl(221 78% 57%);
+  --muted: hsl(252 24% 94%);
+  --muted-foreground: hsl(218 14% 34%);
+  --accent: hsl(262 83% 96%);
+  --accent-foreground: hsl(262 83% 58%);
+  --destructive: hsl(346 84% 61%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(253 27% 91%);
+  --input: hsl(253 27% 91%);
+  --ring: hsl(262 83% 58%);
+  --radius: 0.75rem;
+
+  --color-primary: #7C3AED;
+  --color-secondary: #C2185B;
+  --color-tertiary: #3C71E5;
+  --color-surface-base: #F8F7FC;
+  --color-surface-raised: #FFFFFF;
+  --color-surface-overlay: #FFFFFF;
+  --color-on-surface: #1F2430;
+  --color-on-surface-variant: #4B5563;
+  --color-border-default: #E4E1F0;
+  --color-border-strong: #C9C3E0;
+  --color-text-on-primary: #FFFFFF;
+  --color-text-on-secondary: #FFFFFF;
+  --color-state-active: rgba(124, 58, 237, 0.10);
+  --color-state-hover: rgba(124, 58, 237, 0.06);
+}
+
+.dark {
+  /* Midnight Studio (Dark Theme Tokens) */
+  --background: hsl(225 47% 4%);
+  --foreground: hsl(220 14% 90%);
+  --card: hsl(223 30% 12%);
+  --card-foreground: hsl(220 14% 90%);
+  --popover: hsl(221 28% 15%);
+  --popover-foreground: hsl(220 14% 90%);
+  --primary: hsl(257 91% 76%);
+  --primary-foreground: hsl(225 47% 4%);
+  --secondary: hsl(330 81% 60%);
+  --secondary-foreground: hsl(0 0% 100%);
+  --tertiary: hsl(221 83% 53%);
+  --muted: hsl(223 22% 20%);
+  --muted-foreground: hsl(215 14% 65%);
+  --accent: hsl(257 91% 20%);
+  --accent-foreground: hsl(257 91% 76%);
+  --destructive: hsl(346 84% 61%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(222 20% 30%);
+  --input: hsl(222 20% 30%);
+  --ring: hsl(257 91% 76%);
+
+  --color-primary: #A78BFA;
+  --color-secondary: #EC4899;
+  --color-tertiary: #2563EB;
+  --color-surface-base: #05070E;
+  --color-surface-raised: #121724;
+  --color-surface-overlay: #1B2234;
+  --color-on-surface: #E5E7EB;
+  --color-on-surface-variant: #9CA3AF;
+  /* Enhanced border contrast for Midnight Studio dark mode
+     WHY: Provides distinct visual boundaries around cards, sidebar, header,
+     and search containers against dark backgrounds. */
+  --color-border-default: #37435D;
+  --color-border-strong: #4C5B7C;
+  --color-text-on-primary: #05070E;
+  --color-text-on-secondary: #FFFFFF;
+  --color-state-active: rgba(167, 139, 250, 0.20);
+  --color-state-hover: rgba(167, 139, 250, 0.12);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+.scrollbar-custom {
+  -ms-overflow-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: #888 transparent;
+}
+
+.scrollbar-custom::-webkit-scrollbar {
+  height: 6px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-track {
+  background: transparent;
+  margin-top: 12px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+html {
+  font-size: 100%;
+}
+
+.mini-player-header {
+  cursor: move;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  user-select: none;
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 90%;
+  }
+}
+
+@media (max-width: 480px) {
+  html {
+    font-size: 85%;
+  }
+}
+
+/* Vertical Smooth Pan Animation for Hero Banner Background Artwork */
+@keyframes heroPanUpDown {
+  0% {
+    object-position: center 5%;
+    transform: scale(1.04);
+  }
+  50% {
+    object-position: center 95%;
+    transform: scale(1.08);
+  }
+  100% {
+    object-position: center 5%;
+    transform: scale(1.04);
+  }
+}
+
+.animate-pan-vertical {
+  animation: heroPanUpDown 12s ease-in-out infinite alternate;
+  will-change: object-position, transform;
+}
+

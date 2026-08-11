@@ -5,6 +5,7 @@ import { RecordListenDto } from './dto/record-listen.dto';
 import { ToggleLikeDto } from './dto/toggle-like.dto';
 import { GetHistoryQueryDto } from './dto/get-history-query.dto';
 import { PlaybackSource } from '@prisma/client';
+import { getValidThumbnailUrl } from '../utils/youtubeUtils';
 
 /**
  * ============================================================================
@@ -149,8 +150,18 @@ export class HistoryService {
         }),
       ]);
 
+      const sanitizedItems = items.map((item) => ({
+        ...item,
+        track: item.track
+          ? {
+              ...item.track,
+              thumbnailUrl: getValidThumbnailUrl(item.track.thumbnailUrl) || null,
+            }
+          : item.track,
+      }));
+
       return {
-        data: items,
+        data: sanitizedItems,
         pagination: {
           total: totalCount,
           page,
@@ -202,11 +213,18 @@ export class HistoryService {
       });
 
       this.logger.log(` Toggled track like: user=${userId}, track=${videoId}, liked=${liked}`);
+      const sanitizedTrack = historyRecord.track
+        ? {
+            ...historyRecord.track,
+            thumbnailUrl: getValidThumbnailUrl(historyRecord.track.thumbnailUrl) || null,
+          }
+        : historyRecord.track;
+
       return {
         message: liked ? 'Track added to favorites' : 'Track removed from favorites',
         liked: historyRecord.liked,
         likedAt: historyRecord.likedAt,
-        track: historyRecord.track,
+        track: sanitizedTrack,
       };
     } catch (error: any) {
       this.logger.error(`Failed to toggle track like for user ${userId}: ${error.message}`);
@@ -235,9 +253,19 @@ export class HistoryService {
         },
       });
 
+      const sanitizedFavorites = favorites.map((fav) => ({
+        ...fav,
+        track: fav.track
+          ? {
+              ...fav.track,
+              thumbnailUrl: getValidThumbnailUrl(fav.track.thumbnailUrl) || null,
+            }
+          : fav.track,
+      }));
+
       return {
-        count: favorites.length,
-        favorites,
+        count: sanitizedFavorites.length,
+        favorites: sanitizedFavorites,
       };
     } catch (error: any) {
       this.logger.error(`Failed to fetch favorites for user ${userId}: ${error.message}`);
