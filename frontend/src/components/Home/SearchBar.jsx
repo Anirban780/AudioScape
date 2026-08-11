@@ -357,6 +357,7 @@ const SearchBar = ({ onSelectTrack }) => {
         />
         <Input
           ref={inputRef}
+          id="search-input"
           type="text"
           placeholder="Search songs, artists (Press Enter for YouTube API)..."
           value={query}

@@ -1,220 +1,305 @@
 import React, { useEffect, useState } from "react";
-import { getRecommendations } from "@/utils/api";
-import placeholder from "@/assets/placeholder.jpg";
-import { Play, Sparkles, Heart, ChevronLeft, ChevronRight } from "lucide-react";
 import MusicCard from "@/components/Cards/MusicCard";
+import placeholder from "@/assets/placeholder.jpg";
+import { Sparkles, Play, ChevronLeft, ChevronRight, Heart } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
+import { Skeleton } from "@/components/ui/skeleton";
+import { getRecommendations, fetchExploreFeed } from "@/utils/api";
+import { fetchYoutubeMusic } from "@/utils/youtube";
+import { getHighResThumbnailUrl, getNextFallbackThumbnailUrl } from "@/utils/youtubeUtils";
 import toast from "react-hot-toast";
 
 /**
  * ============================================================================
- * AI RECOMMENDATIONS & AUTO-ROTATING DAILY MIX BANNER (RecommendForYou.jsx)
+ * PERSONALIZED RECOMMENDATIONS SECTION (RecommendForYou.jsx)
  * ============================================================================
  * 
  * WHAT THIS FILE DOES:
  * Renders personalized AI music recommendations featuring:
  * 1. Auto-Rotating Daily Mix Banner Carousel: Wide high-contrast glassmorphic
- *    banner (`340px rounded-[32px]`) that automatically rotates through the top 5
- *    AI recommended tracks every 5 seconds with crossfade transitions and manual
- *    slide indicator controls.
- * 2. Full-Width Background Artwork: Full-width background image with optimal
- *    center positioning (`object-cover object-center`) and smooth gradient overlay.
+ *    banner featuring full-width HD background artwork with automatic top-to-bottom
+ *    slow-pan vertical animation (`animate-pan-vertical`), multi-stop gradient overlays,
+ *    and manual slide controls.
+ * 2. Fallback Discovery Feed: Automatically fetches curated music if the user is a guest
+ *    or has no listen history yet, guaranteeing the section is ALWAYS visible.
  * 3. Recommendations Carousel/Grid: Responsive track cards powered by backend
  *    TF-IDF content similarity scoring.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Full-Width Immersive Banner: Matches Stitch Midnight Studio (`721d44993cd748aca88d8a328189655e`)
- *    and Fragrant Glassy (`8ac7f54565f9488ebb1bc86ad5bfe597`) Dashboard layouts.
- * 2. Dynamic Auto-Slide: Cycles through top 5 recommendations every 5000ms.
+ * 1. Always-Visible Section: Replaced silent `return null` with fallback curated music feeds,
+ *    ensuring the recommendation banner and grid never disappear.
+ * 2. Full-Width HD Slow-Pan Banner: Matches the Explore and Home Hero banner design layout.
+ * 3. Multi-Tier Resolution Fallbacks: Uses `getHighResThumbnailUrl` and `getNextFallbackThumbnailUrl`
+ *    for crisp image rendering across all screen viewports.
  * 
  * HOW IT WORKS:
- * - `featuredTracks`: Extracts top 5 songs from `getRecommendations(15)`.
- * - `bannerIndex` & `isTransitioning`: Rotates active featured song with 500ms fade.
+ * - Attempts to fetch personalized recommendations for `userId`.
+ * - Falls back to `fetchExploreFeed()` / `fetchYoutubeMusic("pop hits")` if recommendations are empty.
+ * - Rotates featured daily mix tracks with 6s interval.
  */
 
-const RecommendForYou = ({ userId }) => {
+const FALLBACK_RECOMMENDATIONS = [
+  { id: "X4VbdwhkE10", videoId: "X4VbdwhkE10", title: "Lofi Hip Hop Radio - Beats to Relax/Study", name: "Lofi Hip Hop Radio - Beats to Relax/Study", artist: "Lofi Girl", channelTitle: "Lofi Girl", thumbnail: "https://img.youtube.com/vi/X4VbdwhkE10/maxresdefault.jpg" },
+  { id: "5qap5aO4i9A", videoId: "5qap5aO4i9A", title: "Lofi Study Beats - Chill Ambient Music", name: "Lofi Study Beats - Chill Ambient Music", artist: "Chillhop Music", channelTitle: "Chillhop Music", thumbnail: "https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" },
+  { id: "DWcJFNfaw9c", videoId: "DWcJFNfaw9c", title: "Midnight City Synthwave Beats", name: "Midnight City Synthwave Beats", artist: "M83 Soundscapes", channelTitle: "M83 Soundscapes", thumbnail: "https://img.youtube.com/vi/DWcJFNfaw9c/maxresdefault.jpg" },
+  { id: "jfKfPfyJRdk", videoId: "jfKfPfyJRdk", title: "Relaxing Jazz Music & Soft Rain", name: "Relaxing Jazz Music & Soft Rain", artist: "Relaxing Vibes", channelTitle: "Relaxing Vibes", thumbnail: "https://img.youtube.com/vi/jfKfPfyJRdk/maxresdefault.jpg" },
+  { id: "1fueZCTYkpA", videoId: "1fueZCTYkpA", title: "Deep Focus Flow Spatial Audio", name: "Deep Focus Flow Spatial Audio", artist: "AudioScape Beats", channelTitle: "AudioScape Beats", thumbnail: "https://img.youtube.com/vi/1fueZCTYkpA/maxresdefault.jpg" },
+];
+
+const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
   const [recommendedSongs, setRecommendedSongs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [bannerIndex, setBannerIndex] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
 
   useEffect(() => {
-    if (userId) {
+    let isMounted = true;
+
+    const loadRecommendations = async () => {
       setLoading(true);
-      getRecommendations(15)
-        .then((songs) => {
-          setRecommendedSongs(songs || []);
-        })
-        .catch((err) => {
-          console.error("Error fetching recommendations:", err);
-        })
-        .finally(() => setLoading(false));
-    }
+
+      try {
+        let songs = [];
+        if (userId) {
+          songs = await getRecommendations(userId, 15);
+        }
+
+        if (!Array.isArray(songs) || songs.length === 0) {
+          // Attempt fallback from Explore feed
+          const exploreData = await fetchExploreFeed();
+          if (exploreData && exploreData.length > 0 && exploreData[0].tracks) {
+            songs = exploreData.flatMap((sec) => sec.tracks).slice(0, 15);
+          }
+        }
+
+        if (!Array.isArray(songs) || songs.length === 0) {
+          // Attempt YouTube API fallback
+          const ytSongs = await fetchYoutubeMusic("pop hits", 15);
+          if (Array.isArray(ytSongs) && ytSongs.length > 0) {
+            songs = ytSongs;
+          }
+        }
+
+        if (!isMounted) return;
+
+        if (Array.isArray(songs) && songs.length > 0) {
+          const uniqueSongs = Array.from(
+            new Map(
+              songs
+                .filter((song) => song && (song.id || song.videoId))
+                .map((song) => [song.id || song.videoId, song])
+            ).values()
+          );
+          setRecommendedSongs(uniqueSongs);
+        } else {
+          setRecommendedSongs(FALLBACK_RECOMMENDATIONS);
+        }
+      } catch (err) {
+        console.error("Error loading recommendations, using fallback:", err);
+        if (isMounted) setRecommendedSongs(FALLBACK_RECOMMENDATIONS);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    loadRecommendations();
+
+    return () => {
+      isMounted = false;
+    };
   }, [userId]);
 
-  // Auto-rotate Featured Daily Mix Banner every 5 seconds
-  useEffect(() => {
-    if (recommendedSongs.length > 1) {
-      const maxFeaturedCount = Math.min(recommendedSongs.length, 5);
-      const interval = setInterval(() => {
-        setIsTransitioning(true);
-        setTimeout(() => {
-          setBannerIndex((prev) => (prev + 1) % maxFeaturedCount);
-          setIsTransitioning(false);
-        }, 500);
-      }, 5000);
-
-      return () => clearInterval(interval);
-    }
-  }, [recommendedSongs]);
-
-  if (!userId || (!loading && !recommendedSongs.length)) {
-    return null;
-  }
-
   const featuredTracks = recommendedSongs.slice(0, 5);
-  const activeFeaturedTrack = featuredTracks[bannerIndex] || recommendedSongs[0];
-  const gridTracks = recommendedSongs.slice(5);
 
-  const handleNextBanner = () => {
-    setIsTransitioning(true);
-    setTimeout(() => {
+  useEffect(() => {
+    if (featuredTracks.length <= 1) return;
+    const interval = setInterval(() => {
       setBannerIndex((prev) => (prev + 1) % featuredTracks.length);
-      setIsTransitioning(false);
-    }, 300);
-  };
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [featuredTracks.length]);
 
   const handlePrevBanner = () => {
-    setIsTransitioning(true);
-    setTimeout(() => {
-      setBannerIndex((prev) => (prev - 1 + featuredTracks.length) % featuredTracks.length);
-      setIsTransitioning(false);
-    }, 300);
+    setBannerIndex((prev) => (prev - 1 + featuredTracks.length) % featuredTracks.length);
   };
 
+  const handleNextBanner = () => {
+    setBannerIndex((prev) => (prev + 1) % featuredTracks.length);
+  };
+
+  if (loading) {
+    return (
+      <div className="mb-10 w-full">
+        <Skeleton className="w-full h-[300px] sm:h-[350px] rounded-[32px] mb-8 bg-[var(--color-surface-raised)] border border-[var(--color-border-default)]" />
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-5">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-64 rounded-2xl bg-[var(--color-surface-raised)]" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const activeFeaturedTrack = featuredTracks[bannerIndex] || featuredTracks[0] || FALLBACK_RECOMMENDATIONS[0];
+  const trackName = activeFeaturedTrack?.name || activeFeaturedTrack?.title || "Daily Discovery";
+  const artistName = activeFeaturedTrack?.artist || activeFeaturedTrack?.channelTitle || "Featured Artist";
+  const trackId = activeFeaturedTrack?.id || activeFeaturedTrack?.videoId;
+
+  const rawArtwork = activeFeaturedTrack?.thumbnail || activeFeaturedTrack?.thumbNail;
+  const artwork = getHighResThumbnailUrl(rawArtwork, trackId) || placeholder;
+
   return (
-    <section id="recommendations-section" className="mb-10 sm:mb-12">
-      {/* Featured Auto-Rotating Daily Mix Banner */}
-      {activeFeaturedTrack && (
-        <div className="relative w-full h-[300px] sm:h-[340px] rounded-[32px] overflow-hidden border border-[var(--color-border-strong)] shadow-2xl mb-8 group bg-[var(--color-surface-raised)]">
-          {/* Full-Width Background Artwork */}
-          <img
-            src={activeFeaturedTrack.thumbnail || placeholder}
-            alt={activeFeaturedTrack.name || activeFeaturedTrack.title}
-            className="absolute inset-0 w-full h-full object-cover object-center opacity-45 group-hover:scale-105 transition-all duration-700"
-            style={{ opacity: isTransitioning ? 0.1 : 0.45 }}
-          />
-          {/* Backdrop Gradient Overlay */}
-          <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-surface-base)] via-[var(--color-surface-base)]/75 to-transparent pointer-events-none" />
-
-          {/* Banner Content */}
-          <div
-            className="relative h-full flex flex-col justify-center p-6 sm:p-10 md:w-3/5 z-10 transition-opacity duration-500"
-            style={{ opacity: isTransitioning ? 0.2 : 1 }}
-          >
-            <div className="flex items-center gap-2 mb-3">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[var(--color-secondary)]/20 text-[var(--color-secondary)] border border-[var(--color-secondary)]/30 rounded-full font-bold text-[10px] tracking-widest uppercase">
-                <Sparkles size={12} /> DAILY MIX #{bannerIndex + 1}
-              </span>
-              <span className="text-[10px] font-bold text-[var(--color-primary)] tracking-widest uppercase">
-                AI SPOTLIGHT
-              </span>
-            </div>
-
-            <h2 className="text-2xl sm:text-4xl font-extrabold text-[var(--color-on-surface)] leading-tight mb-2 line-clamp-1">
-              {activeFeaturedTrack.name || activeFeaturedTrack.title}
-            </h2>
-            <p className="text-xs sm:text-sm text-[var(--color-on-surface-variant)] mb-6 max-w-md line-clamp-2 leading-relaxed">
-              Curated for your personal taste based on recent listening sessions.
-              {activeFeaturedTrack.artist ? ` Features ${activeFeaturedTrack.artist}.` : ""}
-            </p>
-
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => {
-                  usePlayerStore.getState().setTrack(activeFeaturedTrack);
-                  usePlayerStore.getState().setIsPlaying(true);
-                  toast.success(`Playing: ${activeFeaturedTrack.name || activeFeaturedTrack.title}`);
-                }}
-                className="bg-[var(--color-primary)] text-[var(--color-text-on-primary)] px-8 py-3 rounded-full font-bold text-xs tracking-wider hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center gap-2"
-              >
-                <Play size={16} fill="currentColor" /> LISTEN NOW
-              </button>
-              <button
-                onClick={() => toast.success("Added to your favorites!")}
-                className="w-11 h-11 rounded-full bg-[var(--color-surface-overlay)] border border-[var(--color-border-default)] flex items-center justify-center text-[var(--color-on-surface-variant)] hover:text-pink-500 hover:border-pink-500/40 transition-colors"
-                title="Add to Favorites"
-              >
-                <Heart size={18} />
-              </button>
-            </div>
+    <section id="recommendations-section" className="mb-12">
+      {/* Section Title */}
+      <div className="flex items-center justify-between mb-6">
+        <h3 className="text-2xl font-bold text-[var(--color-on-surface)] tracking-tight flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-[var(--color-primary)]/15 flex items-center justify-center text-[var(--color-primary)] shadow-sm">
+            <Sparkles size={20} />
           </div>
+          <span>Recommended For You</span>
+        </h3>
+        <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[var(--color-surface-overlay)] text-[var(--color-on-surface-variant)] border border-[var(--color-border-default)]">
+          AI TASTE ENGINE
+        </span>
+      </div>
 
-          {/* Banner Slider Controls & Indicators (Bottom-Right) */}
-          <div className="absolute bottom-4 right-4 sm:bottom-6 sm:right-8 z-20 flex items-center gap-3 bg-[var(--color-surface-overlay)]/85 backdrop-blur-md border border-[var(--color-border-default)] px-3 py-1.5 rounded-full shadow-lg">
-            <button
-              onClick={handlePrevBanner}
-              className="text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] transition-colors p-1"
-              title="Previous slide"
-            >
-              <ChevronLeft size={18} />
-            </button>
+      {/* Featured Auto-Rotating Daily Mix Banner - Full-Width HD & Slow-Pan Design */}
+      {activeFeaturedTrack && (
+        <div className="relative w-full h-[300px] sm:h-[350px] rounded-[32px] overflow-hidden border border-[var(--color-border-strong)] shadow-2xl mb-8 group bg-[var(--color-surface-raised)] flex items-center transition-all duration-500">
+          
+          {/* 1. Full-Width HD Background Artwork Image with Automatic Vertical Slow-Pan */}
+          <img
+            key={`rec-banner-${trackId}-${bannerIndex}`}
+            src={artwork}
+            alt={trackName}
+            onError={(e) => {
+              e.target.onerror = null;
+              e.target.src = getNextFallbackThumbnailUrl(e.target.src, trackId, placeholder);
+            }}
+            className={`absolute inset-0 w-full h-full object-cover opacity-65 dark:opacity-60 transition-all duration-700 pointer-events-none ${
+              enablePanAnimation ? "animate-pan-vertical" : ""
+            }`}
+          />
 
-            {/* Slide Dots */}
-            <div className="flex items-center gap-1.5">
-              {featuredTracks.map((_, i) => (
-                <button
-                  key={i}
-                  onClick={() => {
-                    setIsTransitioning(true);
-                    setTimeout(() => {
-                      setBannerIndex(i);
-                      setIsTransitioning(false);
-                    }, 300);
-                  }}
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    i === bannerIndex
-                      ? "w-6 bg-[var(--color-primary)]"
-                      : "w-2 bg-[var(--color-border-default)] hover:bg-[var(--color-on-surface-variant)]"
-                  }`}
-                  aria-label={`Go to slide ${i + 1}`}
-                />
-              ))}
+          {/* 2. Gradient Overlays for Optimal Legibility & Atmosphere */}
+          <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-surface-raised)] via-[var(--color-surface-raised)]/90 via-45% sm:via-40% to-transparent pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-surface-raised)]/90 via-transparent to-[var(--color-surface-raised)]/30 pointer-events-none" />
+
+          {/* 3. Hero Content Block */}
+          <div className="relative z-10 h-full w-full flex flex-col justify-between p-6 sm:p-10 max-w-2xl">
+            
+            {/* Top Badges */}
+            <div>
+              <div className="flex items-center gap-2.5 mb-3 flex-wrap">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[var(--color-secondary)]/20 text-[var(--color-secondary)] border border-[var(--color-secondary)]/30 rounded-full font-bold text-[11px] tracking-wider uppercase shadow-xs">
+                  <Sparkles size={13} /> DAILY MIX #{bannerIndex + 1}
+                </span>
+                <span className="text-[11px] font-bold text-[var(--color-primary)] tracking-wider uppercase flex items-center gap-1 bg-[var(--color-primary)]/15 px-3 py-1 rounded-full border border-[var(--color-primary)]/30 backdrop-blur-xs">
+                  AI RECOMMENDATION
+                </span>
+              </div>
+
+              {/* Track Title & Artist */}
+              <h2 className="text-2xl sm:text-4xl font-extrabold text-[var(--color-on-surface)] leading-tight mb-2 line-clamp-1 tracking-tight drop-shadow-md">
+                {trackName}
+              </h2>
+              <p className="text-sm sm:text-base text-[var(--color-on-surface-variant)] line-clamp-1 font-medium max-w-lg drop-shadow-xs">
+                Curated based on your taste profile with <span className="text-[var(--color-on-surface)] font-semibold">{artistName}</span>.
+              </p>
             </div>
 
-            <button
-              onClick={handleNextBanner}
-              className="text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] transition-colors p-1"
-              title="Next slide"
-            >
-              <ChevronRight size={18} />
-            </button>
+            {/* Bottom CTA & Carousel Controls */}
+            <div className="flex items-center justify-between gap-4 flex-wrap mt-4">
+              
+              {/* Action Buttons */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => {
+                    usePlayerStore.getState().setTrack({
+                      id: trackId,
+                      name: trackName,
+                      artist: artistName,
+                      thumbnail: artwork,
+                    });
+                    usePlayerStore.getState().setIsPlaying(true);
+                    toast.success(`Playing: ${trackName}`);
+                  }}
+                  className="bg-[var(--color-primary)] text-[var(--color-text-on-primary)] px-7 py-3 rounded-full font-bold text-xs sm:text-sm tracking-wider hover:scale-105 active:scale-95 transition-all duration-300 shadow-lg flex items-center gap-2.5 cursor-pointer"
+                >
+                  <Play size={17} fill="currentColor" className="ml-0.5" />
+                  <span>PLAY DAILY MIX</span>
+                </button>
+                <button
+                  onClick={() => toast.success("Added to your favorites!")}
+                  className="w-10 h-10 rounded-full bg-[var(--color-surface-overlay)]/90 backdrop-blur-md border border-[var(--color-border-default)] flex items-center justify-center text-[var(--color-on-surface-variant)] hover:text-pink-500 hover:border-pink-500/40 transition-colors shadow-sm cursor-pointer"
+                  title="Add to Favorites"
+                >
+                  <Heart size={18} />
+                </button>
+              </div>
+
+              {/* Carousel Navigation (Dots & Arrows) */}
+              {featuredTracks.length > 1 && (
+                <div className="flex items-center gap-3 bg-[var(--color-surface-overlay)]/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-[var(--color-border-default)] shadow-md">
+                  <button
+                    onClick={handlePrevBanner}
+                    className="p-1 rounded-full hover:bg-[var(--color-state-hover)] text-[var(--color-on-surface)] transition-colors cursor-pointer"
+                    title="Previous slide"
+                    aria-label="Previous slide"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+
+                  {/* Dots */}
+                  <div className="flex items-center gap-1.5">
+                    {featuredTracks.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setBannerIndex(i)}
+                        className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                          i === bannerIndex
+                            ? "w-6 bg-[var(--color-primary)]"
+                            : "w-2 bg-[var(--color-on-surface-variant)]/40 hover:bg-[var(--color-on-surface-variant)]"
+                        }`}
+                        aria-label={`Go to slide ${i + 1}`}
+                      />
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={handleNextBanner}
+                    className="p-1 rounded-full hover:bg-[var(--color-state-hover)] text-[var(--color-on-surface)] transition-colors cursor-pointer"
+                    title="Next slide"
+                    aria-label="Next slide"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
 
-      {/* Recommended Songs Grid */}
-      <div className="flex items-center justify-between mb-5">
-        <h3 className="text-lg sm:text-xl font-bold text-[var(--color-on-surface)] flex items-center gap-2">
-          <span>✨</span> Recommended for You
-        </h3>
-      </div>
-
-      <div className="grid grid-flow-col auto-cols-[minmax(180px,1fr)] sm:auto-cols-[minmax(200px,1fr)] gap-5 overflow-x-auto scrollbar-hide scroll-smooth py-2">
-        {gridTracks.map((song, index) => (
-          <div key={`${song.id || song.videoId}-${index}`}>
-            <MusicCard
-              id={song.id || song.videoId}
-              name={song.name || song.title}
-              artist={song.artist}
-              image={song.thumbnail || placeholder}
-              onClick={() => {
-                usePlayerStore.getState().setTrack(song);
-                usePlayerStore.getState().setIsPlaying(true);
-                toast.success(`Playing: ${song.name || song.title}`);
-              }}
-            />
-          </div>
+      {/* Recommended Songs 5-Column Grid */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-5">
+        {recommendedSongs.slice(0, 10).map((song, index) => (
+          <MusicCard
+            key={`${song.id || song.videoId}-${index}`}
+            id={song.id || song.videoId}
+            name={song.name || song.title}
+            artist={song.artist || song.channelTitle}
+            image={song.thumbnail || song.thumbNail}
+            onClick={() => {
+              usePlayerStore.getState().setTrack({
+                id: song.id || song.videoId,
+                name: song.name || song.title,
+                artist: song.artist || song.channelTitle,
+                thumbnail: song.thumbnail || song.thumbNail,
+              });
+              usePlayerStore.getState().setIsPlaying(true);
+              toast.success(`Playing: ${song.name || song.title}`);
+            }}
+          />
         ))}
       </div>
     </section>
