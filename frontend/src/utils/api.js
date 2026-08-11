@@ -84,7 +84,7 @@ export async function fetchLastPlayed(userId) {
         }
 
         const data = await response.json();
-        const rawHistory = data.history || (Array.isArray(data) ? data : []);
+        const rawHistory = data.data || data.history || (Array.isArray(data) ? data : []);
 
         return rawHistory.map((item) => {
             const track = item.track || item;
