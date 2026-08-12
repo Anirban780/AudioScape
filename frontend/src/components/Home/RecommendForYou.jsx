@@ -7,6 +7,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { getRecommendations, fetchExploreFeed } from "@/utils/api";
 import { fetchYoutubeMusic } from "@/utils/youtube";
 import { getHighResThumbnailUrl, getNextFallbackThumbnailUrl } from "@/utils/youtubeUtils";
+import MediaGrid from "@/components/Layout/MediaGrid";
+import SectionHeader from "@/components/Home/SectionHeader";
 import toast from "react-hot-toast";
 
 /**
@@ -16,22 +18,15 @@ import toast from "react-hot-toast";
  * 
  * WHAT THIS FILE DOES:
  * Renders personalized AI music recommendations featuring:
- * 1. Integrated Auto-Rotating Daily Mix Banner: Full-bleed background artwork where
- *    track title, artist subtitle, badges, and action buttons merge directly on top of
- *    the sliding image artwork with 100% bright visibility and zero boxed card separation.
- * 2. Automatic Vertical Slow-Pan Motion: Preserves `animate-pan-vertical` motion.
- * 3. Fallback Discovery Feed: Automatically fetches curated music if user is guest/new,
- *    guaranteeing 100% section visibility.
+ * 1. Branded Section Header (`SectionHeader.jsx`): Top gradient bar, subtitle tagline, AI Taste Engine badge.
+ * 2. Integrated Auto-Rotating Daily Mix Banner: Full-bleed background artwork with vertical slow-pan.
+ * 3. Container-Query Driven MediaGrid (`MediaGrid.jsx`): Responsive card grid driven 100% by container width.
+ *    Collapsed view displays 10 recommended tracks; Expanded view ("SEE ALL") renders ALL 20 tracks!
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Seamless Text & Artwork Integration: Aligns with HeroSection design by removing
- *    dark background overlays and heavy card borders.
- * 2. Ambient Drop Shadows: Employs `drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]` and soft gradient
- *    fades (`from-black/80 via-black/35 to-transparent`) for maximum legibility.
- * 
- * HOW IT WORKS:
- * - Attempts to fetch recommendations for `userId` with multi-tier fallback.
- * - Rotates featured daily mix tracks with 6s interval and smooth slow-pan animation.
+ * 1. Flash-Free Container Queries: MediaGrid uses CSS `@container` queries so grid columns react instantly
+ *    to sidebar toggles and container dimension changes without JS latency or layout shifts.
+ * 2. Theme Compliance: Employs Stitch surface variables (`var(--color-surface-raised)`, `var(--color-border-default)`).
  */
 
 const FALLBACK_RECOMMENDATIONS = [
@@ -40,12 +35,20 @@ const FALLBACK_RECOMMENDATIONS = [
   { id: "DWcJFNfaw9c", videoId: "DWcJFNfaw9c", title: "Midnight City Synthwave Beats", name: "Midnight City Synthwave Beats", artist: "M83 Soundscapes", channelTitle: "M83 Soundscapes", thumbnail: "https://img.youtube.com/vi/DWcJFNfaw9c/maxresdefault.jpg" },
   { id: "jfKfPfyJRdk", videoId: "jfKfPfyJRdk", title: "Relaxing Jazz Music & Soft Rain", name: "Relaxing Jazz Music & Soft Rain", artist: "Relaxing Vibes", channelTitle: "Relaxing Vibes", thumbnail: "https://img.youtube.com/vi/jfKfPfyJRdk/maxresdefault.jpg" },
   { id: "1fueZCTYkpA", videoId: "1fueZCTYkpA", title: "Deep Focus Flow Spatial Audio", name: "Deep Focus Flow Spatial Audio", artist: "AudioScape Beats", channelTitle: "AudioScape Beats", thumbnail: "https://img.youtube.com/vi/1fueZCTYkpA/maxresdefault.jpg" },
+  { id: "HuFYqnbVbzA", videoId: "HuFYqnbVbzA", title: "Synthwave Radio Beats", name: "Synthwave Radio Beats", artist: "Cyberpunk Audio", channelTitle: "Cyberpunk Audio", thumbnail: "https://img.youtube.com/vi/HuFYqnbVbzA/maxresdefault.jpg" },
+  { id: "lTRiuFIWV54", videoId: "lTRiuFIWV54", title: "Chill Lofi Beats To Sleep", name: "Chill Lofi Beats To Sleep", artist: "Lofi Sleep", channelTitle: "Lofi Sleep", thumbnail: "https://img.youtube.com/vi/lTRiuFIWV54/maxresdefault.jpg" },
+  { id: "fEvM-OUbaKs", videoId: "fEvM-OUbaKs", title: "Ambient Space Soundscapes", name: "Ambient Space Soundscapes", artist: "Cosmic Audio", channelTitle: "Cosmic Audio", thumbnail: "https://img.youtube.com/vi/fEvM-OUbaKs/maxresdefault.jpg" },
+  { id: "9SUMxTpLDAs", videoId: "9SUMxTpLDAs", title: "Acoustic Chill Acoustic Guitars", name: "Acoustic Chill Acoustic Guitars", artist: "Acoustic Sessions", channelTitle: "Acoustic Sessions", thumbnail: "https://img.youtube.com/vi/9SUMxTpLDAs/maxresdefault.jpg" },
+  { id: "2gliGobe99o", videoId: "2gliGobe99o", title: "Piano Peace Relaxation", name: "Piano Peace Relaxation", artist: "Piano Peace", channelTitle: "Piano Peace", thumbnail: "https://img.youtube.com/vi/2gliGobe99o/maxresdefault.jpg" },
+  { id: "4xDzrJKXOOY", videoId: "4xDzrJKXOOY", title: "Synthwave Sunset Drive", name: "Synthwave Sunset Drive", artist: "Retro Beats", channelTitle: "Retro Beats", thumbnail: "https://img.youtube.com/vi/4xDzrJKXOOY/maxresdefault.jpg" },
+  { id: "wA0C0u85y1y", videoId: "wA0C0u85y1y", title: "Deep Focus Ambient Rain", name: "Deep Focus Ambient Rain", artist: "Rainy Mood", channelTitle: "Rainy Mood", thumbnail: "https://img.youtube.com/vi/wA0C0u85y1y/maxresdefault.jpg" },
 ];
 
 const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
   const [recommendedSongs, setRecommendedSongs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [bannerIndex, setBannerIndex] = useState(0);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -56,18 +59,18 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
       try {
         let songs = [];
         if (userId) {
-          songs = await getRecommendations(userId, 15);
+          songs = await getRecommendations(userId, 20);
         }
 
         if (!Array.isArray(songs) || songs.length === 0) {
           const exploreData = await fetchExploreFeed();
           if (exploreData && exploreData.length > 0 && exploreData[0].tracks) {
-            songs = exploreData.flatMap((sec) => sec.tracks).slice(0, 15);
+            songs = exploreData.flatMap((sec) => sec.tracks).slice(0, 20);
           }
         }
 
         if (!Array.isArray(songs) || songs.length === 0) {
-          const ytSongs = await fetchYoutubeMusic("pop hits", 15);
+          const ytSongs = await fetchYoutubeMusic("pop hits", 20);
           if (Array.isArray(ytSongs) && ytSongs.length > 0) {
             songs = ytSongs;
           }
@@ -120,6 +123,17 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
     setBannerIndex((prev) => (prev + 1) % featuredTracks.length);
   };
 
+  const handlePlayTrack = (song) => {
+    usePlayerStore.getState().setTrack({
+      id: song.id || song.videoId,
+      name: song.name || song.title,
+      artist: song.artist || song.channelTitle,
+      thumbnail: song.thumbnail || song.thumbNail,
+    });
+    usePlayerStore.getState().setIsPlaying(true);
+    toast.success(`Playing: ${song.name || song.title}`);
+  };
+
   if (loading) {
     return (
       <div className="mb-10 w-full">
@@ -141,26 +155,30 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
   const rawArtwork = activeFeaturedTrack?.thumbnail || activeFeaturedTrack?.thumbNail;
   const artwork = getHighResThumbnailUrl(rawArtwork, trackId) || placeholder;
 
+  // Track Slicing: Collapsed shows 10 tracks; Expanded ("SEE ALL") renders ALL 20 tracks!
+  const gridSongs = isExpanded ? recommendedSongs : recommendedSongs.slice(0, 10);
+
   return (
     <section id="recommendations-section" className="mb-12">
-      {/* Section Title */}
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-2xl font-bold text-[var(--color-on-surface)] tracking-tight flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-[var(--color-primary)]/15 flex items-center justify-center text-[var(--color-primary)] shadow-sm">
-            <Sparkles size={20} />
-          </div>
-          <span>Recommended For You</span>
-        </h3>
-        <span className="text-xs font-semibold px-3 py-1 rounded-full bg-[var(--color-surface-overlay)] text-[var(--color-on-surface-variant)] border border-[var(--color-border-default)]">
-          AI TASTE ENGINE
-        </span>
-      </div>
+      {/* Branded Section Header */}
+      <SectionHeader
+        icon={<Sparkles size={20} />}
+        title="Recommended For You"
+        subtitle="curated by your unique listening DNA & AI taste profile"
+        accentGradient="from-[var(--color-secondary)] via-purple-500 to-transparent"
+        iconBgColor="bg-[var(--color-secondary)]/15 text-[var(--color-secondary)] border-[var(--color-secondary)]/30"
+        titleGradient="from-pink-400 via-fuchsia-400 to-[var(--color-primary)]"
+        trackCount={recommendedSongs.length}
+        extraBadge="AI TASTE ENGINE"
+        isExpanded={isExpanded}
+        onToggleExpand={() => setIsExpanded((prev) => !prev)}
+      />
 
-      {/* Featured Auto-Rotating Daily Mix Banner - Integrated Bright Slow-Pan Design */}
+      {/* Featured Auto-Rotating Daily Mix Banner */}
       {activeFeaturedTrack && (
         <div className="relative w-full h-[300px] sm:h-[350px] rounded-[32px] overflow-hidden border border-[var(--color-border-strong)] shadow-2xl mb-8 group bg-[var(--color-surface-raised)] flex items-center transition-all duration-500">
           
-          {/* 1. Full-Width HD Background Artwork Image with Automatic Vertical Slow-Pan */}
+          {/* Background Artwork Image */}
           <img
             key={`rec-banner-integrated-${trackId}-${bannerIndex}`}
             src={artwork}
@@ -174,14 +192,14 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
             }`}
           />
 
-          {/* 2. Soft Ambient Gradient Overlay (Blends text into background with zero dark layout covering) */}
+          {/* Ambient Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 via-50% to-transparent pointer-events-none" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent pointer-events-none" />
 
-          {/* 3. Integrated Hero Content Block */}
+          {/* Hero Content Block */}
           <div className="relative z-10 h-full w-full flex flex-col justify-between p-6 sm:p-10 max-w-2xl">
             
-            {/* Top Integrated Text Content */}
+            {/* Top Text Content */}
             <div className="max-w-xl">
               <div className="flex items-center gap-2 mb-3 flex-wrap">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/25 text-amber-300 border border-amber-500/40 rounded-full font-bold text-[11px] tracking-wider uppercase shadow-md backdrop-blur-xs">
@@ -192,7 +210,6 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
                 </span>
               </div>
 
-              {/* Track Title & Artist */}
               <h2 className="text-2xl sm:text-4xl font-extrabold text-white leading-tight mb-2 line-clamp-1 tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
                 {trackName}
               </h2>
@@ -201,22 +218,11 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
               </p>
             </div>
 
-            {/* Bottom Side-by-Side Integrated Action Buttons */}
+            {/* Bottom Action Buttons */}
             <div className="flex items-center justify-between gap-4 flex-wrap mt-4">
-              
-              {/* Play Daily Mix & Heart Actions */}
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => {
-                    usePlayerStore.getState().setTrack({
-                      id: trackId,
-                      name: trackName,
-                      artist: artistName,
-                      thumbnail: artwork,
-                    });
-                    usePlayerStore.getState().setIsPlaying(true);
-                    toast.success(`Playing: ${trackName}`);
-                  }}
+                  onClick={() => handlePlayTrack(activeFeaturedTrack)}
                   className="bg-[var(--color-primary)] text-[var(--color-text-on-primary)] px-7 py-3 rounded-full font-bold text-xs sm:text-sm tracking-wider hover:scale-105 active:scale-95 transition-all duration-300 shadow-xl flex items-center gap-2.5 cursor-pointer"
                 >
                   <Play size={17} fill="currentColor" className="ml-0.5" />
@@ -231,19 +237,17 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
                 </button>
               </div>
 
-              {/* Carousel Navigation (Dots & Arrows) */}
+              {/* Carousel Navigation */}
               {featuredTracks.length > 1 && (
                 <div className="flex items-center gap-3 bg-black/40 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 shadow-lg text-white">
                   <button
                     onClick={handlePrevBanner}
                     className="p-1 rounded-full hover:bg-white/20 text-white transition-colors cursor-pointer"
                     title="Previous slide"
-                    aria-label="Previous slide"
                   >
                     <ChevronLeft size={16} />
                   </button>
 
-                  {/* Slide Dots */}
                   <div className="flex items-center gap-1.5">
                     {featuredTracks.map((_, i) => (
                       <button
@@ -254,7 +258,6 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
                             ? "w-6 bg-[var(--color-primary)]"
                             : "w-2 bg-white/40 hover:bg-white"
                         }`}
-                        aria-label={`Go to slide ${i + 1}`}
                       />
                     ))}
                   </div>
@@ -263,7 +266,6 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
                     onClick={handleNextBanner}
                     className="p-1 rounded-full hover:bg-white/20 text-white transition-colors cursor-pointer"
                     title="Next slide"
-                    aria-label="Next slide"
                   >
                     <ChevronRight size={16} />
                   </button>
@@ -274,30 +276,23 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
         </div>
       )}
 
-      {/* Recommended Songs 5-Column Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-5">
-        {recommendedSongs.slice(0, 10).map((song, index) => (
+      {/* Container-Query Driven MediaGrid */}
+      <MediaGrid>
+        {gridSongs.map((song, index) => (
           <MusicCard
             key={`${song.id || song.videoId}-${index}`}
             id={song.id || song.videoId}
             name={song.name || song.title}
             artist={song.artist || song.channelTitle}
             image={song.thumbnail || song.thumbNail}
-            onClick={() => {
-              usePlayerStore.getState().setTrack({
-                id: song.id || song.videoId,
-                name: song.name || song.title,
-                artist: song.artist || song.channelTitle,
-                thumbnail: song.thumbnail || song.thumbNail,
-              });
-              usePlayerStore.getState().setIsPlaying(true);
-              toast.success(`Playing: ${song.name || song.title}`);
-            }}
+            variant="default"
+            onClick={() => handlePlayTrack(song)}
           />
         ))}
-      </div>
+      </MediaGrid>
     </section>
   );
 };
 
 export default RecommendForYou;
+

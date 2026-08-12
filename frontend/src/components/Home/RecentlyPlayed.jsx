@@ -1,36 +1,43 @@
 import React, { useEffect, useState } from "react";
 import { fetchLastPlayed } from "@/utils/api";
 import placeholder from "@/assets/placeholder.jpg";
-import { Play, History, Music } from "lucide-react";
+import { Play, History, Music, ListPlus, RotateCcw } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
+import usePlaylistStore from "@/store/usePlaylistStore";
 import { Skeleton } from "@/components/ui/skeleton";
+import SectionHeader from "@/components/Home/SectionHeader";
+import MusicCard from "@/components/Cards/MusicCard";
+import { getValidThumbnailUrl } from "@/utils/youtubeUtils";
 import toast from "react-hot-toast";
 
 /**
  * ============================================================================
- * RECENTLY PLAYED ALBUM GRID (RecentlyPlayed.jsx)
+ * RECENTLY PLAYED SECTION (RecentlyPlayed.jsx)
  * ============================================================================
  * 
  * WHAT THIS FILE DOES:
- * Displays a responsive 5-column album card grid of the user's recent listening history
- * fetched from the backend. Includes loading skeleton states and an empty state card.
+ * Displays user's recent listening history in a specialized "Hero + Compact Rows" layout:
+ * 1. Branded Section Header (`SectionHeader.jsx`): Top gradient bar, subtitle tagline, track count.
+ * 2. Hero Last-Played Spotlight Card: Highlights most recently played track with 1-click "RESUME PLAYBACK".
+ * 3. Compact Horizontal Track Rows: List-style track rows for remaining listening history.
+ * 4. Inline Expansion: "See All / Show Less" pill button smoothly toggles list expansion inline.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Always-Visible Section: Replaced silent `return null` with glassmorphic empty state
- *    and skeleton loading states so the section never disappears unexpectedly.
- * 2. Stitch Grid Layout: Responsive 5-column grid (`grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5`)
- *    matching Midnight Studio & Fragrant Glassy Dashboard screens.
- * 3. Array Safety & Deduplication: Safely checks `Array.isArray(songs)` and deduplicates on track IDs.
+ * 1. Action-Oriented UX: Users check history to quickly resume listening. The hero card + list format
+ *    allows instant scanning without taking up excessive vertical screen space.
+ * 2. Theme Compliance: Uses Stitch surface tokens (`var(--color-surface-raised)`, `var(--color-border-default)`).
  * 
  * HOW IT WORKS:
  * - Queries `fetchLastPlayed(userId)` on mount.
- * - Displays 5 skeleton cards while loading.
- * - Renders listening history or an empty state card if no history exists yet.
+ * - `recentlyPlayed[0]` feeds the Hero Spotlight Card.
+ * - Remaining items render as compact `<MusicCard variant="compact" />` rows.
  */
 
 const RecentlyPlayed = ({ userId }) => {
   const [recentlyPlayed, setRecentlyPlayed] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const { openModal } = usePlaylistStore();
 
   useEffect(() => {
     let isMounted = true;
@@ -67,28 +74,41 @@ const RecentlyPlayed = ({ userId }) => {
     };
   }, [userId]);
 
+  const handlePlayTrack = (song) => {
+    usePlayerStore.getState().setTrack(song);
+    usePlayerStore.getState().setIsPlaying(true);
+    toast.success(`Playing: ${song.name || song.title}`);
+  };
+
+  const heroTrack = recentlyPlayed[0];
+  const compactTracks = isExpanded ? recentlyPlayed.slice(1) : recentlyPlayed.slice(1, 5);
+
   return (
     <section className="mb-10 sm:mb-12">
-      {/* Section Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-[var(--color-on-surface)] tracking-tight flex items-center gap-2">
-          <span>🕒</span> Recently Played
-        </h2>
-        <span className="text-[var(--color-on-surface-variant)] text-xs font-bold tracking-wider hover:text-[var(--color-primary)] cursor-pointer transition-colors uppercase">
-          SEE ALL
-        </span>
-      </div>
+      {/* Branded Section Header */}
+      <SectionHeader
+        icon={<History size={20} />}
+        title="Recently Played"
+        subtitle="pick up where you left off in your listening journey"
+        accentGradient="from-[var(--color-primary)] via-indigo-500 to-transparent"
+        iconBgColor="bg-[var(--color-primary)]/15 text-[var(--color-primary)] border-[var(--color-primary)]/30"
+        titleGradient="from-violet-400 via-[var(--color-primary)] to-indigo-400"
+        trackCount={recentlyPlayed.length}
+        seeAllHref="/history"
+        seeAllLabel="VIEW ALL"
+      />
 
       {/* Loading Skeleton Grid */}
       {loading && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
-          {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex flex-col gap-2">
-              <Skeleton className="aspect-square rounded-2xl w-full bg-[var(--color-surface-raised)]" />
-              <Skeleton className="h-4 w-3/4 bg-[var(--color-surface-raised)]" />
-              <Skeleton className="h-3 w-1/2 bg-[var(--color-surface-raised)]" />
-            </div>
-          ))}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-5">
+            <Skeleton className="h-[280px] rounded-3xl w-full bg-[var(--color-surface-raised)]" />
+          </div>
+          <div className="lg:col-span-7 flex flex-col gap-3">
+            {[...Array(4)].map((_, i) => (
+              <Skeleton key={i} className="h-14 rounded-2xl w-full bg-[var(--color-surface-raised)]" />
+            ))}
+          </div>
         </div>
       )}
 
@@ -109,50 +129,90 @@ const RecentlyPlayed = ({ userId }) => {
               const exploreEl = document.getElementById("recommendations-section");
               exploreEl?.scrollIntoView({ behavior: "smooth" });
             }}
-            className="px-5 py-2.5 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] font-bold text-xs tracking-wider flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-md"
+            className="px-5 py-2.5 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] font-bold text-xs tracking-wider flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer"
           >
             <Music size={16} /> EXPLORE MUSIC
           </button>
         </div>
       )}
 
-      {/* 5-Column Album Cards Grid */}
+      {/* "Hero + Compact Rows" Layout */}
       {!loading && recentlyPlayed.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-6">
-          {recentlyPlayed.slice(0, 10).map((song, index) => (
-            <div
-              key={`${song.id || song.videoId}-${index}`}
-              onClick={() => {
-                usePlayerStore.getState().setTrack(song);
-                usePlayerStore.getState().setIsPlaying(true);
-                toast.success(`Playing: ${song.name || song.title}`);
-              }}
-              className="group relative cursor-pointer"
-            >
-              {/* Card Image Container */}
-              <div className="aspect-square rounded-2xl overflow-hidden bg-[var(--color-surface-raised)] mb-3 border-2 border-[var(--color-border-default)] relative shadow-lg">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* Left Column (5 Cols): Hero Last-Played Spotlight Card */}
+          {heroTrack && (
+            <div className="lg:col-span-5">
+              <div
+                onClick={() => handlePlayTrack(heroTrack)}
+                className="group relative h-full min-h-[280px] rounded-3xl p-6 bg-[var(--color-surface-raised)] border border-[var(--color-border-strong)] shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden cursor-pointer flex flex-col justify-between"
+              >
+                {/* Full-Bleed Artwork Image with Subtle Scale */}
                 <img
-                  src={song.thumbnail || placeholder}
-                  alt={song.name || song.title}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  src={getValidThumbnailUrl(heroTrack.thumbnail || placeholder)}
+                  alt={heroTrack.name || heroTrack.title}
+                  className="absolute inset-0 w-full h-full object-cover opacity-35 group-hover:scale-105 transition-transform duration-700 pointer-events-none"
                 />
-                {/* Glowing Play Overlay */}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                  <div className="w-12 h-12 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] flex items-center justify-center shadow-[0_0_20px_rgba(167,139,250,0.5)] transform scale-95 group-hover:scale-100 transition-transform">
-                    <Play size={22} fill="currentColor" className="ml-0.5" />
-                  </div>
+                
+                {/* Soft Vignette Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none" />
+
+                {/* Top Badge */}
+                <div className="relative z-10 flex items-center justify-between">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] text-[10px] font-extrabold tracking-wider uppercase shadow-md">
+                    <RotateCcw size={12} /> LAST PLAYED
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openModal(heroTrack);
+                    }}
+                    className="p-2 rounded-full bg-black/40 hover:bg-[var(--color-primary)] text-white transition-all backdrop-blur-xs"
+                    title="Add to playlist"
+                  >
+                    <ListPlus size={16} />
+                  </button>
+                </div>
+
+                {/* Bottom Song Details & Play CTA */}
+                <div className="relative z-10 mt-auto pt-6">
+                  <h3 className="text-xl sm:text-2xl font-extrabold text-white line-clamp-2 leading-tight drop-shadow-md mb-1 group-hover:text-[var(--color-primary)] transition-colors">
+                    {heroTrack.name || heroTrack.title}
+                  </h3>
+                  <p className="text-xs sm:text-sm text-slate-300 font-medium truncate mb-4 drop-shadow-xs">
+                    {heroTrack.artist || "Unknown Artist"}
+                  </p>
+
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handlePlayTrack(heroTrack);
+                    }}
+                    className="w-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] py-3 rounded-2xl font-bold text-xs tracking-wider flex items-center justify-center gap-2 shadow-lg group-hover:scale-[1.02] active:scale-95 transition-all cursor-pointer"
+                  >
+                    <Play size={16} fill="currentColor" className="ml-0.5" />
+                    <span>RESUME PLAYBACK</span>
+                  </button>
                 </div>
               </div>
-
-              {/* Track Info */}
-              <h4 className="font-bold text-sm text-[var(--color-on-surface)] truncate group-hover:text-[var(--color-primary)] transition-colors">
-                {song.name || song.title || "Untitled Track"}
-              </h4>
-              <p className="text-xs text-[var(--color-on-surface-variant)] truncate mt-0.5">
-                {song.artist || "Unknown Artist"}
-              </p>
             </div>
-          ))}
+          )}
+
+          {/* Right Column (7 Cols): Compact Track Rows with Smooth Expansion */}
+          <div className="lg:col-span-7 flex flex-col gap-3">
+            {compactTracks.map((song, index) => (
+              <MusicCard
+                key={`${song.id || song.videoId}-${index}`}
+                id={song.id || song.videoId}
+                name={song.name || song.title}
+                artist={song.artist}
+                image={song.thumbnail || placeholder}
+                variant="compact"
+                onClick={() => handlePlayTrack(song)}
+              />
+            ))}
+          </div>
+
         </div>
       )}
     </section>

@@ -12,6 +12,7 @@ import usePlayerStore from "@/store/usePlayerStore";
 import HelpFeedback from "@/pages/HelpFeedback";
 import PlaylistModal from "@/components/Playlist/PlaylistModal";
 import PlaylistsPage from "@/pages/PlaylistsPage";
+import HistoryPage from "@/pages/HistoryPage";
 
 /**
  * ============================================================================
@@ -30,7 +31,7 @@ import PlaylistsPage from "@/pages/PlaylistsPage";
  * 2. Instant Route Navigation: Removed legacy artificial 1-second setTimeout route delay
  *    (Known Bug #1 fix), allowing instant, responsive page switches.
  * 3. Protected Routes: Unauthenticated users attempting to access protected routes
- *    (/home, /explore, /favourites, /playlists) are automatically redirected to LandingPage ("/").
+ *    (/home, /explore, /favourites, /playlists, /history) are redirected to LandingPage ("/").
  * 
  * HOW IT WORKS:
  * - `ThemeProvider` wraps the application, applying `.dark` / `.light` root classes.
@@ -71,6 +72,7 @@ function AppContent() {
         <Route path="/explore" element={user ? <ExplorePage /> : <Navigate to="/" replace />} />
         <Route path="/favourites" element={user ? <FavoritesPage /> : <Navigate to="/" replace />} />
         <Route path="/playlists" element={user ? <PlaylistsPage /> : <Navigate to="/" replace />} />
+        <Route path="/history" element={user ? <HistoryPage /> : <Navigate to="/" replace />} />
         <Route path="/help" element={<HelpFeedback />} />
         {/* Profile fallback route (Known Bug #2 fix) */}
         <Route path="/profile" element={user ? <Navigate to="/home" replace /> : <Navigate to="/" replace />} />

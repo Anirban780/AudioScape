@@ -15,19 +15,21 @@ import { useAuth } from "@/context/AuthContext";
  * Primary Stitch Dashboard view for AudioScape users.
  * Assembles Home page sections in order:
  * 1. Stitch Hero Spotlight Grid (`HeroSection.jsx`): Platform soundscape banners & Focus Flow.
- * 2. Featured Daily Mix & AI Recommendations (`RecommendForYou.jsx`): 5s auto-rotating banner.
- * 3. Recently Played Album Grid (`RecentlyPlayed.jsx`): Responsive 5-column album card grid.
+ * 2. Recently Played Album Grid (`RecentlyPlayed.jsx`): Listening history right after hero.
+ * 3. Featured Daily Mix & AI Recommendations (`RecommendForYou.jsx`): 5s auto-rotating banner & track grid.
  * 4. Favorite Songs Carousel (`FavoriteSongs.jsx`): User liked tracks collection at the last.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Always-Visible Layout Sections: Passes `userId` (or fallback) to ensure all sections
- *    render their loading skeletons or empty state cards rather than disappearing silently.
- * 2. Stitch Theme Alignment: Rebuild matches screens `721d44993cd748aca88d8a328189655e`
+ * 1. Immediate Listening History Access: Placed Recently Played directly under HeroSection so users
+ *    can instantly resume recent listening sessions upon landing on Home.
+ * 2. Always-Visible Layout Sections: Passes `userId` (or fallback) to ensure all sections
+ *    render loading skeletons or empty state cards rather than disappearing silently.
+ * 3. Stitch Theme Alignment: Rebuild matches screens `721d44993cd748aca88d8a328189655e`
  *    & `8ac7f54565f9488ebb1bc86ad5bfe597` with unified Light & Dark surface tokens.
  * 
  * HOW IT WORKS:
  * - Obtains `user` from `useAuth()`.
- * - Passes `user?.uid` to `RecommendForYou`, `RecentlyPlayed`, and `FavoriteSongs`.
+ * - Passes `user?.uid` to `RecentlyPlayed`, `RecommendForYou`, and `FavoriteSongs`.
  */
 
 const HomePage = () => {
@@ -40,11 +42,11 @@ const HomePage = () => {
         {/* 1. Stitch Visual Platform Hero Spotlight */}
         <HeroSection />
 
-        {/* 2. Featured Daily Mix & AI Recommendations */}
-        <RecommendForYou userId={userId} />
-
-        {/* 3. Recently Played Album Grid */}
+        {/* 2. Recently Played Album Grid (Moved right after HeroSection) */}
         <RecentlyPlayed userId={userId} />
+
+        {/* 3. Featured Daily Mix & AI Recommendations */}
+        <RecommendForYou userId={userId} />
 
         {/* 4. Favorite Songs Carousel (At the last) */}
         <FavoriteSongs userId={userId} />

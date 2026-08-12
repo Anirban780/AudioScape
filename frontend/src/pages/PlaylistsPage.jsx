@@ -8,6 +8,7 @@ import MusicCard from "@/components/Cards/MusicCard";
 import Loader from "@/components/Home/Loader";
 import { Trash2, FolderHeart } from "lucide-react";
 import { getPlaylists, deletePlaylist } from "@/utils/playlists";
+import MediaGrid from "@/components/Layout/MediaGrid";
 
 /**
  * ============================================================================
@@ -96,13 +97,13 @@ const PlaylistsPage = () => {
                   <h3 className="text-xl font-bold text-[var(--color-on-surface)]">{pl.name}</h3>
                   <button
                     onClick={() => confirmDeletePlaylist(pl)}
-                    className="p-2 rounded-xl text-[var(--color-on-surface-variant)] hover:text-red-500 hover:bg-red-500/10 transition-colors"
+                    className="p-2 rounded-xl text-[var(--color-on-surface-variant)] hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                     title="Delete Playlist"
                   >
                     <Trash2 size={18} />
                   </button>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+                <MediaGrid>
                   {pl.songs?.map((song, i) => (
                     <MusicCard
                       key={`${song.id}-${i}`}
@@ -116,7 +117,7 @@ const PlaylistsPage = () => {
                       }}
                     />
                   ))}
-                </div>
+                </MediaGrid>
               </div>
             ))}
           </div>

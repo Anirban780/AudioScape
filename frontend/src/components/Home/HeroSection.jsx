@@ -14,21 +14,24 @@ import { Zap, ArrowRight, Search, Sparkles, ChevronLeft, ChevronRight } from "lu
  * WHAT THIS FILE DOES:
  * Renders the top 2-column Stitch Dashboard hero banner spotlight grid:
  * 1. Main Dashboard Banner (8-cols): Integrated full-bleed banner artwork where text,
- *    badges, and CTA buttons blend directly on top of the zooming image with zero
- *    boxed card distinction.
- * 2. Focus Flow Shortcut Card (4-cols): Deep concentration music mode shortcut card.
+ *    badges, and CTA buttons blend directly on top of the zooming image.
+ * 2. Silky Smooth Crossfade Image Carousel: All 5 WebP banner images stay mounted in
+ *    the DOM with CSS `transition-opacity duration-1000 ease-in-out`, eliminating
+ *    harsh key-based remounting jumps and enabling seamless crossfades.
+ * 3. Focus Flow Shortcut Card (4-cols): Deep concentration music mode shortcut card.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Seamless Text & Image Integration: Removed separate glass card boxes so typography
- *    and artwork merge into a single, cohesive cinematic hero banner.
- * 2. High Contrast Drop Shadows: Uses crisp text shadows (`drop-shadow-md`) and an ambient
- *    gradient fade (`from-black/75 via-black/25 to-transparent`) for legibility.
- * 3. Cinematic Zoom-In Motion: Background image starts at `scale(1.0)` and smoothly zooms in to
- *    `scale(1.15)` on each slide transition.
+ * 1. Seamless Crossfade Transitions: Replaced single `key={currentIndex}` image unmounting
+ *    with concurrent image layers fading smoothly over 1000ms.
+ * 2. High Contrast Drop Shadows: Uses crisp text shadows (`drop-shadow-md`) and ambient
+ *    gradient overlays (`from-black/80 via-black/35 to-transparent`) for legibility.
+ * 3. Cinematic Zoom-In Motion: Active slide image applies `.animate-zoom-in` for smooth
+ *    Ken Burns scale motion.
  * 
  * HOW IT WORKS:
  * - `banners`: Predefined array of WebP banner image assets and headlines.
- * - `currentIndex`: Controls active slideshow banner slide.
+ * - `currentIndex`: Controls active slideshow banner index.
+ * - `isTextFading`: Brief 300ms transition state for text fade synchronization.
  */
 
 const banners = [
@@ -66,23 +69,35 @@ const banners = [
 
 const HeroSection = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [isTextFading, setIsTextFading] = useState(false);
 
+  // Auto-rotate slides every 6 seconds with smooth text fade synchronization
   useEffect(() => {
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % banners.length);
+      handleSlideChange((currentIndex + 1) % banners.length);
     }, 6000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [currentIndex]);
+
+  const handleSlideChange = (nextIndex) => {
+    setIsTextFading(true);
+    setTimeout(() => {
+      setCurrentIndex(nextIndex);
+      setIsTextFading(false);
+    }, 250);
+  };
 
   const activeBanner = banners[currentIndex];
 
   const handlePrev = () => {
-    setCurrentIndex((prev) => (prev - 1 + banners.length) % banners.length);
+    const nextIdx = (currentIndex - 1 + banners.length) % banners.length;
+    handleSlideChange(nextIdx);
   };
 
   const handleNext = () => {
-    setCurrentIndex((prev) => (prev + 1) % banners.length);
+    const nextIdx = (currentIndex + 1) % banners.length;
+    handleSlideChange(nextIdx);
   };
 
   const handleSearchClick = () => {
@@ -105,23 +120,30 @@ const HeroSection = () => {
       {/* Main Spotlight Dashboard Banner (8 Cols) - Seamless Integrated Design */}
       <div className="lg:col-span-8 rounded-[32px] h-[340px] sm:h-[370px] relative overflow-hidden bg-[var(--color-surface-raised)] border border-[var(--color-border-strong)] shadow-2xl transition-all duration-500 flex items-center group">
         
-        {/* 1. Full-Width Background Image with Smooth Zoom-In Animation */}
-        <img
-          key={`home-banner-integrated-${currentIndex}`}
-          src={activeBanner.image}
-          alt={activeBanner.title}
-          className="absolute inset-0 w-full h-full object-cover pointer-events-none animate-zoom-in opacity-100"
-        />
+        {/* 1. Stacked Background Image Layers for Silky Smooth Crossfade Transitions */}
+        {banners.map((banner, idx) => {
+          const isActive = idx === currentIndex;
+          return (
+            <img
+              key={`hero-bg-layer-${idx}`}
+              src={banner.image}
+              alt={banner.title}
+              className={`absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-1000 ease-in-out ${
+                isActive ? "opacity-100 z-0 animate-zoom-in" : "opacity-0 -z-10"
+              }`}
+            />
+          );
+        })}
 
         {/* 2. Soft Integrated Gradient Overlay (Blends text into image with zero boxed separation) */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 via-50% to-transparent pointer-events-none" />
-        <div className="absolute inset-0 bg-gradient-to-r from-black/60 via-transparent to-transparent pointer-events-none" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 via-50% to-transparent pointer-events-none z-10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-transparent to-transparent pointer-events-none z-10" />
 
         {/* 3. Hero Content Block Directly Integrated Over Artwork */}
-        <div className="relative z-10 h-full w-full flex flex-col justify-between p-6 sm:p-10 max-w-2xl">
+        <div className="relative z-20 h-full w-full flex flex-col justify-between p-6 sm:p-10 max-w-2xl">
           
-          {/* Top Integrated Text Content */}
-          <div className="max-w-xl">
+          {/* Top Integrated Text Content with Smooth Fade Sync */}
+          <div className={`max-w-xl transition-opacity duration-300 ${isTextFading ? "opacity-30" : "opacity-100"}`}>
             <div className="flex items-center gap-2 mb-3 flex-wrap">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/25 text-amber-300 border border-amber-500/40 rounded-full font-bold text-[11px] tracking-wider uppercase backdrop-blur-xs shadow-md">
                 <Sparkles size={13} /> SPOTLIGHT #{currentIndex + 1}
@@ -166,7 +188,7 @@ const HeroSection = () => {
                 {banners.map((_, idx) => (
                   <button
                     key={idx}
-                    onClick={() => setCurrentIndex(idx)}
+                    onClick={() => handleSlideChange(idx)}
                     className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
                       idx === currentIndex
                         ? "w-6 bg-[var(--color-primary)]"

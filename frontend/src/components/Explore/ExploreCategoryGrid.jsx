@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Compass } from "lucide-react";
 import { fetchExploreCategories } from "@/utils/api";
+import MediaGrid from "@/components/Layout/MediaGrid";
 
 /**
  * ============================================================================
@@ -75,8 +76,8 @@ const ExploreCategoryGrid = ({ onCategoryClick }) => {
         </h3>
       </div>
 
-      {/* 4-Column Category Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-6">
+      {/* Container-Query Driven Category Grid */}
+      <MediaGrid>
         {displayCategories.map((category) => (
           <div
             key={category.name}

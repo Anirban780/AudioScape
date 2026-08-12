@@ -7,6 +7,7 @@ import usePlayerStore from "@/store/usePlayerStore";
 import Loader from '@/components/Home/Loader';
 import toast from 'react-hot-toast';
 import { Heart } from 'lucide-react';
+import MediaGrid from '@/components/Layout/MediaGrid';
 
 /**
  * ============================================================================
@@ -77,7 +78,7 @@ const FavoritesPage = () => {
                         <p className="text-xs text-[var(--color-on-surface-variant)]">Click the heart icon on any song to save it here!</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 sm:gap-5">
+                    <MediaGrid>
                         {likedSongs.map((track, index) => (
                             <MusicCard
                                 key={`${track.id}-${index}`}
@@ -91,7 +92,7 @@ const FavoritesPage = () => {
                                 }}
                             />
                         ))}
-                    </div>
+                    </MediaGrid>
                 )}
             </div>
         </AppLayout>
