@@ -5,6 +5,7 @@ import UserMenu from "@/components/Auth/UserMenu";
 import { useTheme } from "@/ThemeProvider";
 import { Sun, Moon, Menu } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
+import Footer from "@/components/Home/Footer";
 import { cn } from "@/lib/utils";
 
 /**
@@ -111,9 +112,10 @@ const AppLayout = ({ children }) => {
           </div>
         </header>
 
-        {/* Main Page Content Area with Enhanced Outer Padding & Smooth Reflow */}
-        <main className="flex-1 w-full max-w-[1400px] mx-auto px-6 sm:px-10 md:px-14 lg:px-16 pt-8 pb-32 md:pb-36 sidebar-transition">
+        {/* Main Page Content Area with Integrated Compact Footer */}
+        <main className="flex-1 w-full max-w-[1400px] mx-auto px-6 sm:px-10 md:px-14 lg:px-16 pt-8 pb-20 sidebar-transition">
           {children}
+          <Footer />
         </main>
       </div>
     </div>

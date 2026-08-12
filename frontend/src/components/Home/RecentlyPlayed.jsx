@@ -7,7 +7,7 @@ import usePlaylistStore from "@/store/usePlaylistStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import SectionHeader from "@/components/Home/SectionHeader";
 import MusicCard from "@/components/Cards/MusicCard";
-import { getValidThumbnailUrl } from "@/utils/youtubeUtils";
+import { getValidThumbnailUrl, getHighResThumbnailUrl, getNextFallbackThumbnailUrl } from "@/utils/youtubeUtils";
 import toast from "react-hot-toast";
 
 /**
@@ -141,21 +141,28 @@ const RecentlyPlayed = ({ userId }) => {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* Left Column (5 Cols): Hero Last-Played Spotlight Card */}
-          {heroTrack && (
-            <div className="lg:col-span-5">
-              <div
-                onClick={() => handlePlayTrack(heroTrack)}
-                className="group relative h-full min-h-[280px] rounded-3xl p-6 bg-[var(--color-surface-raised)] border border-[var(--color-border-strong)] shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden cursor-pointer flex flex-col justify-between"
-              >
-                {/* Full-Bleed Artwork Image with Subtle Scale */}
-                <img
-                  src={getValidThumbnailUrl(heroTrack.thumbnail || placeholder)}
-                  alt={heroTrack.name || heroTrack.title}
-                  className="absolute inset-0 w-full h-full object-cover opacity-35 group-hover:scale-105 transition-transform duration-700 pointer-events-none"
-                />
-                
-                {/* Soft Vignette Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none" />
+          {heroTrack && (() => {
+            const heroId = heroTrack.id || heroTrack.videoId;
+            const heroHdImage = getHighResThumbnailUrl(heroTrack.thumbnail, heroId) || getValidThumbnailUrl(heroTrack.thumbnail || placeholder);
+            return (
+              <div className="lg:col-span-5">
+                <div
+                  onClick={() => handlePlayTrack(heroTrack)}
+                  className="group relative h-full min-h-[280px] rounded-3xl p-6 bg-[var(--color-surface-raised)] border border-[var(--color-border-strong)] shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden cursor-pointer flex flex-col justify-between"
+                >
+                  {/* Full-Bleed HD Artwork Image with Subtle Scale */}
+                  <img
+                    src={heroHdImage}
+                    alt={heroTrack.name || heroTrack.title}
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.src = getNextFallbackThumbnailUrl(e.target.src, heroId, placeholder);
+                    }}
+                    className="absolute inset-0 w-full h-full object-cover opacity-45 group-hover:scale-105 transition-transform duration-700 pointer-events-none"
+                  />
+                  
+                  {/* Soft Vignette Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none" />
 
                 {/* Top Badge */}
                 <div className="relative z-10 flex items-center justify-between">
@@ -196,7 +203,8 @@ const RecentlyPlayed = ({ userId }) => {
                 </div>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* Right Column (7 Cols): Compact Track Rows with Smooth Expansion */}
           <div className="lg:col-span-7 flex flex-col gap-3">
