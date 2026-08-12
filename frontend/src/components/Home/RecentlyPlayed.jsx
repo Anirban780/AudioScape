@@ -7,7 +7,7 @@ import usePlaylistStore from "@/store/usePlaylistStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import SectionHeader from "@/components/Home/SectionHeader";
 import MusicCard from "@/components/Cards/MusicCard";
-import { getValidThumbnailUrl, getHighResThumbnailUrl, getNextFallbackThumbnailUrl } from "@/utils/youtubeUtils";
+import { getValidThumbnailUrl, getHighResThumbnailUrl, handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
 import toast from "react-hot-toast";
 
 /**
@@ -154,10 +154,8 @@ const RecentlyPlayed = ({ userId }) => {
                   <img
                     src={heroHdImage}
                     alt={heroTrack.name || heroTrack.title}
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = getNextFallbackThumbnailUrl(e.target.src, heroId, placeholder);
-                    }}
+                    onLoad={handleThumbnailLoad}
+                    onError={(e) => handleThumbnailError(e, heroId)}
                     className="absolute inset-0 w-full h-full object-cover opacity-45 group-hover:scale-105 transition-transform duration-700 pointer-events-none"
                   />
                   

@@ -3,7 +3,7 @@ import { ListPlus, Play, Sparkles } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import usePlaylistStore from "@/store/usePlaylistStore";
 import placeholder from "@/assets/placeholder.jpg";
-import { getHighResThumbnailUrl, getNextFallbackThumbnailUrl } from "@/utils/youtubeUtils";
+import { getHighResThumbnailUrl, decodeHtmlEntities, handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
 
 /**
  * ============================================================================
@@ -31,11 +31,12 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
   const [isHovered, setIsHovered] = useState(false);
   const { openModal } = usePlaylistStore();
 
+  const cleanName = decodeHtmlEntities(name || "Unknown Title");
   const hdImage = getHighResThumbnailUrl(image, id) || placeholder;
 
   const songData = {
     id,
-    name,
+    name: cleanName,
     artist,
     thumbnail: hdImage,
   };
@@ -45,10 +46,7 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
     openModal(songData);
   };
 
-  const handleImageError = (e) => {
-    e.target.onerror = null;
-    e.target.src = getNextFallbackThumbnailUrl(e.target.src, id, placeholder);
-  };
+
 
   /* -------------------------------------------------------------------------- */
   /* VARIANT 1: COMPACT LIST ROW LAYOUT                                         */
@@ -61,11 +59,13 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
       >
         {/* Left Side: Thumbnail Artwork & Play Overlay */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-[var(--color-border-default)]">
+          <div className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-[var(--color-border-default)] bg-gradient-to-br from-purple-900/40 via-pink-900/20 to-blue-900/30 flex items-center justify-center">
+            <Sparkles size={16} className="text-white/30 absolute pointer-events-none" />
             <img
               src={hdImage}
               alt={name}
-              onError={handleImageError}
+              onLoad={handleThumbnailLoad}
+              onError={(e) => handleThumbnailError(e, id)}
               className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
             />
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
@@ -75,8 +75,8 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
 
           {/* Title & Artist */}
           <div className="min-w-0 flex-1">
-            <h4 className="font-bold text-sm text-[var(--color-on-surface)] truncate group-hover:text-[var(--color-primary)] transition-colors" title={name}>
-              {name}
+            <h4 className="font-bold text-sm text-[var(--color-on-surface)] truncate group-hover:text-[var(--color-primary)] transition-colors" title={cleanName}>
+              {cleanName}
             </h4>
             <p className="text-xs text-[var(--color-on-surface-variant)] truncate mt-0.5" title={artist}>
               {artist || "Unknown Artist"}
@@ -118,8 +118,9 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
         <div className="relative w-full sm:w-44 aspect-square rounded-2xl overflow-hidden shrink-0 border border-[var(--color-border-strong)] shadow-lg">
           <img
             src={hdImage}
-            alt={name}
-            onError={handleImageError}
+            alt={cleanName}
+            onLoad={handleThumbnailLoad}
+            onError={(e) => handleThumbnailError(e, id)}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
@@ -137,8 +138,8 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
                 <Sparkles size={11} /> TOP PICK
               </span>
             </div>
-            <h3 className="font-extrabold text-base sm:text-lg text-[var(--color-on-surface)] line-clamp-2 leading-snug group-hover:text-[var(--color-primary)] transition-colors" title={name}>
-              {name}
+            <h3 className="font-extrabold text-base sm:text-lg text-[var(--color-on-surface)] line-clamp-2 leading-snug group-hover:text-[var(--color-primary)] transition-colors" title={cleanName}>
+              {cleanName}
             </h3>
             <p className="text-xs sm:text-sm text-[var(--color-on-surface-variant)] truncate mt-1" title={artist}>
               {artist || "Featured Artist"}
@@ -189,8 +190,9 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
         >
           <img
             src={hdImage}
-            alt={name}
-            onError={handleImageError}
+            alt={cleanName}
+            onLoad={handleThumbnailLoad}
+            onError={(e) => handleThumbnailError(e, id)}
             className={`w-full h-full object-cover transition-all duration-300 ${
               isHovered ? "scale-105 opacity-80" : "scale-100 opacity-100"
             }`}
@@ -208,8 +210,8 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
 
         {/* Song Info */}
         <div className="w-full mt-3 text-left">
-          <p className="font-semibold text-sm truncate text-[var(--color-on-surface)]" title={name}>
-            {name}
+          <p className="font-semibold text-sm truncate text-[var(--color-on-surface)]" title={cleanName}>
+            {cleanName}
           </p>
           {artist && (
             <p className="text-xs text-[var(--color-on-surface-variant)] truncate mt-0.5" title={artist}>

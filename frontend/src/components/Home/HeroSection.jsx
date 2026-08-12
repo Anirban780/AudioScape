@@ -4,7 +4,8 @@ import banner2 from "@/assets/banner_2.webp";
 import banner3 from "@/assets/banner_3.webp";
 import banner4 from "@/assets/banner_4.webp";
 import banner5 from "@/assets/banner_5.webp";
-import { Zap, ArrowRight, Search, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import DailyMixCards from "@/components/Home/DailyMixCards";
 
 /**
  * ============================================================================
@@ -18,20 +19,19 @@ import { Zap, ArrowRight, Search, Sparkles, ChevronLeft, ChevronRight } from "lu
  * 2. Silky Smooth Crossfade Image Carousel: All 5 WebP banner images stay mounted in
  *    the DOM with CSS `transition-opacity duration-1000 ease-in-out`, eliminating
  *    harsh key-based remounting jumps and enabling seamless crossfades.
- * 3. Focus Flow Shortcut Card (4-cols): Deep concentration music mode shortcut card.
+ * 3. Daily Mix Cards (4-cols): Grouped TF-IDF recommendation mix cards seeded from
+ *    distinct top genres in the user's history (`DailyMixCards.jsx`).
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Seamless Crossfade Transitions: Replaced single `key={currentIndex}` image unmounting
- *    with concurrent image layers fading smoothly over 1000ms.
- * 2. High Contrast Drop Shadows: Uses crisp text shadows (`drop-shadow-md`) and ambient
- *    gradient overlays (`from-black/80 via-black/35 to-transparent`) for legibility.
- * 3. Cinematic Zoom-In Motion: Active slide image applies `.animate-zoom-in` for smooth
- *    Ken Burns scale motion.
+ * 1. Personalized Music Curation Hero UX: Authenticated users get 2-3 instant mix cards
+ *    (e.g., "Mix: Lo-fi", "Mix: K-pop", "Mix: Ambient") seeded directly from recommendation keywords.
+ * 2. Seamless Crossfade Transitions: Concurrent image layers fading smoothly over 1000ms.
+ * 3. Cinematic Zoom-In Motion: Active slide image applies `.animate-zoom-in` for smooth motion.
  * 
  * HOW IT WORKS:
  * - `banners`: Predefined array of WebP banner image assets and headlines.
+ * - `recommendations`: Array of recommendation tracks passed down to `<DailyMixCards />`.
  * - `currentIndex`: Controls active slideshow banner index.
- * - `isTextFading`: Brief 300ms transition state for text fade synchronization.
  */
 
 const banners = [
@@ -67,7 +67,7 @@ const banners = [
   },
 ];
 
-const HeroSection = () => {
+const HeroSection = ({ recommendations = [] }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isTextFading, setIsTextFading] = useState(false);
 
@@ -108,11 +108,6 @@ const HeroSection = () => {
         searchInput.focus();
       }, 400);
     }
-  };
-
-  const handleStartListening = () => {
-    const targetElement = document.getElementById("recommendations-section");
-    targetElement?.scrollIntoView({ behavior: "smooth" });
   };
 
   return (
@@ -213,31 +208,8 @@ const HeroSection = () => {
         </div>
       </div>
 
-      {/* Focus Flow Discovery Card (4 Cols) */}
-      <div className="lg:col-span-4 flex flex-col gap-6">
-        <div className="rounded-[32px] p-6 h-[340px] sm:h-[370px] flex flex-col justify-between bg-[var(--color-surface-raised)] border border-[var(--color-border-strong)] shadow-xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity pointer-events-none">
-            <Zap size={120} className="text-[var(--color-primary)]" />
-          </div>
-          <div>
-            <div className="w-12 h-12 rounded-2xl bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/30 flex items-center justify-center mb-4 text-[var(--color-primary)] shadow-sm">
-              <Zap size={24} />
-            </div>
-            <h3 className="text-xl font-extrabold text-[var(--color-on-surface)] mb-2 tracking-tight">
-              Focus Flow
-            </h3>
-            <p className="text-xs sm:text-sm text-[var(--color-on-surface-variant)] leading-relaxed">
-              Deep concentration beats & spatial soundscapes tailored for high-focus sessions.
-            </p>
-          </div>
-          <button
-            onClick={handleStartListening}
-            className="flex items-center gap-2 text-xs font-bold tracking-wider text-[var(--color-primary)] hover:gap-3 transition-all cursor-pointer"
-          >
-            LISTEN NOW <ArrowRight size={16} />
-          </button>
-        </div>
-      </div>
+      {/* Grouped Daily Mix Cards Module (4 Cols) */}
+      <DailyMixCards recommendations={recommendations} />
     </section>
   );
 };

@@ -10,10 +10,11 @@ export default defineConfig({
     tailwindcss(),
   ],
   resolve: {
-    alias: {
-      "@/assets": path.resolve(__dirname, "./frontend/assets"),
-      "@": path.resolve(__dirname, "./frontend/src"),
-    },
+    alias: [
+      { find: /^@\/assets\/(.*)/, replacement: path.resolve(__dirname, "./frontend/assets/$1") },
+      { find: /^@assets\/(.*)/, replacement: path.resolve(__dirname, "./frontend/assets/$1") },
+      { find: "@", replacement: path.resolve(__dirname, "./frontend/src") },
+    ],
   },
   build: {
     outDir: "dist",

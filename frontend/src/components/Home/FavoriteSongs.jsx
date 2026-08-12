@@ -7,7 +7,7 @@ import usePlayerStore from "@/store/usePlayerStore";
 import usePlaylistStore from "@/store/usePlaylistStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import SectionHeader from "@/components/Home/SectionHeader";
-import { getValidThumbnailUrl } from "@/utils/youtubeUtils";
+import { getValidThumbnailUrl, getHighResThumbnailUrl, decodeHtmlEntities, handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
 import toast from "react-hot-toast";
 
 /**
@@ -158,10 +158,12 @@ const FavoriteSongs = ({ userId }) => {
           style={{ scrollSnapType: "x mandatory" }}
         >
           {favoriteSongs.map((song, index) => {
-            const validImage = getValidThumbnailUrl(song.thumbnail || placeholder);
+            const songId = song.id || song.videoId;
+            const validImage = getHighResThumbnailUrl(song.thumbnail || song.coverUrl, songId) || getValidThumbnailUrl(song.thumbnail) || placeholder;
+            const cleanTitle = decodeHtmlEntities(song.name || song.title || "Untitled Track");
             return (
               <div
-                key={`${song.id || song.videoId}-${index}`}
+                key={`${songId}-${index}`}
                 style={{ scrollSnapAlign: "start" }}
                 onClick={() => handlePlayTrack(song)}
                 className="group relative cursor-pointer flex flex-col items-center select-none"
@@ -186,7 +188,9 @@ const FavoriteSongs = ({ userId }) => {
                   <div className="relative z-10 w-full h-full rounded-xl overflow-hidden shadow-md group-hover:-translate-x-2 transition-transform duration-500 bg-[var(--color-surface-base)]">
                     <img
                       src={validImage}
-                      alt={song.name || song.title}
+                      alt={cleanTitle}
+                      onLoad={handleThumbnailLoad}
+                      onError={(e) => handleThumbnailError(e, songId)}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
 
@@ -200,8 +204,8 @@ const FavoriteSongs = ({ userId }) => {
                       onClick={(e) => {
                         e.stopPropagation();
                         openModal({
-                          id: song.id || song.videoId,
-                          name: song.name || song.title,
+                          id: songId,
+                          name: cleanTitle,
                           artist: song.artist,
                           thumbnail: validImage,
                         });
@@ -224,8 +228,8 @@ const FavoriteSongs = ({ userId }) => {
 
                 {/* Song Title & Artist */}
                 <div className="w-full mt-3 text-left px-1">
-                  <h4 className="font-bold text-sm text-[var(--color-on-surface)] truncate group-hover:text-pink-500 transition-colors" title={song.name || song.title}>
-                    {song.name || song.title || "Untitled Track"}
+                  <h4 className="font-bold text-sm text-[var(--color-on-surface)] truncate group-hover:text-pink-500 transition-colors" title={cleanTitle}>
+                    {cleanTitle}
                   </h4>
                   <p className="text-xs text-[var(--color-on-surface-variant)] truncate mt-0.5" title={song.artist}>
                     {song.artist || "Unknown Artist"}

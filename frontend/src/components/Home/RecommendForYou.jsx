@@ -6,7 +6,7 @@ import usePlayerStore from "@/store/usePlayerStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getRecommendations, fetchExploreFeed } from "@/utils/api";
 import { fetchYoutubeMusic } from "@/utils/youtube";
-import { getHighResThumbnailUrl, getNextFallbackThumbnailUrl } from "@/utils/youtubeUtils";
+import { getHighResThumbnailUrl, handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
 import MediaGrid from "@/components/Layout/MediaGrid";
 import SectionHeader from "@/components/Home/SectionHeader";
 import toast from "react-hot-toast";
@@ -183,10 +183,8 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
             key={`rec-banner-integrated-${trackId}-${bannerIndex}`}
             src={artwork}
             alt={trackName}
-            onError={(e) => {
-              e.target.onerror = null;
-              e.target.src = getNextFallbackThumbnailUrl(e.target.src, trackId, placeholder);
-            }}
+            onLoad={handleThumbnailLoad}
+            onError={(e) => handleThumbnailError(e, trackId)}
             className={`absolute inset-0 w-full h-full object-cover pointer-events-none blur-[1px] ${
               enablePanAnimation ? "animate-pan-vertical" : ""
             }`}

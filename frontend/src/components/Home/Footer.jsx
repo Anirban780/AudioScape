@@ -15,14 +15,14 @@ import { Link } from "react-router-dom";
 
 /**
  * ============================================================================
- * RICH MULTI-COLUMN MUSIC FOOTER (Footer.jsx)
+ * EQUIDISTANT MULTI-COLUMN MUSIC FOOTER (Footer.jsx)
  * ============================================================================
  * 
  * WHAT THIS FILE DOES:
- * Renders an expansive, highly legible multi-column copyright & navigation footer featuring:
- * 1. Larger, Highly Legible Typography: Headings (`text-base`), links (`text-sm`), copyright (`text-sm`).
- * 2. 4-Column Layout: Brand & Mission, Navigation, Library Shortcuts & Community Social Badges.
- * 3. 100% Container Fit: Fits perfectly inside `<AppLayout>`'s `max-w-[1400px]` main container.
+ * Renders a 4-column music platform footer with perfectly equidistant column spacing.
+ * 1. Equidistant 4-Column Grid: CSS Grid with 4 equal `1fr` tracks and uniform gaps (`gap-8 lg:gap-12`).
+ * 2. High Legibility: Larger typography for headings (`text-base`), links (`text-sm`), and copyright (`text-sm`).
+ * 3. Container Fit: Fits 100% inside `<AppLayout>`'s `max-w-[1400px]` main container.
  */
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -39,11 +39,11 @@ const Footer = () => {
   return (
     <footer className="w-full mt-16 pt-10 pb-8 border-t border-[var(--color-border-default)] text-[var(--color-on-surface-variant)] transition-colors duration-300">
       
-      {/* 4-Column Main Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 pb-10 border-b border-[var(--color-border-default)]">
+      {/* Equidistant 4-Column Main Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 sm:gap-10 lg:gap-12 pb-10 border-b border-[var(--color-border-default)]">
         
-        {/* Column 1: Brand Identity & Rich Description */}
-        <div className="space-y-3 sm:col-span-2 lg:col-span-1">
+        {/* Column 1: Brand Identity & Description */}
+        <div className="space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/30 flex items-center justify-center text-[var(--color-primary)] shadow-xs shrink-0">
               <Music className="w-5 h-5 animate-pulse" />
@@ -116,7 +116,7 @@ const Footer = () => {
           <h4 className="font-display font-extrabold text-sm sm:text-base text-[var(--color-on-surface)] uppercase tracking-wider mb-4 flex items-center gap-2">
             <Radio size={16} className="text-indigo-400" /> Connect
           </h4>
-          <p className="text-sm text-[var(--color-on-surface-variant)] mb-4">
+          <p className="text-sm text-[var(--color-on-surface-variant)] mb-4 leading-relaxed">
             Follow AudioScape on social media for new features and music releases.
           </p>
           <div className="flex items-center gap-3">
