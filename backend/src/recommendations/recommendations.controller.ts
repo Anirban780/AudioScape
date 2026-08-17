@@ -3,6 +3,7 @@ import { RecommendationsService } from './recommendations.service';
 import { GetRecommendationsDto } from './dto/get-recommendations.dto';
 import { CacheRelatedTracksDto } from './dto/cache-related-tracks.dto';
 import { GenerateQueueDto } from './dto/generate-queue.dto';
+import { ExtendQueueDto } from './dto/extend-queue.dto';
 import { GoogleAuthGuard } from '../auth/google-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
 
@@ -22,6 +23,7 @@ import { GetUser } from '../auth/decorators/get-user.decorator';
  * - POST `/api/music/recommend`             -> Get personalized music recommendations
  * - POST `/api/music/cache-related-tracks` -> Cache keyword search results in PostgreSQL
  * - POST `/api/music/generate-queue`        -> Generate continuous queue for current track
+ * - POST `/api/music/extend-queue`          -> Fetch additional non-duplicate queue tracks
  * - GET  `/api/music/explore`               -> Get server-side explore page section feeds
  * ============================================================================
  */
@@ -65,6 +67,19 @@ export class RecommendationsController {
     @Body() dto: GenerateQueueDto,
   ) {
     return this.recommendationsService.generateQueue(userId, dto.currentTrackId, dto.keyword);
+  }
+
+  /**
+   * Fetches additional non-duplicate recommended tracks to extend an active playback queue (radio auto-refill).
+   * @route POST `/api/music/extend-queue`
+   * @header Authorization Bearer <google_id_token>
+   */
+  @Post('extend-queue')
+  async extendQueue(
+    @GetUser('id') userId: string,
+    @Body() dto: ExtendQueueDto,
+  ) {
+    return this.recommendationsService.extendQueue(userId, dto.existingTrackIds, dto.keyword);
   }
 
   /**
