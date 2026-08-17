@@ -15,6 +15,7 @@ dist-ssr
 DOCKER_PACKAGE_GUIDE.md
 .devcontainer
 .github
+audioscape_backup.sql
 
 # Editor directories and files
 .vscode/*
