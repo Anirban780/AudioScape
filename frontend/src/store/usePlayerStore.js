@@ -1,4 +1,4 @@
-import { create } from 'zustand'
+import { create } from 'zustand';
 import { saveLikeSong, fetchLikedStatus } from '@/utils/api';
 import { auth } from "@/firebase/firebaseConfig";
 import toast from 'react-hot-toast';
@@ -10,7 +10,7 @@ import toast from 'react-hot-toast';
  * 
  * WHAT THIS FILE DOES:
  * Core state management for audio playback, queue management, YouTube iFrame sync,
- * volume persistence, and track favourites status.
+ * volume persistence, track favourites status, and queue manipulations.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
  * 1. Single Source of Playback Truth: Playback state (active track, queue, shuffle, loop,
@@ -19,16 +19,19 @@ import toast from 'react-hot-toast';
  * 2. Seamless View Mode Switching: Moving between MiniPlayer (floating draggable window) and
  *    FullScreenPlayer must preserve audio playback, volume level, progress, and queue position
  *    without reloading or resetting the YouTube iFrame embed.
- * 3. YouTube iFrame Integration: The store holds a reference to the hidden YouTube player API
+ * 3. Interactive Queue Control: Supports reordering (`reorderQueue`), track removal (`removeFromQueue`),
+ *    appending tracks (`addToQueue`), clearing upcoming tracks (`clearQueue`), and radio auto-refill.
+ * 4. YouTube iFrame Integration: The store holds a reference to the hidden YouTube player API
  *    instance (`player`), allowing Zustand actions like `nextTrack`, `prevTrack`, `togglePlayPause`,
  *    and `setVolume` to directly control the video stream.
  * 
  * HOW IT WORKS:
  * - `setTrack(track)`: Sets active track and checks Firebase backend for user's like status.
- * - `nextTrack()` / `prevTrack()`: Calculates next queue index (accounting for shuffle mode),
- *   clamping boundaries, and updates active track.
+ * - `nextTrack()` / `prevTrack()`: Calculates next queue index (accounting for shuffle mode and
+ *   playback history stack), clamping boundaries, and updates active track.
+ * - `addToQueue(track)` / `removeFromQueue(index)` / `reorderQueue(from, to)` / `clearQueue()`:
+ *   Manipulates queue array with index safety logic.
  * - `toggleLike()`: Optimistically updates local state and saves status to Firestore.
- * - `volume` / `setVolume()`: Manages volume level (0-100), synchronized across player views.
  */
 
 /**
@@ -45,71 +48,64 @@ import toast from 'react-hot-toast';
  * @property {boolean} isPlayerReady - Indicates if YouTube iFrame player has completed onReady event
  * @property {Array} queue - Array of upcoming track objects in current queue
  * @property {number} currentIndex - Active track's index in the queue array
+ * @property {Array<number>} playbackHistory - Stack of played indices for accurate previous track navigation
  * @property {boolean} isLooping - When true, track replays upon finishing
  * @property {boolean} isShuffling - When true, nextTrack picks a random index from queue
+ * @property {boolean} isAutoRefillEnabled - When true, player automatically fetches more recommendations near queue end
  */
+
 const usePlayerStore = create((set, get) => ({
     // ------------------------------------------------------------------------
     // TRACK & PLAYBACK STATE
     // ------------------------------------------------------------------------
 
     /**
-     * WHAT: Active track object { id, name, artist, thumbnail, genre }.
-     * WHY: Primary entity displayed in player bars, queue, and fullscreen views.
+     * Active track object { id, name, artist, thumbnail, genre }.
      */
     track: null,
 
     /**
-     * WHAT: Playback active boolean.
-     * WHY: Controls play/pause icon states and triggers YouTube iFrame play/pause commands.
+     * Playback active boolean.
      */
     isPlaying: false,
 
     /**
-     * WHAT: Fullscreen view modal toggle.
-     * WHY: Determines whether MiniPlayer or FullScreenPlayer component is rendered in PlayerContainer.
+     * Fullscreen view modal toggle.
      */
     isFullScreen: false,
 
     /**
-     * WHAT: Current playback position (seconds).
-     * WHY: Drives ProgressBar slider handle and elapsed time text displays.
+     * Current playback position (seconds).
      */
     progress: 0,
 
     /**
-     * WHAT: Total duration of active track (seconds).
-     * WHY: Used for ProgressBar max bound calculation and remaining time formatting.
+     * Total duration of active track (seconds).
      */
     duration: 0,
 
     /**
-     * WHAT: Master volume level (0 to 100).
-     * WHY: Persisted across MiniPlayer and FullScreenPlayer so switching views never resets volume.
+     * Master volume level (0 to 100).
      */
     volume: 50,
 
     /**
-     * WHAT: Audio mute state boolean.
-     * WHY: Controls mute icon display and calls `player.mute()` / `player.unMute()`.
+     * Audio mute state boolean.
      */
     isMuted: false,
 
     /**
-     * WHAT: Favourites state for active track.
-     * WHY: Displays filled/empty heart icon in player controls and allows quick toggling.
+     * Favourites state for active track.
      */
     isLiked: false,
 
     /**
-     * WHAT: Reference to the underlying YouTube iFrame API player object.
-     * WHY: Allows direct method calls (`playVideo`, `pauseVideo`, `seekTo`, `setVolume`) from any UI control.
+     * Reference to underlying YouTube iFrame API player object.
      */
     player: null,
 
     /**
-     * WHAT: YouTube iFrame initialization status.
-     * WHY: Guards against calling player API methods before the iFrame is ready.
+     * YouTube iFrame initialization status.
      */
     isPlayerReady: false,
 
@@ -120,11 +116,10 @@ const usePlayerStore = create((set, get) => ({
     /**
      * WHAT: Action to set active track and fetch user's like status.
      * WHY: Ensures whenever a song starts playing, its like status is accurately reflected from Firestore.
-     * HOW: Sets track in state immediately, then asynchronously queries `fetchLikedStatus(uid, trackId)`.
      * 
      * @param {Object} track - Track object to start playing
      */
-    setTrack: async(track) => {
+    setTrack: async (track) => {
         const user = auth.currentUser;
         let liked = false;
 
@@ -152,13 +147,12 @@ const usePlayerStore = create((set, get) => ({
     /**
      * WHAT: Toggle favourite/like status for currently playing track.
      * WHY: Allows user to save or remove tracks from their Favourites collection.
-     * HOW: Optimistically updates `isLiked` state, notifies user with toast, and saves to Firestore via `saveLikeSong`.
      */
-    toggleLike: async() => {
+    toggleLike: async () => {
         const { track, isLiked } = get();
         const user = auth.currentUser;
 
-        if(!track?.id || !user) {
+        if (!track?.id || !user) {
             console.warn("⚠️ Error: Track ID or User not found");
             return;
         }
@@ -178,46 +172,181 @@ const usePlayerStore = create((set, get) => ({
     // ------------------------------------------------------------------------
 
     /**
-     * WHAT: List of queued track objects.
-     * WHY: Rendered in TrackQueue drawer and used for automatic track advancement.
+     * List of queued track objects.
      */
     queue: [],
 
     /**
-     * WHAT: Index of currently active track inside `queue`.
-     * WHY: Tracks navigation position within the queue array.
+     * Index of currently active track inside `queue`.
      */
     currentIndex: 0,
 
-    setQueue: (queue) => set({ queue }),
-    setCurrentIndex: (index) => set({ currentIndex: index }),
+    /**
+     * Stack of played indices for accurate previous track navigation (especially during shuffle).
+     */
+    playbackHistory: [],
 
     /**
-     * WHAT: Loop single track boolean.
-     * WHY: When true, player loops current track on end instead of advancing.
+     * Loop single track boolean.
      */
     isLooping: false,
 
     /**
-     * WHAT: Shuffle playback boolean.
-     * WHY: When true, `nextTrack` and `prevTrack` pick random non-duplicate indices.
+     * Shuffle playback boolean.
      */
     isShuffling: false,
+
+    /**
+     * Auto-refill queue flag for continuous radio playback.
+     */
+    isAutoRefillEnabled: true,
+
+    setQueue: (queue) => set({ queue }),
+    setCurrentIndex: (index) => set({ currentIndex: index }),
+    setAutoRefillEnabled: (isAutoRefillEnabled) => set({ isAutoRefillEnabled }),
 
     toggleLooping: () => set((state) => ({ isLooping: !state.isLooping })),
     toggleShuffling: () => set((state) => ({ isShuffling: !state.isShuffling })),
 
     /**
+     * WHAT: Add a track to the end of the queue.
+     * WHY: Allows users to queue up tracks from cards, search, or recommendation lists.
+     * HOW: Appends track to `queue`. If queue is currently empty, sets it as active track.
+     */
+    addToQueue: (track) => {
+        if (!track || (!track.id && !track.videoId)) return;
+        const normalizedTrack = {
+            id: track.id || track.videoId,
+            name: track.name || track.title || "Unknown Track",
+            artist: track.artist || track.channelTitle || "Unknown Artist",
+            thumbnail: track.thumbnail || track.thumbNail || "",
+            genre: track.genre || [],
+        };
+
+        const { queue, track: currentTrack } = get();
+
+        // Check if track is already in queue
+        const existingIdx = queue.findIndex((t) => (t.id || t.videoId) === normalizedTrack.id);
+        if (existingIdx !== -1) {
+            toast.success("Track is already in queue");
+            return;
+        }
+
+        const newQueue = [...queue, normalizedTrack];
+
+        if (!currentTrack || queue.length === 0) {
+            set({
+                queue: newQueue,
+                currentIndex: 0,
+                track: normalizedTrack,
+                isPlaying: true,
+            });
+            toast.success(`Playing: ${normalizedTrack.name}`);
+        } else {
+            set({ queue: newQueue });
+            toast.success(`Added to queue: ${normalizedTrack.name}`);
+        }
+    },
+
+    /**
+     * WHAT: Remove a track from the queue by index.
+     * WHY: Allows users to remove specific tracks from the upcoming queue list.
+     */
+    removeFromQueue: (index) => {
+        const { queue, currentIndex } = get();
+        if (index < 0 || index >= queue.length) return;
+
+        const newQueue = [...queue];
+        newQueue.splice(index, 1);
+
+        let newCurrentIndex = currentIndex;
+
+        if (index === currentIndex) {
+            // Removing currently playing track -> play next if available, else prev, else clear
+            if (newQueue.length === 0) {
+                set({ queue: [], currentIndex: 0, track: null, isPlaying: false });
+                return;
+            }
+            newCurrentIndex = index < newQueue.length ? index : newQueue.length - 1;
+            set({
+                queue: newQueue,
+                currentIndex: newCurrentIndex,
+                track: newQueue[newCurrentIndex],
+            });
+            return;
+        } else if (index < currentIndex) {
+            // Shift current index left by 1
+            newCurrentIndex = currentIndex - 1;
+        }
+
+        set({ queue: newQueue, currentIndex: newCurrentIndex });
+    },
+
+    /**
+     * WHAT: Reorder a track inside the queue from `fromIndex` to `toIndex`.
+     * WHY: Driven by drag-and-drop actions in TrackQueue component.
+     */
+    reorderQueue: (fromIndex, toIndex) => {
+        const { queue, currentIndex } = get();
+        if (
+            fromIndex < 0 ||
+            fromIndex >= queue.length ||
+            toIndex < 0 ||
+            toIndex >= queue.length ||
+            fromIndex === toIndex
+        ) {
+            return;
+        }
+
+        const newQueue = [...queue];
+        const [movedItem] = newQueue.splice(fromIndex, 1);
+        newQueue.splice(toIndex, 0, movedItem);
+
+        // Adjust currentIndex to follow the currently active track
+        let newCurrentIndex = currentIndex;
+        if (currentIndex === fromIndex) {
+            newCurrentIndex = toIndex;
+        } else if (fromIndex < currentIndex && toIndex >= currentIndex) {
+            newCurrentIndex = currentIndex - 1;
+        } else if (fromIndex > currentIndex && toIndex <= currentIndex) {
+            newCurrentIndex = currentIndex + 1;
+        }
+
+        set({ queue: newQueue, currentIndex: newCurrentIndex });
+    },
+
+    /**
+     * WHAT: Clear all upcoming tracks in the queue.
+     * WHY: Keeps only the currently playing track in queue.
+     */
+    clearQueue: () => {
+        const { queue, currentIndex, track } = get();
+        if (!track || queue.length === 0) {
+            set({ queue: [], currentIndex: 0 });
+            return;
+        }
+
+        // Retain only current track at index 0
+        set({
+            queue: [track],
+            currentIndex: 0,
+            playbackHistory: [],
+        });
+        toast.success("Cleared upcoming queue");
+    },
+
+    /**
      * WHAT: Navigates to next track in queue.
      * WHY: Triggered by user 'Next' button click or automatic track completion.
-     * HOW:
-     * - If `isShuffling` is true: selects a random index different from `currentIndex`.
-     * - Otherwise: increments `currentIndex` by 1.
-     * - Clamps index within valid queue bounds `[0, queue.length - 1]`.
      */
     nextTrack: () => set((state) => {
         let nextIndex;
-    
+
+        if (state.queue.length === 0) return state;
+
+        // Push current index to history stack
+        const newHistory = [...state.playbackHistory, state.currentIndex];
+
         if (state.isShuffling) {
             if (state.queue.length <= 1) {
                 nextIndex = state.currentIndex;
@@ -229,28 +358,39 @@ const usePlayerStore = create((set, get) => ({
         } else {
             nextIndex = state.currentIndex + 1;
         }
-    
+
         if (nextIndex < state.queue.length && nextIndex >= 0) {
             return {
                 currentIndex: nextIndex,
                 track: state.queue[nextIndex],
                 isPlaying: true,
+                playbackHistory: newHistory,
             };
         }
         return state;
     }),
-    
+
     /**
      * WHAT: Navigates to previous track in queue.
      * WHY: Triggered by user 'Previous' button click.
-     * HOW:
-     * - If `isShuffling` is true: selects a random index different from `currentIndex`.
-     * - Otherwise: decrements `currentIndex` by 1.
-     * - Clamps index within valid queue bounds `[0, queue.length - 1]`.
      */
     prevTrack: () => set((state) => {
+        if (state.queue.length === 0) return state;
+
         let prevIndex;
-    
+
+        // Check if we have history to pop
+        if (state.playbackHistory.length > 0) {
+            const newHistory = [...state.playbackHistory];
+            prevIndex = newHistory.pop();
+            return {
+                currentIndex: prevIndex,
+                track: state.queue[prevIndex] || state.track,
+                isPlaying: true,
+                playbackHistory: newHistory,
+            };
+        }
+
         if (state.isShuffling) {
             if (state.queue.length <= 1) {
                 prevIndex = state.currentIndex;
@@ -262,7 +402,7 @@ const usePlayerStore = create((set, get) => ({
         } else {
             prevIndex = state.currentIndex - 1;
         }
-    
+
         if (prevIndex >= 0 && prevIndex < state.queue.length) {
             return {
                 currentIndex: prevIndex,
@@ -271,30 +411,6 @@ const usePlayerStore = create((set, get) => ({
             };
         }
         return state;
-    }),
-
-    // ------------------------------------------------------------------------
-    // UI & SIDEBAR GLOBAL STATE (Persisted across routes & reloads)
-    // ------------------------------------------------------------------------
-    isSidebarCollapsed: typeof window !== 'undefined' ? localStorage.getItem("audioscape_sidebar_collapsed") === "true" : false,
-
-    toggleSidebarCollapsed: () => set((state) => {
-        const next = !state.isSidebarCollapsed;
-        try {
-            localStorage.setItem("audioscape_sidebar_collapsed", String(next));
-        } catch (e) {
-            console.error("Failed saving sidebar state:", e);
-        }
-        return { isSidebarCollapsed: next };
-    }),
-
-    setSidebarCollapsed: (collapsed) => set(() => {
-        try {
-            localStorage.setItem("audioscape_sidebar_collapsed", String(collapsed));
-        } catch (e) {
-            console.error("Failed saving sidebar state:", e);
-        }
-        return { isSidebarCollapsed: collapsed };
     }),
 }));
 

@@ -5,6 +5,7 @@ import UserMenu from "@/components/Auth/UserMenu";
 import { useTheme } from "@/ThemeProvider";
 import { Sun, Moon, Menu } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
+import useSidebarStore from "@/store/useSidebarStore";
 import Footer from "@/components/Home/Footer";
 import { cn } from "@/lib/utils";
 
@@ -18,7 +19,7 @@ import { cn } from "@/lib/utils";
  * mobile drawer, and main content viewport.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Persisted Global Sidebar State: Connects to `usePlayerStore` (`isSidebarCollapsed`)
+ * 1. Persisted Global Sidebar State: Connects to `useSidebarStore` (`isSidebarCollapsed`)
  *    so collapsing or expanding the sidebar stays persisted across all page navigations.
  * 2. Ultra-Smooth Layout Pacing: Applies `.sidebar-transition` utility with synchronized
  *    cubic-bezier easing curve (`cubic-bezier(0.4, 0, 0.2, 1)`), eliminating jittering during resizes.
@@ -33,7 +34,8 @@ import { cn } from "@/lib/utils";
 const AppLayout = ({ children }) => {
   const { theme, setTheme } = useTheme();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const { isSidebarCollapsed, toggleSidebarCollapsed, setTrack } = usePlayerStore();
+  const { isSidebarCollapsed, toggleSidebarCollapsed } = useSidebarStore();
+  const { setTrack } = usePlayerStore();
 
   return (
     <div className="h-screen flex overflow-hidden transition-colors duration-300 bg-[var(--color-surface-base)] text-[var(--color-on-surface)]">

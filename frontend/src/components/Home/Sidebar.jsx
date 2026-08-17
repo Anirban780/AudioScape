@@ -4,6 +4,7 @@ import { Home, Compass, Library, Heart, PanelLeftClose, PanelLeftOpen } from 'lu
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import usePlayerStore from '@/store/usePlayerStore';
+import useSidebarStore from '@/store/useSidebarStore';
 
 /**
  * ============================================================================
@@ -17,14 +18,14 @@ import usePlayerStore from '@/store/usePlayerStore';
  * 3. Rich, non-tight active & hover pill styling with breathing room.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Global State Persistence: Uses `usePlayerStore` (`isSidebarCollapsed`) so the sidebar
+ * 1. Global State Persistence: Uses `useSidebarStore` (`isSidebarCollapsed`) so the sidebar
  *    state remains persisted across all page navigations (Home -> Explore -> Favourites -> Playlists).
  * 2. Generous Pill Padding: Replaced tight items with spacious `py-3.5 px-4 my-1 rounded-2xl` pills,
  *    subtle glassmorphic active background (`bg-[var(--color-primary)]/15`), and left accent bar.
  * 3. Button-First Header Layout: Places toggle icon first on left, followed by "AudioScape" title.
  * 
  * HOW IT WORKS:
- * - Reads `isSidebarCollapsed` & `toggleSidebarCollapsed` from Zustand store.
+ * - Reads `isSidebarCollapsed` & `toggleSidebarCollapsed` from `useSidebarStore`.
  * - Applies smooth `.sidebar-transition` utility for fluid layout pacing.
  */
 
@@ -35,7 +36,7 @@ const Sidebar = ({
   onToggle,
   isMobile = false,
 }) => {
-  const { isSidebarCollapsed: storeCollapsed, toggleSidebarCollapsed } = usePlayerStore();
+  const { isSidebarCollapsed: storeCollapsed, toggleSidebarCollapsed } = useSidebarStore();
 
   const isCollapsed = isMobile
     ? false
