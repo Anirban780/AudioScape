@@ -2,35 +2,34 @@ import React, { useEffect, useRef, useState } from "react";
 import { fetchUserLikedSongs } from "@/utils/api";
 import placeholder from "@/assets/placeholder.jpg";
 import { Button } from "@/components/ui/button";
-import { ChevronRight, ChevronLeft, Heart, Music } from "lucide-react";
-import MusicCard from "@/components/Cards/MusicCard";
+import { ChevronRight, ChevronLeft, Heart, Music, Play, ListPlus } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
+import usePlaylistStore from "@/store/usePlaylistStore";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useNavigate } from "react-router-dom";
+import SectionHeader from "@/components/Home/SectionHeader";
+import { getValidThumbnailUrl, getHighResThumbnailUrl, decodeHtmlEntities, handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
 import toast from "react-hot-toast";
 
 /**
  * ============================================================================
- * FAVORITE SONGS CAROUSEL SECTION (FavoriteSongs.jsx)
+ * FAVORITE SONGS VINYL CAROUSEL SECTION (FavoriteSongs.jsx)
  * ============================================================================
  * 
  * WHAT THIS FILE DOES:
- * Displays the user's liked/favourited track collection on the Home Page
- * as a responsive horizontal scroll-snap carousel with direct play triggers
- * and a "SEE ALL" action link to the main `/favourites` page.
+ * Displays user's liked/favourited track collection with vinyl record hover effects:
+ * 1. Branded Section Header (`SectionHeader.jsx`): Rose accent bar, tagline subtitle, track count.
+ * 2. Tactile Vinyl Record Hover Effect: On card hover, album artwork shifts left while a dark
+ *    grooved vinyl disc peeks out from behind the right edge with a spinning animation.
+ * 3. Rank Badges: Shows `#1`, `#2`, `#3` badges based on recent like order.
+ * 4. Router Navigation: "SEE ALL" pill button navigates directly to `/favourites`.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Always-Visible Section: Includes skeleton loading states and glassmorphic
- *    empty state card so the section is always present and informative.
- * 2. Stitch Design Tokens: Uses surface elevation tokens (`bg-[var(--color-surface-raised)]`,
- *    `border-[var(--color-border-default)]`) for seamless Light (`Aura Lumina`) and
- *    Dark (`Midnight Studio`) theme integration.
- * 3. Positioned at Page End: Placed as the final section on the Home Page to provide
- *    quick access to personal favorites.
+ * 1. Premium Tactile Feel: The vinyl disc animation makes personal favorites feel treasured.
+ * 2. Theme Compliance: Employs Stitch surface variables (`var(--color-surface-raised)`, `var(--color-border-default)`).
  * 
  * HOW IT WORKS:
  * - On mount, fetches liked tracks for `userId`.
- * - Displays loading skeletons or empty state card if no favorites exist yet.
+ * - Displays horizontal scroll-snap carousel of vinyl cards.
  * - Clicking any track invokes `usePlayerStore.getState().setTrack(song)` to start playback.
  */
 
@@ -40,7 +39,7 @@ const FavoriteSongs = ({ userId }) => {
   const [showScrollRight, setShowScrollRight] = useState(false);
   const [showScrollLeft, setShowScrollLeft] = useState(false);
   const scrollRef = useRef(null);
-  const navigate = useNavigate();
+  const { openModal } = usePlaylistStore();
 
   useEffect(() => {
     let isMounted = true;
@@ -87,20 +86,31 @@ const FavoriteSongs = ({ userId }) => {
     }
   };
 
+  const handlePlayTrack = (song) => {
+    usePlayerStore.getState().setTrack({
+      id: song.id || song.videoId,
+      name: song.name || song.title,
+      artist: song.artist,
+      thumbnail: song.thumbnail || placeholder,
+    });
+    usePlayerStore.getState().setIsPlaying(true);
+    toast.success(`Playing: ${song.name || song.title}`);
+  };
+
   return (
     <section className="mb-10 sm:mb-12 relative">
-      {/* Section Header */}
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-xl sm:text-2xl font-bold text-[var(--color-on-surface)] flex items-center gap-2 tracking-tight">
-          <span className="text-pink-500">❤️</span> Favorite Songs
-        </h2>
-        <button
-          onClick={() => navigate("/favourites")}
-          className="text-[var(--color-on-surface-variant)] text-xs font-bold tracking-wider hover:text-[var(--color-primary)] transition-colors uppercase cursor-pointer"
-        >
-          SEE ALL
-        </button>
-      </div>
+      {/* Branded Section Header */}
+      <SectionHeader
+        icon={<Heart size={20} className="fill-current" />}
+        title="Your Favorites"
+        subtitle="songs you can't stop replaying in your collection"
+        accentGradient="from-pink-500 via-rose-400 to-transparent"
+        iconBgColor="bg-pink-500/15 text-pink-500 border-pink-500/30"
+        titleGradient="from-rose-400 via-pink-400 to-fuchsia-400"
+        trackCount={favoriteSongs.length}
+        seeAllHref="/favourites"
+        seeAllLabel="VIEW ALL"
+      />
 
       {/* Skeleton Loading State */}
       {loading && (
@@ -132,36 +142,102 @@ const FavoriteSongs = ({ userId }) => {
               const exploreEl = document.getElementById("recommendations-section");
               exploreEl?.scrollIntoView({ behavior: "smooth" });
             }}
-            className="px-5 py-2.5 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] font-bold text-xs tracking-wider flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-md"
+            className="px-5 py-2.5 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] font-bold text-xs tracking-wider flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer"
           >
             <Music size={16} /> DISCOVER MUSIC
           </button>
         </div>
       )}
 
-      {/* Favorites Carousel Container */}
+      {/* Favorites Vinyl Record Carousel */}
       {!loading && favoriteSongs.length > 0 && (
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="grid grid-flow-col auto-cols-[minmax(180px,1fr)] sm:auto-cols-[minmax(200px,1fr)] gap-5 overflow-x-auto scrollbar-hide scroll-smooth py-2"
+          className="grid grid-flow-col auto-cols-[minmax(190px,1fr)] sm:auto-cols-[minmax(210px,1fr)] gap-6 overflow-x-auto scrollbar-hide scroll-smooth py-3 px-1 relative z-10"
           style={{ scrollSnapType: "x mandatory" }}
         >
-          {favoriteSongs.map((song, index) => (
-            <div key={`${song.id || song.videoId}-${index}`} style={{ scrollSnapAlign: "start" }}>
-              <MusicCard
-                id={song.id || song.videoId}
-                name={song.name || song.title}
-                artist={song.artist}
-                image={song.thumbnail || placeholder}
-                onClick={() => {
-                  usePlayerStore.getState().setTrack(song);
-                  usePlayerStore.getState().setIsPlaying(true);
-                  toast.success(`Playing: ${song.name || song.title}`);
-                }}
-              />
-            </div>
-          ))}
+          {favoriteSongs.map((song, index) => {
+            const songId = song.id || song.videoId;
+            const validImage = getHighResThumbnailUrl(song.thumbnail || song.coverUrl, songId) || getValidThumbnailUrl(song.thumbnail) || placeholder;
+            const cleanTitle = decodeHtmlEntities(song.name || song.title || "Untitled Track");
+            return (
+              <div
+                key={`${songId}-${index}`}
+                style={{ scrollSnapAlign: "start" }}
+                onClick={() => handlePlayTrack(song)}
+                className="group relative cursor-pointer flex flex-col items-center select-none"
+              >
+                {/* Vinyl Record + Sleeve Container */}
+                <div className="relative w-full aspect-square rounded-2xl bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] hover:border-pink-500/50 shadow-md hover:shadow-xl transition-all duration-500 p-2 overflow-visible">
+                  
+                  {/* Dark Vinyl Disc Peeking Out on Hover */}
+                  <div className="absolute top-2 right-2 w-[85%] h-[85%] rounded-full bg-neutral-900 border-4 border-neutral-800 shadow-xl flex items-center justify-center transition-all duration-500 group-hover:translate-x-5 group-hover:rotate-45 pointer-events-none z-0">
+                    {/* Vinyl Grooves Pattern */}
+                    <div className="w-[70%] h-[70%] rounded-full border border-neutral-700/50 flex items-center justify-center">
+                      <div className="w-[45%] h-[45%] rounded-full border border-neutral-700/50 flex items-center justify-center">
+                        {/* Center Vinyl Label */}
+                        <div className="w-[30%] h-[30%] rounded-full bg-pink-600 border border-pink-400 flex items-center justify-center">
+                          <div className="w-1.5 h-1.5 rounded-full bg-black" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Album Cover Artwork Sleeve */}
+                  <div className="relative z-10 w-full h-full rounded-xl overflow-hidden shadow-md group-hover:-translate-x-2 transition-transform duration-500 bg-[var(--color-surface-base)]">
+                    <img
+                      src={validImage}
+                      alt={cleanTitle}
+                      onLoad={handleThumbnailLoad}
+                      onError={(e) => handleThumbnailError(e, songId)}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+
+                    {/* Rank Badge */}
+                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-xs text-white text-[10px] font-extrabold tracking-wider border border-white/20">
+                      #{index + 1}
+                    </div>
+
+                    {/* Add to Playlist Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openModal({
+                          id: songId,
+                          name: cleanTitle,
+                          artist: song.artist,
+                          thumbnail: validImage,
+                        });
+                      }}
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 hover:bg-pink-600 text-white transition-all shadow-md cursor-pointer"
+                      title="Add to playlist"
+                    >
+                      <ListPlus size={14} />
+                    </button>
+
+                    {/* Hover Play Button Overlay */}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                      <div className="w-11 h-11 rounded-full bg-pink-600 text-white flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
+                        <Play size={20} fill="currentColor" className="ml-0.5" />
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Song Title & Artist */}
+                <div className="w-full mt-3 text-left px-1">
+                  <h4 className="font-bold text-sm text-[var(--color-on-surface)] truncate group-hover:text-pink-500 transition-colors" title={cleanTitle}>
+                    {cleanTitle}
+                  </h4>
+                  <p className="text-xs text-[var(--color-on-surface-variant)] truncate mt-0.5" title={song.artist}>
+                    {song.artist || "Unknown Artist"}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
@@ -170,7 +246,7 @@ const FavoriteSongs = ({ userId }) => {
         <Button
           onClick={handleScrollLeft}
           size="icon"
-          className="absolute left-2 top-1/2 -translate-y-1/2 bg-[var(--color-primary)] text-[var(--color-text-on-primary)] hover:opacity-90 shadow-xl rounded-full z-20"
+          className="absolute left-2 top-1/2 -translate-y-1/2 bg-[var(--color-primary)] text-[var(--color-text-on-primary)] hover:opacity-90 shadow-xl rounded-full z-20 cursor-pointer"
           aria-label="Scroll left"
         >
           <ChevronLeft size={20} />
@@ -182,7 +258,7 @@ const FavoriteSongs = ({ userId }) => {
         <Button
           onClick={handleScrollRight}
           size="icon"
-          className="absolute right-2 top-1/2 -translate-y-1/2 bg-[var(--color-primary)] text-[var(--color-text-on-primary)] hover:opacity-90 shadow-xl rounded-full z-20"
+          className="absolute right-2 top-1/2 -translate-y-1/2 bg-[var(--color-primary)] text-[var(--color-text-on-primary)] hover:opacity-90 shadow-xl rounded-full z-20 cursor-pointer"
           aria-label="Scroll right"
         >
           <ChevronRight size={20} />

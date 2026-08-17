@@ -1,10 +1,21 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
 @import "tailwindcss";
 
 @plugin "tailwindcss-animate";
 
 @custom-variant dark (&:is(.dark *));
 
+.font-display {
+  font-family: 'Outfit', sans-serif;
+}
+
+.font-body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
 :root {
+
   /* Aura Lumina (Light Theme Tokens) */
   --background: hsl(255 33% 98%);
   --foreground: hsl(223 21% 16%);
@@ -167,7 +178,6 @@ html {
     font-size: 85%;
   }
 }
-
 /* Vertical Smooth Pan Animation for Hero Banner Background Artwork */
 @keyframes heroPanUpDown {
   0% {
@@ -187,5 +197,59 @@ html {
 .animate-pan-vertical {
   animation: heroPanUpDown 12s ease-in-out infinite alternate;
   will-change: object-position, transform;
+}
+
+/* Cinematic Zoom-In Animation for Hero Banner Background Artwork */
+@keyframes heroZoomIn {
+  0% {
+    transform: scale(1.0);
+  }
+  100% {
+    transform: scale(1.15);
+  }
+}
+
+.animate-zoom-in {
+  animation: heroZoomIn 7s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  will-change: transform;
+}
+
+/* Smooth Layout Pacing & Transition Utilities for Sidebar & Page Reflow */
+.sidebar-transition {
+  transition: width 350ms cubic-bezier(0.4, 0, 0.2, 1),
+              max-width 350ms cubic-bezier(0.4, 0, 0.2, 1),
+              padding 350ms cubic-bezier(0.4, 0, 0.2, 1),
+              margin 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: width, max-width;
+}
+
+/* Animated Accent Bar for Section Headers */
+@keyframes accentBarGrow {
+  0% {
+    width: 0%;
+    opacity: 0;
+  }
+  100% {
+    width: 100%;
+    opacity: 1;
+  }
+}
+
+.animate-accent-bar {
+  animation: accentBarGrow 800ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Vinyl Record Hover Animation for Favorite Songs Carousel */
+@keyframes vinylSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-vinyl-spin {
+  animation: vinylSpin 8s linear infinite;
 }
 

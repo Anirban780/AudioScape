@@ -4,7 +4,8 @@ import banner2 from "@/assets/banner_2.webp";
 import banner3 from "@/assets/banner_3.webp";
 import banner4 from "@/assets/banner_4.webp";
 import banner5 from "@/assets/banner_5.webp";
-import { Zap, ArrowRight, Compass } from "lucide-react";
+import { Search, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import DailyMixCards from "@/components/Home/DailyMixCards";
 
 /**
  * ============================================================================
@@ -13,20 +14,24 @@ import { Zap, ArrowRight, Compass } from "lucide-react";
  * 
  * WHAT THIS FILE DOES:
  * Renders the top 2-column Stitch Dashboard hero banner spotlight grid:
- * 1. Main Dashboard Banner (8-cols): Visual showcase carousel featuring
- *    brand artwork banners, live status pill, headline, and "START LISTENING" CTA button.
- * 2. Focus Flow Shortcut Card (4-cols): Deep concentration music mode shortcut card.
+ * 1. Main Dashboard Banner (8-cols): Integrated full-bleed banner artwork where text,
+ *    badges, and CTA buttons blend directly on top of the zooming image.
+ * 2. Silky Smooth Crossfade Image Carousel: All 5 WebP banner images stay mounted in
+ *    the DOM with CSS `transition-opacity duration-1000 ease-in-out`, eliminating
+ *    harsh key-based remounting jumps and enabling seamless crossfades.
+ * 3. Daily Mix Cards (4-cols): Grouped TF-IDF recommendation mix cards seeded from
+ *    distinct top genres in the user's history (`DailyMixCards.jsx`).
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Stitch Pure Visual Dashboard Banners: Matches Stitch Midnight Studio (`721d44993cd748aca88d8a328189655e`)
- *    and Fragrant Glassy (`8ac7f54565f9488ebb1bc86ad5bfe597`) Dashboard layouts.
- * 2. Pure Visual Banners (No Mock Song Audio): The banner serves strictly as a platform
- *    dashboard banner. Clicking "START LISTENING" smooth-scrolls to the active recommendations grid.
- * 3. Smooth Banner Crossfade: Preloads WebP banners and auto-rotates every 5 seconds.
+ * 1. Personalized Music Curation Hero UX: Authenticated users get 2-3 instant mix cards
+ *    (e.g., "Mix: Lo-fi", "Mix: K-pop", "Mix: Ambient") seeded directly from recommendation keywords.
+ * 2. Seamless Crossfade Transitions: Concurrent image layers fading smoothly over 1000ms.
+ * 3. Cinematic Zoom-In Motion: Active slide image applies `.animate-zoom-in` for smooth motion.
  * 
  * HOW IT WORKS:
  * - `banners`: Predefined array of WebP banner image assets and headlines.
- * - `currentIndex`: Controls active slideshow banner opacity transition.
+ * - `recommendations`: Array of recommendation tracks passed down to `<DailyMixCards />`.
+ * - `currentIndex`: Controls active slideshow banner index.
  */
 
 const banners = [
@@ -62,114 +67,149 @@ const banners = [
   },
 ];
 
-const HeroSection = () => {
+const HeroSection = ({ recommendations = [] }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isTextFading, setIsTextFading] = useState(false);
 
+  // Auto-rotate slides every 6 seconds with smooth text fade synchronization
   useEffect(() => {
     const interval = setInterval(() => {
-      setIsTransitioning(true);
-      setTimeout(() => {
-        setCurrentIndex((prev) => (prev + 1) % banners.length);
-        setIsTransitioning(false);
-      }, 700);
-    }, 5000);
+      handleSlideChange((currentIndex + 1) % banners.length);
+    }, 6000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [currentIndex]);
+
+  const handleSlideChange = (nextIndex) => {
+    setIsTextFading(true);
+    setTimeout(() => {
+      setCurrentIndex(nextIndex);
+      setIsTextFading(false);
+    }, 250);
+  };
 
   const activeBanner = banners[currentIndex];
 
-  const handleStartListening = () => {
-    const targetElement = document.getElementById("recommendations-section");
-    targetElement?.scrollIntoView({ behavior: "smooth" });
+  const handlePrev = () => {
+    const nextIdx = (currentIndex - 1 + banners.length) % banners.length;
+    handleSlideChange(nextIdx);
+  };
+
+  const handleNext = () => {
+    const nextIdx = (currentIndex + 1) % banners.length;
+    handleSlideChange(nextIdx);
+  };
+
+  const handleSearchClick = () => {
+    const searchInput = document.getElementById("search-input") || document.querySelector('input[placeholder*="Search"]');
+    if (searchInput) {
+      searchInput.scrollIntoView({ behavior: "smooth", block: "center" });
+      setTimeout(() => {
+        searchInput.focus();
+      }, 400);
+    }
   };
 
   return (
     <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-10">
-      {/* Main Spotlight Dashboard Banner (8 Cols) */}
-      <div className="lg:col-span-8 rounded-[32px] p-6 sm:p-8 flex flex-col md:flex-row gap-6 sm:gap-8 relative overflow-hidden bg-[var(--color-surface-raised)] border border-[var(--color-border-strong)] shadow-2xl transition-all duration-300">
-        {/* Ambient Radial Blur Glows */}
-        <div className="absolute -right-20 -top-20 w-64 h-64 bg-[var(--color-primary)]/15 blur-[90px] pointer-events-none" />
-        <div className="absolute -left-20 -bottom-20 w-64 h-64 bg-[var(--color-secondary)]/15 blur-[90px] pointer-events-none" />
+      {/* Main Spotlight Dashboard Banner (8 Cols) - Seamless Integrated Design */}
+      <div className="lg:col-span-8 rounded-[32px] h-[340px] sm:h-[370px] relative overflow-hidden bg-[var(--color-surface-raised)] border border-[var(--color-border-strong)] shadow-2xl transition-all duration-500 flex items-center group">
+        
+        {/* 1. Stacked Background Image Layers for Silky Smooth Crossfade Transitions */}
+        {banners.map((banner, idx) => {
+          const isActive = idx === currentIndex;
+          return (
+            <img
+              key={`hero-bg-layer-${idx}`}
+              src={banner.image}
+              alt={banner.title}
+              className={`absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-1000 ease-in-out ${
+                isActive ? "opacity-100 z-0 animate-zoom-in" : "opacity-0 -z-10"
+              }`}
+            />
+          );
+        })}
 
-        {/* Hero Banner Artwork Showcase */}
-        <div className="w-full md:w-72 h-64 md:h-72 rounded-2xl overflow-hidden shadow-2xl relative shrink-0 group">
-          <img
-            src={activeBanner.image}
-            alt={activeBanner.title}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-          />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-          <div className="absolute bottom-3 left-3 right-3 p-3 rounded-xl bg-[var(--color-surface-overlay)]/90 backdrop-blur-md border border-[var(--color-border-default)]">
-            <p className="text-[10px] font-bold tracking-widest text-[var(--color-primary)] uppercase mb-0.5">
-              PLATFORM SPOTLIGHT
-            </p>
-            <h4 className="text-sm font-semibold text-slate-600 truncate">
-              {activeBanner.title}
-            </h4>
-          </div>
-        </div>
+        {/* 2. Soft Integrated Gradient Overlay (Blends text into image with zero boxed separation) */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 via-50% to-transparent pointer-events-none z-10" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-transparent to-transparent pointer-events-none z-10" />
 
-        {/* Hero Content Block */}
-        <div className="flex-1 flex flex-col justify-center z-10">
-          <div className="flex items-center gap-2 mb-3">
-            <span className="w-2.5 h-2.5 rounded-full bg-[var(--color-secondary)] animate-pulse" />
-            <span className="text-xs font-bold tracking-widest text-[var(--color-secondary)] uppercase">
-              FEATURED SOUNDSCAPE
-            </span>
-          </div>
-
-          <h1
-            className="text-2xl sm:text-4xl font-extrabold text-[var(--color-on-surface)] leading-tight mb-2 transition-opacity duration-700"
-            style={{ opacity: isTransitioning ? 0.3 : 1 }}
-          >
-            {activeBanner.headline}
-          </h1>
-          <p
-            className="text-xs sm:text-sm text-[var(--color-on-surface-variant)] mb-6 transition-opacity duration-700 leading-relaxed max-w-lg"
-            style={{ opacity: isTransitioning ? 0.3 : 1 }}
-          >
-            {activeBanner.subtitle}
-          </p>
-
-          {/* Start Listening CTA */}
-          <div className="flex items-center gap-4">
-            <button
-              onClick={handleStartListening}
-              className="bg-[var(--color-primary)] text-[var(--color-text-on-primary)] px-6 py-3 rounded-full font-bold text-xs sm:text-sm tracking-wider flex items-center gap-2 shadow-lg hover:scale-105 active:scale-95 transition-all duration-300"
-            >
-              <Compass size={18} /> START LISTENING
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Focus Flow Discovery Card (4 Cols) */}
-      <div className="lg:col-span-4 flex flex-col gap-6">
-        <div className="rounded-[32px] p-6 flex-1 flex flex-col justify-between bg-[var(--color-surface-raised)] border border-[var(--color-border-strong)] shadow-xl relative overflow-hidden group">
-          <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity">
-            <Zap size={100} className="text-[var(--color-primary)]" />
-          </div>
-          <div>
-            <div className="w-12 h-12 rounded-2xl bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/30 flex items-center justify-center mb-4 text-[var(--color-primary)]">
-              <Zap size={24} />
+        {/* 3. Hero Content Block Directly Integrated Over Artwork */}
+        <div className="relative z-20 h-full w-full flex flex-col justify-between p-6 sm:p-10 max-w-2xl">
+          
+          {/* Top Integrated Text Content with Smooth Fade Sync */}
+          <div className={`max-w-xl transition-opacity duration-300 ${isTextFading ? "opacity-30" : "opacity-100"}`}>
+            <div className="flex items-center gap-2 mb-3 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/25 text-amber-300 border border-amber-500/40 rounded-full font-bold text-[11px] tracking-wider uppercase backdrop-blur-xs shadow-md">
+                <Sparkles size={13} /> SPOTLIGHT #{currentIndex + 1}
+              </span>
+              <span className="text-[11px] font-bold text-white tracking-wider uppercase flex items-center gap-1 bg-white/15 px-3 py-1 rounded-full border border-white/25 backdrop-blur-xs shadow-md">
+                {activeBanner.title}
+              </span>
             </div>
-            <h3 className="text-xl font-bold text-[var(--color-on-surface)] mb-2">
-              Focus Flow
-            </h3>
-            <p className="text-xs sm:text-sm text-[var(--color-on-surface-variant)] leading-relaxed">
-              Deep concentration beats & spatial soundscapes tailored for high-focus sessions.
+
+            <h1 className="text-2xl sm:text-4xl font-extrabold text-white leading-tight mb-2 line-clamp-1 tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
+              {activeBanner.headline}
+            </h1>
+            <p className="text-sm sm:text-base text-slate-200 line-clamp-2 font-medium leading-relaxed drop-shadow-[0_1px_4px_rgba(0,0,0,0.8)] max-w-lg">
+              {activeBanner.subtitle}
             </p>
           </div>
-          <button
-            onClick={handleStartListening}
-            className="flex items-center gap-2 text-xs font-bold tracking-wider text-[var(--color-primary)] mt-6 hover:gap-3 transition-all"
-          >
-            LISTEN NOW <ArrowRight size={16} />
-          </button>
+
+          {/* Bottom Side-by-Side Integrated Action Buttons */}
+          <div className="flex items-center justify-between gap-4 flex-wrap mt-4">
+            
+            {/* Search Music CTA Button */}
+            <button
+              onClick={handleSearchClick}
+              className="bg-[var(--color-primary)] text-[var(--color-text-on-primary)] px-7 py-3 rounded-full font-bold text-xs sm:text-sm tracking-wider flex items-center gap-2.5 shadow-xl hover:scale-105 active:scale-95 transition-all duration-300 cursor-pointer"
+            >
+              <Search size={18} /> SEARCH MUSIC
+            </button>
+
+            {/* Carousel Navigation Controls */}
+            <div className="flex items-center gap-3 bg-black/40 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 shadow-lg text-white">
+              <button
+                onClick={handlePrev}
+                className="p-1 rounded-full hover:bg-white/20 text-white transition-colors cursor-pointer"
+                title="Previous banner"
+                aria-label="Previous banner"
+              >
+                <ChevronLeft size={16} />
+              </button>
+
+              {/* Slide Dots */}
+              <div className="flex items-center gap-1.5">
+                {banners.map((_, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleSlideChange(idx)}
+                    className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                      idx === currentIndex
+                        ? "w-6 bg-[var(--color-primary)]"
+                        : "w-2 bg-white/40 hover:bg-white"
+                    }`}
+                    title={`Go to slide ${idx + 1}`}
+                    aria-label={`Go to slide ${idx + 1}`}
+                  />
+                ))}
+              </div>
+
+              <button
+                onClick={handleNext}
+                className="p-1 rounded-full hover:bg-white/20 text-white transition-colors cursor-pointer"
+                title="Next banner"
+                aria-label="Next banner"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
         </div>
       </div>
+
+      {/* Grouped Daily Mix Cards Module (4 Cols) */}
+      <DailyMixCards recommendations={recommendations} />
     </section>
   );
 };

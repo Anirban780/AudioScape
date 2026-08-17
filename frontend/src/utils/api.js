@@ -84,7 +84,7 @@ export async function fetchLastPlayed(userId) {
         }
 
         const data = await response.json();
-        const rawHistory = data.history || (Array.isArray(data) ? data : []);
+        const rawHistory = data.data || data.history || (Array.isArray(data) ? data : []);
 
         return rawHistory.map((item) => {
             const track = item.track || item;
@@ -261,6 +261,7 @@ export const getRecommendations = async (topN = 10) => {
                 channelTitle: item.channelTitle || item.artist || "Unknown Artist",
                 thumbnail: thumb,
                 thumbNail: thumb,
+                sourceKeyword: item.sourceKeyword || item.keyword || (Array.isArray(item.genre) ? item.genre[0] : item.genre) || "Daily Mix",
             };
         });
     } catch (err) {

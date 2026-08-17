@@ -1,5 +1,6 @@
 import React from "react";
 import MusicCard from "@/components/Cards/MusicCard";
+import MediaGrid from "@/components/Layout/MediaGrid";
 import { RefreshCcw } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
 import toast from "react-hot-toast";
@@ -11,13 +12,13 @@ import toast from "react-hot-toast";
  * 
  * WHAT THIS FILE DOES:
  * Renders an individual music section (e.g. "Lofi Music", "Pop Hits") featuring
- * a 5-column responsive album card grid of tracks and a "More" pagination button.
+ * a container-query driven album card grid of tracks and a "More" pagination button.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
  * 1. Stitch Token Surface: Wraps section in `bg-[var(--color-surface-raised)]`
  *    with `border-[var(--color-border-default)]` for unified Light and Dark theme styling.
- * 2. Responsive 5-Column Grid: Replaces plain vertical list with Stitch's 5-column
- *    grid (`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5`).
+ * 2. MediaGrid Container Queries: Uses `MediaGrid` (`@container`) so track grid columns
+ *    react instantly to sidebar toggles and container dimension changes without JS latency.
  * 
  * HOW IT WORKS:
  * - Accepts `section` object (`title`, `tracks`), `visibleCount`, and `onLoadMore` handler.
@@ -46,8 +47,8 @@ const ExploreSection = ({ section, visibleCount = 5, onLoadMore }) => {
         </span>
       </div>
 
-      {/* 5-Column Track Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+      {/* Container-Query Track Grid */}
+      <MediaGrid>
         {displayedTracks.map((track, index) => (
           <MusicCard
             key={`${track.id || track.videoId}-${index}`}
@@ -67,7 +68,7 @@ const ExploreSection = ({ section, visibleCount = 5, onLoadMore }) => {
             }}
           />
         ))}
-      </div>
+      </MediaGrid>
 
       {/* Load More Button */}
       {hasMore && (
