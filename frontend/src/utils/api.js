@@ -367,3 +367,102 @@ export async function fetchExploreCategories() {
     }
 }
 
+/**
+ * Generates an initial play queue from NestJS backend (`POST /api/music/generate-queue`).
+ * @param {string} currentTrackId - Active YouTube video ID.
+ * @param {string} [keyword] - Optional context genre/keyword.
+ * @returns {Promise<Array>} Array of normalized queued track objects.
+ */
+export async function generateQueueFromBackend(currentTrackId, keyword) {
+    if (!currentTrackId) return [];
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
+
+        const response = await fetch(`${API_URL}/api/music/generate-queue`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...headers,
+            },
+            body: JSON.stringify({ currentTrackId, keyword }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to generate queue from backend: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const rawTracks = Array.isArray(data) ? data : (data.queue || data.tracks || []);
+
+        return rawTracks.map((t) => {
+            const trackId = t.id || t.videoId;
+            const thumb = getValidThumbnailUrl(t.thumbnail || t.thumbNail || t.thumbnailUrl || "") || "";
+            return {
+                id: trackId,
+                videoId: trackId,
+                title: t.name || t.title || "Unknown Title",
+                name: t.name || t.title || "Unknown Title",
+                artist: t.artist || t.channelTitle || "Unknown Artist",
+                channelTitle: t.artist || t.channelTitle || "Unknown Artist",
+                thumbnail: thumb,
+                thumbNail: thumb,
+                genre: t.genre || [],
+            };
+        });
+    } catch (error) {
+        console.error("Error generating queue from backend:", error);
+        return [];
+    }
+}
+
+/**
+ * Fetches additional non-duplicate recommended tracks from NestJS backend (`POST /api/music/extend-queue`).
+ * @param {Array<string>} existingTrackIds - Array of track IDs currently present in client queue.
+ * @param {string} [keyword] - Optional context genre/keyword.
+ * @returns {Promise<Array>} Array of new normalized track objects.
+ */
+export async function extendQueueFromBackend(existingTrackIds, keyword) {
+    if (!Array.isArray(existingTrackIds) || existingTrackIds.length === 0) return [];
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
+
+        const response = await fetch(`${API_URL}/api/music/extend-queue`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...headers,
+            },
+            body: JSON.stringify({ existingTrackIds, keyword }),
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to extend queue from backend: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const rawTracks = Array.isArray(data) ? data : (data.tracks || []);
+
+        return rawTracks.map((t) => {
+            const trackId = t.id || t.videoId;
+            const thumb = getValidThumbnailUrl(t.thumbnail || t.thumbNail || t.thumbnailUrl || "") || "";
+            return {
+                id: trackId,
+                videoId: trackId,
+                title: t.name || t.title || "Unknown Title",
+                name: t.name || t.title || "Unknown Title",
+                artist: t.artist || t.channelTitle || "Unknown Artist",
+                channelTitle: t.artist || t.channelTitle || "Unknown Artist",
+                thumbnail: thumb,
+                thumbNail: thumb,
+                genre: t.genre || [],
+            };
+        });
+    } catch (error) {
+        console.error("Error extending queue from backend:", error);
+        return [];
+    }
+}
+
+

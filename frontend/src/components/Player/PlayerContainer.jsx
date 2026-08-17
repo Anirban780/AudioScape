@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback, useEffect, useRef } from "react";
 import FullScreenPlayer from "./FullScreenPlayer";
 import YoutubePlayer from "./YoutubePlayer";
 import MiniPlayer from "./MiniPlayer";
 import usePlayerStore from "@/store/usePlayerStore";
-import { generateQueue } from "@/utils/generateQueue";
+import { generateQueueFromBackend, extendQueueFromBackend } from "@/utils/api";
 
 const isValidKeyword = (keyword) => {
   if (!keyword) return false;
@@ -15,17 +15,40 @@ const isValidKeyword = (keyword) => {
 const getRandomGenre = (genres) => {
   if (Array.isArray(genres) && genres.length > 0) {
     const cleanedGenres = genres
-      .map((g) => g.toLowerCase().trim())
+      .map((g) => (typeof g === "string" ? g.toLowerCase().trim() : ""))
       .filter(isValidKeyword);
 
     if (cleanedGenres.length > 0) {
       return cleanedGenres[Math.floor(Math.random() * cleanedGenres.length)];
     }
   }
-
   return null;
 };
 
+/**
+ * ============================================================================
+ * PLAYER CONTAINER ORCHESTRATOR (PlayerContainer.jsx)
+ * ============================================================================
+ * 
+ * WHAT THIS FILE DOES:
+ * Parent orchestrator managing audio playback lifecycle, hidden YouTube iFrame embed,
+ * server-side queue generation, continuous radio auto-refill, and view switching
+ * between MiniPlayer and FullScreenPlayer.
+ * 
+ * WHY IT WAS DESIGNED THIS WAY:
+ * 1. Single Audio Lifecycle: Keeps YouTube iFrame mounted continuously while toggling
+ *    between MiniPlayer and FullScreenPlayer without interrupting playback.
+ * 2. Event-Driven Track End: Replaced legacy polling interval with single `onTrackEnd`
+ *    callback from `YoutubePlayer.jsx`, eliminating state race conditions.
+ * 3. Server-Authoritative Queue: Uses NestJS `generateQueueFromBackend` and `extendQueueFromBackend`
+ *    for zero-quota TF-IDF recommendations and continuous auto-refill.
+ * 
+ * HOW IT WORKS:
+ * - When a new track starts with empty queue: calls `generateQueueFromBackend(track.id, keyword)`.
+ * - When playback nears queue end (`currentIndex >= queue.length - 2`): calls `extendQueueFromBackend`
+ *   to append fresh non-duplicate recommendations seamlessly.
+ * - On track completion (`onTrackEnd`): re-seeks if looping, else calls `nextTrack()`.
+ */
 const PlayerContainer = ({ onClose, uid }) => {
   const {
     player,
@@ -36,54 +59,82 @@ const PlayerContainer = ({ onClose, uid }) => {
     setTrack,
     queue,
     setQueue,
+    currentIndex,
     setCurrentIndex,
     isLooping,
     isFullScreen,
     toggleFullScreen,
     nextTrack,
+    isAutoRefillEnabled,
   } = usePlayerStore();
 
+  const isExtendingRef = useRef(false);
+
+  // STEP 1: Initial Queue Generation from NestJS Backend
   useEffect(() => {
-    if (track?.id && uid && queue.length === 0) {
+    if (track?.id && queue.length === 0) {
       const keyword = getRandomGenre(track.genre);
-      console.debug("Generating queue for track:", track.id, "with keyword:", keyword);
+      console.debug("Generating backend queue for track:", track.id, "keyword:", keyword);
 
       const fetchQueue = async () => {
         try {
-          const generatedQueue = await generateQueue(keyword, uid, track);
+          const generatedQueue = await generateQueueFromBackend(track.id, keyword);
           if (Array.isArray(generatedQueue) && generatedQueue.length > 0) {
             setQueue(generatedQueue);
             setCurrentIndex(0);
           }
         } catch (err) {
-          console.error("Queue generation failed", err);
+          console.error("Backend queue generation failed:", err);
         }
       };
 
       fetchQueue();
     }
-  }, [track?.id, uid, queue.length, setQueue, setCurrentIndex]);
+  }, [track?.id, queue.length, setQueue, setCurrentIndex]);
 
+  // STEP 2: Continuous Radio Auto-Refill near Queue End
   useEffect(() => {
-    if (!player || !track?.id) return;
+    if (
+      !isAutoRefillEnabled ||
+      isExtendingRef.current ||
+      queue.length === 0 ||
+      currentIndex < queue.length - 2
+    ) {
+      return;
+    }
 
-    const checkState = () => {
-      if (!player) return;
+    const extendQueue = async () => {
+      isExtendingRef.current = true;
+      try {
+        const keyword = getRandomGenre(track?.genre);
+        const existingTrackIds = queue.map((t) => t.id || t.videoId).filter(Boolean);
+        const extension = await extendQueueFromBackend(existingTrackIds, keyword);
 
-      const state = player.getPlayerState();
-      if (state === 0) {
-        if (isLooping) {
-          player.seekTo(0);
-          player.playVideo();
-        } else {
-          nextTrack();
+        if (Array.isArray(extension) && extension.length > 0) {
+          console.debug(`[Radio Auto-Refill] Appended ${extension.length} new tracks to queue.`);
+          setQueue([...queue, ...extension]);
         }
+      } catch (err) {
+        console.error("Queue auto-refill failed:", err);
+      } finally {
+        isExtendingRef.current = false;
       }
     };
 
-    const interval = setInterval(checkState, 1000);
-    return () => clearInterval(interval);
-  }, [player, track?.id, isLooping, nextTrack]);
+    extendQueue();
+  }, [currentIndex, queue, isAutoRefillEnabled, track?.genre, setQueue]);
+
+  // STEP 3: Single Event-Driven Track Completion Handler
+  const handleTrackEnd = useCallback(() => {
+    if (isLooping) {
+      if (player && typeof player.seekTo === "function") {
+        player.seekTo(0);
+        player.playVideo?.();
+      }
+    } else {
+      nextTrack();
+    }
+  }, [isLooping, nextTrack, player]);
 
   const onPlayerReady = useCallback((event) => {
     const ytPlayer = event.target;
@@ -94,15 +145,14 @@ const PlayerContainer = ({ onClose, uid }) => {
     setIsPlayerReady(true);
 
     const currentTrack = usePlayerStore.getState().track;
-    if (currentTrack?.id && ytPlayer.getVideoData().video_id !== currentTrack.id) {
+    if (currentTrack?.id && ytPlayer.getVideoData()?.video_id !== currentTrack.id) {
       ytPlayer.loadVideoById({ videoId: currentTrack.id });
       ytPlayer.playVideo();
     }
-
   }, [setPlayer, setIsPlayerReady]);
 
   const handleClose = () => {
-    console.debug("Closing player");
+    console.debug("Closing player and cleaning up resources");
 
     if (player) {
       try {
@@ -135,7 +185,11 @@ const PlayerContainer = ({ onClose, uid }) => {
 
   return (
     <>
-      <YoutubePlayer trackId={track?.id} onReady={onPlayerReady} />
+      <YoutubePlayer
+        trackId={track?.id}
+        onReady={onPlayerReady}
+        onTrackEnd={handleTrackEnd}
+      />
       {isFullScreen ? (
         <FullScreenPlayer
           track={track}
