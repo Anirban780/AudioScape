@@ -90,7 +90,7 @@ const PlayerControls = ({
       <button
         onClick={togglePlayPause}
         className={cn(
-          "w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-[var(--color-primary)] via-[#c084fc] to-[#e8ddff] text-white shadow-[0_0_20px_rgba(167,139,250,0.4)] border-2 border-white/30 flex items-center justify-center shrink-0 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+          "w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-tr from-[var(--color-primary)] via-[#c084fc] to-[#e8ddff] text-white shadow-[0_0_20px_rgba(167,139,250,0.4)] ring-2 ring-white/25 ring-inset shadow-[inset_0_1px_2px_rgba(255,255,255,0.5)] flex items-center justify-center shrink-0 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
         )}
         aria-label={isPlaying ? "Pause track" : "Play track"}
         title={isPlaying ? "Pause (Space)" : "Play (Space)"}
