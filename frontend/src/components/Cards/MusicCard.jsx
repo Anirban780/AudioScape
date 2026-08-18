@@ -37,7 +37,7 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
   const songData = {
     id,
     name: cleanName,
-    artist,
+    artist: artist || "Unknown Artist",
     thumbnail: hdImage,
   };
 
@@ -45,8 +45,6 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
     e.stopPropagation();
     openModal(songData);
   };
-
-
 
   /* -------------------------------------------------------------------------- */
   /* VARIANT 1: COMPACT LIST ROW LAYOUT                                         */
@@ -225,3 +223,5 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
 };
 
 export default MusicCard;
+
+

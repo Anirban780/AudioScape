@@ -19,7 +19,7 @@ import toast from "react-hot-toast";
  * WHAT THIS FILE DOES:
  * Renders personalized AI music recommendations featuring:
  * 1. Branded Section Header (`SectionHeader.jsx`): Top gradient bar, subtitle tagline, AI Taste Engine badge.
- * 2. Integrated Auto-Rotating Daily Mix Banner: Full-bleed background artwork with vertical slow-pan.
+ * 2. Integrated Auto-Rotating Daily Mix Banner: Full-bleed background artwork with vertical slow-pan & Add-to-Queue action.
  * 3. Container-Query Driven MediaGrid (`MediaGrid.jsx`): Responsive card grid driven 100% by container width.
  *    Collapsed view displays 10 recommended tracks; Expanded view ("SEE ALL") renders ALL 20 tracks!
  * 
@@ -132,6 +132,17 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
     });
     usePlayerStore.getState().setIsPlaying(true);
     toast.success(`Playing: ${song.name || song.title}`);
+  };
+
+  const handleAddToQueue = (song) => {
+    const cleanName = song.name || song.title || "Track";
+    usePlayerStore.getState().addToQueue({
+      id: song.id || song.videoId,
+      name: cleanName,
+      artist: song.artist || song.channelTitle || "Unknown Artist",
+      thumbnail: song.thumbnail || song.thumbNail,
+    });
+    toast.success(`Added "${cleanName}" to queue`);
   };
 
   if (loading) {

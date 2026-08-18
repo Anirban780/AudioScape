@@ -81,6 +81,7 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
   const [showLayoutMenu, setShowLayoutMenu] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [rndSize, setRndSize] = useState({ width: 450, height: 84 });
+  const [isDraggingCorner, setIsDraggingCorner] = useState(false);
 
   const progressBarRef = useRef(null);
   const menuRef = useRef(null);
@@ -405,92 +406,108 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
   }
 
   /* ========================================================================= */
-  /* MODE 4: CORNER — Fixed 96px circular artwork bubble with hover card        */
+  /* MODE 4: CORNER — Draggable 112px circular artwork bubble with hover card   */
   /* ========================================================================= */
   if (mode === 'corner') {
     return (
-      <div className="fixed bottom-6 right-6 z-50 group/bubble">
+      <Rnd
+        default={{
+          x: typeof window !== 'undefined' ? window.innerWidth - 140 : 800,
+          y: typeof window !== 'undefined' ? window.innerHeight - 140 : 600,
+          width: 112,
+          height: 112,
+        }}
+        enableResizing={false}
+        bounds="window"
+        onDragStart={() => setIsDraggingCorner(true)}
+        onDragStop={() => setTimeout(() => setIsDraggingCorner(false), 150)}
+        className="z-50 group/bubble"
+      >
+        <div className="relative w-full h-full">
 
-        {/* Hover-expand info card that floats above the bubble (with bottom hover bridge overlay) */}
-        <div className={`absolute bottom-full right-0 mb-3 w-64 mini-player-capsule rounded-2xl p-3.5 flex flex-col gap-2.5 transition-all duration-300 shadow-2xl before:absolute before:inset-x-0 before:-bottom-6 before:h-7 before:w-full ${
-          showLayoutMenu
-            ? 'opacity-100 pointer-events-auto translate-y-0'
-            : 'opacity-0 group-hover/bubble:opacity-100 pointer-events-none group-hover/bubble:pointer-events-auto translate-y-2 group-hover/bubble:translate-y-0'
-        }`}>
-          {/* Track info */}
-          <div className="flex items-center gap-3">
-            <img src={thumbnailUrl} alt={cleanTitle} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-[var(--color-border-strong)]" />
-            <div className="min-w-0">
-              <p className="text-xs font-bold truncate text-[var(--color-on-surface)]" title={cleanTitle}>{cleanTitle}</p>
-              <p className="text-[11px] text-[var(--color-on-surface-variant)] truncate mt-0.5 font-medium" title={cleanArtist}>{cleanArtist}</p>
-            </div>
-          </div>
-
-          {/* Mini progress bar */}
-          <div className="relative w-full h-1 bg-[var(--color-surface-overlay)] rounded-full overflow-hidden cursor-pointer" onClick={handleSeekClick} ref={progressBarRef}>
-            <div className="h-full bg-gradient-to-r from-[var(--color-primary)] via-[#c084fc] to-[var(--color-secondary)] transition-all duration-100" style={{ width: `${percentage}%` }} />
-          </div>
-
-          {/* Controls row inside tooltip card */}
-          <div className="flex items-center justify-between gap-1 pt-0.5">
-            <button onClick={toggleLike} className={`p-1.5 rounded-full transition-colors cursor-pointer ${isLiked ? 'text-pink-500' : 'text-[var(--color-on-surface-variant)] hover:text-pink-400'}`} aria-label="Like"><Heart size={14} fill={isLiked ? 'currentColor' : 'none'} /></button>
-            <button onClick={prevTrack} className="p-1.5 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] rounded-full transition-colors cursor-pointer" aria-label="Previous"><SkipBack size={14} /></button>
-            {renderPlayBtn(9, 15)}
-            <button onClick={nextTrack} className="p-1.5 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] rounded-full transition-colors cursor-pointer" aria-label="Next"><SkipForward size={14} /></button>
-            {renderLayoutMenu}
-            {renderExpandBtn}
-          </div>
-        </div>
-
-        {/* Main 96px (w-24 h-24) circular artwork bubble button */}
-        <div className="relative group/circle cursor-pointer" onClick={togglePlayPause}>
-          {/* Pulsing glow ring when playing */}
-          {isPlaying && (
-            <div className="absolute inset-0 rounded-full bg-[var(--color-primary)]/35 animate-ping scale-105 pointer-events-none" />
-          )}
-          
-          <div className="relative w-24 h-24 sm:w-28 sm:h-28 rounded-full shadow-[0_0_30px_rgba(167,139,250,0.5)] ring-4 ring-[var(--color-primary)]/60 border-2 border-white/30 overflow-hidden transition-all duration-300 group-hover/circle:scale-105">
-            <img src={thumbnailUrl} alt={cleanTitle} className="w-full h-full object-cover" />
-            
-            {/* Semi-transparent play/pause hover overlay */}
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover/circle:opacity-100 transition-opacity duration-200">
-              {isPlaying
-                ? <Pause size={28} className="fill-white text-white drop-shadow-md" />
-                : <Play  size={28} className="fill-white text-white ml-1 drop-shadow-md" />
-              }
-            </div>
-
-            {/* Equalizer overlay indicator when playing */}
-            {isPlaying && (
-              <div className="absolute bottom-2 inset-x-0 flex justify-center items-center gap-0.5 bg-black/40 backdrop-blur-xs py-0.5">
-                <span className="w-0.5 bg-white rounded-full animate-eq-1 h-3" />
-                <span className="w-0.5 bg-white rounded-full animate-eq-2 h-3" />
-                <span className="w-0.5 bg-white rounded-full animate-eq-3 h-3" />
+          {/* Hover-expand info card (hidden when dragging!) */}
+          <div className={`absolute bottom-full right-0 mb-3 w-64 mini-player-capsule rounded-2xl p-3.5 flex flex-col gap-2.5 transition-all duration-300 shadow-2xl before:absolute before:inset-x-0 before:-bottom-6 before:h-7 before:w-full ${
+            !isDraggingCorner && showLayoutMenu
+              ? 'opacity-100 pointer-events-auto translate-y-0'
+              : !isDraggingCorner
+              ? 'opacity-0 group-hover/bubble:opacity-100 pointer-events-none group-hover/bubble:pointer-events-auto translate-y-2 group-hover/bubble:translate-y-0'
+              : 'opacity-0 pointer-events-none'
+          }`}>
+            {/* Track info */}
+            <div className="flex items-center gap-3">
+              <img src={thumbnailUrl} alt={cleanTitle} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-[var(--color-border-strong)]" />
+              <div className="min-w-0">
+                <p className="text-xs font-bold truncate text-[var(--color-on-surface)]" title={cleanTitle}>{cleanTitle}</p>
+                <p className="text-[11px] text-[var(--color-on-surface-variant)] truncate mt-0.5 font-medium" title={cleanArtist}>{cleanArtist}</p>
               </div>
+            </div>
+
+            {/* Mini progress bar */}
+            <div className="relative w-full h-1 bg-[var(--color-surface-overlay)] rounded-full overflow-hidden cursor-pointer" onClick={handleSeekClick} ref={progressBarRef}>
+              <div className="h-full bg-gradient-to-r from-[var(--color-primary)] via-[#c084fc] to-[var(--color-secondary)] transition-all duration-100" style={{ width: `${percentage}%` }} />
+            </div>
+
+            {/* Controls row inside tooltip card */}
+            <div className="flex items-center justify-between gap-1 pt-0.5">
+              <button onClick={toggleLike} className={`p-1.5 rounded-full transition-colors cursor-pointer ${isLiked ? 'text-pink-500' : 'text-[var(--color-on-surface-variant)] hover:text-pink-400'}`} aria-label="Like"><Heart size={14} fill={isLiked ? 'currentColor' : 'none'} /></button>
+              <button onClick={prevTrack} className="p-1.5 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] rounded-full transition-colors cursor-pointer" aria-label="Previous"><SkipBack size={14} /></button>
+              {renderPlayBtn(9, 15)}
+              <button onClick={nextTrack} className="p-1.5 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] rounded-full transition-colors cursor-pointer" aria-label="Next"><SkipForward size={14} /></button>
+              {renderLayoutMenu}
+              {renderExpandBtn}
+            </div>
+          </div>
+
+          {/* Main 112px circular artwork bubble button (Draggable handle) */}
+          <div className="relative group/circle cursor-move w-full h-full" onClick={togglePlayPause}>
+            {/* Pulsing glow ring when playing */}
+            {isPlaying && (
+              <div className="absolute inset-0 rounded-full bg-[var(--color-primary)]/35 animate-ping scale-105 pointer-events-none" />
+            )}
+            
+            <div className="relative w-full h-full rounded-full shadow-[0_0_30px_rgba(167,139,250,0.5)] ring-4 ring-[var(--color-primary)]/60 border-2 border-white/30 overflow-hidden transition-all duration-300 group-hover/circle:scale-105">
+              <img src={thumbnailUrl} alt={cleanTitle} className="w-full h-full object-cover pointer-events-none" />
+              
+              {/* Semi-transparent play/pause hover overlay */}
+              <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover/circle:opacity-100 transition-opacity duration-200">
+                {isPlaying
+                  ? <Pause size={28} className="fill-white text-white drop-shadow-md" />
+                  : <Play  size={28} className="fill-white text-white ml-1 drop-shadow-md" />
+                }
+              </div>
+
+              {/* Equalizer overlay indicator when playing */}
+              {isPlaying && (
+                <div className="absolute bottom-2 inset-x-0 flex justify-center items-center gap-0.5 bg-black/40 backdrop-blur-xs py-0.5">
+                  <span className="w-0.5 bg-white rounded-full animate-eq-1 h-3" />
+                  <span className="w-0.5 bg-white rounded-full animate-eq-2 h-3" />
+                  <span className="w-0.5 bg-white rounded-full animate-eq-3 h-3" />
+                </div>
+              )}
+            </div>
+
+            {/* Close button floats top-right of bubble */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                handleClose();
+              }}
+              className="absolute top-0 right-0 w-6 h-6 bg-[var(--color-surface-overlay)] border border-[var(--color-border-strong)] rounded-full flex items-center justify-center text-[var(--color-on-surface-variant)] hover:text-red-400 hover:bg-red-500/15 transition-colors cursor-pointer shadow-lg z-10"
+              title="Close"
+              aria-label="Close player"
+            >
+              <X size={13} />
+            </button>
+
+            {/* Queue badge */}
+            {queue && queue.length > 1 && (
+              <span className="absolute bottom-0 left-0 w-6 h-6 bg-[var(--color-primary)] text-[var(--color-text-on-primary)] font-bold text-[11px] rounded-full flex items-center justify-center shadow-md ring-2 ring-[var(--color-surface-overlay)] z-10">
+                {queue.length}
+              </span>
             )}
           </div>
-
-          {/* Close button floats top-right of bubble */}
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleClose();
-            }}
-            className="absolute top-0 right-0 w-6 h-6 bg-[var(--color-surface-overlay)] border border-[var(--color-border-strong)] rounded-full flex items-center justify-center text-[var(--color-on-surface-variant)] hover:text-red-400 hover:bg-red-500/15 transition-colors cursor-pointer shadow-lg z-10"
-            title="Close"
-            aria-label="Close player"
-          >
-            <X size={13} />
-          </button>
-
-          {/* Queue badge */}
-          {queue && queue.length > 1 && (
-            <span className="absolute bottom-0 left-0 w-6 h-6 bg-[var(--color-primary)] text-[var(--color-text-on-primary)] font-bold text-[11px] rounded-full flex items-center justify-center shadow-md ring-2 ring-[var(--color-surface-overlay)] z-10">
-              {queue.length}
-            </span>
-          )}
         </div>
-      </div>
+      </Rnd>
     );
   }
 
