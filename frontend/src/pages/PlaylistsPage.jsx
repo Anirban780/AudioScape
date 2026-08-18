@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import AppLayout from "@/components/Layout/AppLayout";
-import { useAuth } from "@/context/AuthContext";
+import useAuthStore from "@/store/useAuthStore";
 import usePlaylistStore from "@/store/usePlaylistStore";
 import usePlayerStore from "@/store/usePlayerStore";
 import toast from "react-hot-toast";
@@ -16,26 +16,14 @@ import MediaGrid from "@/components/Layout/MediaGrid";
  * ============================================================================
  * 
  * WHAT THIS FILE DOES:
- * Displays all custom playlists created by the user and allows playing tracks
- * or deleting playlists.
- * 
- * WHY IT WAS DESIGNED THIS WAY:
- * 1. AppLayout Unification: Uses AppLayout for unified sidebar, sticky search header,
- *    and automatic player dock padding.
- * 2. Smooth In-Page Loader: Added `loading` state with `<Loader message="Loading your playlists..." />`
- *    so navigating to Playlists feels natural and unforced.
- * 3. Surface Token Hierarchy: Uses Stitch surface tokens (`bg-[var(--color-surface-raised)]`,
- *    `border-[var(--color-border-default)]`) for playlist cards and deletion dialogs.
- * 
- * HOW IT WORKS:
- * - Reads `user` object from `useAuth()` and fetches playlists on mount via `getPlaylists(uid)`.
- * - Stores playlists in `usePlaylistStore`.
- * - Confirms deletion using a modal dialog before invoking `deletePlaylist(uid, playlistId)`.
+ * Displays user's created playlists and custom track collections.
+ * Supports playlist selection, playing all songs in a playlist, and deletion.
  */
 
 const PlaylistsPage = () => {
-  const { user } = useAuth();
+  const user = useAuthStore((s) => s.user);
   const { playlists, setPlaylists } = usePlaylistStore();
+  const { setTrack, setQueue } = usePlayerStore();
   const [loading, setLoading] = useState(true);
   const [deleteModal, setDeleteModal] = useState({ open: false, playlist: null });
 
@@ -45,7 +33,7 @@ const PlaylistsPage = () => {
       return;
     }
     setLoading(true);
-    getPlaylists(user.uid)
+    getPlaylists(user.id)
       .then(setPlaylists)
       .catch(() => toast.error("Failed to load playlists"))
       .finally(() => setLoading(false));
@@ -59,8 +47,8 @@ const PlaylistsPage = () => {
     if (!user || !deleteModal.playlist) return toast.error("User not logged in");
 
     try {
-      await deletePlaylist(user.uid, deleteModal.playlist.id);
-      const updated = await getPlaylists(user.uid);
+      await deletePlaylist(user.id, deleteModal.playlist.id);
+      const updated = await getPlaylists(user.id);
       setPlaylists(updated);
       toast.success("Playlist deleted");
     } catch (error) {

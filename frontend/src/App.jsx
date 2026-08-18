@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
+import useAuthStore from "@/store/useAuthStore";
+import { initGoogleAuth, promptGoogleOneTap } from "@/auth/googleAuth";
 import Home from "@/pages/Home";
 import LandingPage from "@/pages/LandingPage";
 import NotFound from "@/pages/NotFound";
@@ -21,28 +23,35 @@ import HistoryPage from "@/pages/HistoryPage";
  * 
  * WHAT THIS FILE DOES:
  * Primary application router and root provider orchestrator.
- * It manages authentication-guarded routes, persistent player/modal overlays,
- * toast notification containers, and theme context provider.
+ * Manages authentication-guarded routes, Google Identity Services initialization,
+ * persistent player/modal overlays, toast notification containers, and theme context provider.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Persistent Audio Playback: PlayerContainer and PlaylistModal are mounted at the
+ * 1. Direct Google OAuth Integration: Initializes Google Identity Services (GIS) on mount
+ *    and triggers One Tap prompt for returning users.
+ * 2. Persistent Audio Playback: PlayerContainer and PlaylistModal are mounted at the
  *    root router level (outside individual page route switches) so audio playback
  *    is never interrupted when navigating between pages.
- * 2. Instant Route Navigation: Removed legacy artificial 1-second setTimeout route delay
- *    (Known Bug #1 fix), allowing instant, responsive page switches.
  * 3. Protected Routes: Unauthenticated users attempting to access protected routes
  *    (/home, /explore, /favourites, /playlists, /history) are redirected to LandingPage ("/").
- * 
- * HOW IT WORKS:
- * - `ThemeProvider` wraps the application, applying `.dark` / `.light` root classes.
- * - `AppContent` checks `useAuth()` state and `usePlayerStore()` active track.
- * - Renders `<PlayerContainer>` when an active track is present and user is logged in.
- * - Renders `<PlaylistModal>` for global playlist management.
+ * ============================================================================
  */
 
 function AppContent() {
-  const { user } = useAuth();
+  const user = useAuthStore((s) => s.user);
   const { track } = usePlayerStore();
+
+  useEffect(() => {
+    // Initialize Google Identity Services SDK once on application mount
+    const timer = setTimeout(() => {
+      initGoogleAuth();
+      if (!useAuthStore.getState().user) {
+        promptGoogleOneTap();
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   return (
     <div className="relative min-h-screen bg-[var(--color-surface-base)] text-[var(--color-on-surface)]">
@@ -60,10 +69,10 @@ function AppContent() {
       />
 
       {/* Persistent Audio Player (Preserved across route changes) */}
-      {user && track && <PlayerContainer uid={user.uid} />}
+      {user && track && <PlayerContainer uid={user.id} />}
 
       {/* Persistent Playlist Selection Modal */}
-      {user && <PlaylistModal userId={user.uid} />}
+      {user && <PlaylistModal userId={user.id} />}
 
       {/* Route Definitions */}
       <Routes>
@@ -74,7 +83,7 @@ function AppContent() {
         <Route path="/playlists" element={user ? <PlaylistsPage /> : <Navigate to="/" replace />} />
         <Route path="/history" element={user ? <HistoryPage /> : <Navigate to="/" replace />} />
         <Route path="/help" element={<HelpFeedback />} />
-        {/* Profile fallback route (Known Bug #2 fix) */}
+        {/* Profile fallback route */}
         <Route path="/profile" element={user ? <Navigate to="/home" replace /> : <Navigate to="/" replace />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
