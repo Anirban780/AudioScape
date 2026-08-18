@@ -1,5 +1,7 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 
 /**
  * ============================================================================
@@ -32,12 +34,15 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       process.env.DATABASE_URL ||
       'postgresql://postgres:postgrespassword@localhost:5432/audioscape?schema=public';
 
+    if (primaryUrl) {
+      process.env.DATABASE_URL = primaryUrl;
+    }
+
+    const pool = new Pool({ connectionString: primaryUrl });
+    const adapter = new PrismaPg(pool);
+
     super({
-      datasources: {
-        db: {
-          url: primaryUrl,
-        },
-      },
+      adapter,
       log: process.env.NODE_ENV === 'development' ? ['query', 'info', 'warn', 'error'] : ['error'],
     });
   }

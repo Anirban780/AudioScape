@@ -4,9 +4,13 @@ const path = require("path");
 require("dotenv").config({ path: path.join(__dirname, "../.env") });
 
 const { PrismaClient } = require("@prisma/client");
+const { PrismaPg } = require("@prisma/adapter-pg");
+const { Pool } = require("pg");
 const admin = require("firebase-admin");
 
-const prisma = new PrismaClient();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL || "postgresql://postgres:postgrespassword@postgres:5432/audioscape?schema=public" });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 // Initialize Firebase Admin with credentials from environment variables (.env)
 if (!admin.apps.length) {

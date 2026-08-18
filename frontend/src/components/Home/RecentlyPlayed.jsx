@@ -18,7 +18,7 @@ import toast from "react-hot-toast";
  * WHAT THIS FILE DOES:
  * Displays user's recent listening history in a specialized "Hero + Compact Rows" layout:
  * 1. Branded Section Header (`SectionHeader.jsx`): Top gradient bar, subtitle tagline, track count.
- * 2. Hero Last-Played Spotlight Card: Highlights most recently played track with 1-click "RESUME PLAYBACK".
+ * 2. Hero Last-Played Spotlight Card: Highlights most recently played track with 1-click "RESUME PLAYBACK" & Add-to-Queue.
  * 3. Compact Horizontal Track Rows: List-style track rows for remaining listening history.
  * 4. Inline Expansion: "See All / Show Less" pill button smoothly toggles list expansion inline.
  * 
@@ -172,8 +172,9 @@ const RecentlyPlayed = ({ userId }) => {
                       e.stopPropagation();
                       openModal(heroTrack);
                     }}
-                    className="p-2 rounded-full bg-black/40 hover:bg-[var(--color-primary)] text-white transition-all backdrop-blur-xs"
+                    className="p-2 rounded-full bg-black/40 hover:bg-[var(--color-primary)] text-white transition-all backdrop-blur-xs cursor-pointer"
                     title="Add to playlist"
+                    aria-label="Add to playlist"
                   >
                     <ListPlus size={16} />
                   </button>

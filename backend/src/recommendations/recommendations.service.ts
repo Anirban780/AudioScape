@@ -602,7 +602,7 @@ export class RecommendationsService {
       thumbnail: getValidThumbnailUrl(h.track.thumbnailUrl) || '',
     }));
 
-    // STEP 4: Balance and mix queue (6 related + 4 recent)
+    // STEP 4: Balance and mix queue (up to 12 related + 7 recent = ~20 tracks)
     const usedIds = new Set<string>([currentTrackObj.id]);
     const finalQueue = [currentTrackObj];
 
@@ -610,7 +610,7 @@ export class RecommendationsService {
       if (!usedIds.has(track.id)) {
         usedIds.add(track.id);
         finalQueue.push(track);
-        if (finalQueue.length >= 7) break; // current + 6 related
+        if (finalQueue.length >= 13) break; // current + 12 related
       }
     }
 
@@ -618,11 +618,61 @@ export class RecommendationsService {
       if (!usedIds.has(track.id)) {
         usedIds.add(track.id);
         finalQueue.push(track);
-        if (finalQueue.length >= 11) break; // total queue length ~11
+        if (finalQueue.length >= 20) break; // total queue length ~20
       }
     }
 
     return finalQueue;
+  }
+
+  /**
+   * Generates additional non-duplicate recommended tracks to extend an active playback queue (radio auto-refill).
+   * 
+   * @param userId - Internal PostgreSQL user UUID
+   * @param existingTrackIds - Array of track IDs currently present in user's queue
+   * @param keyword - Optional genre/context keyword
+   * @returns Array of new non-duplicate queued track objects
+   */
+  async extendQueue(userId: string, existingTrackIds: string[], keyword?: string) {
+    const usedIds = new Set<string>(existingTrackIds || []);
+    let candidateTracks: Array<{ id: string; name: string; artist: string; thumbnail: string }> = [];
+
+    // STEP 1: Search for candidates using keyword context if provided
+    if (keyword && keyword.trim()) {
+      try {
+        const searchRes = await this.tracksService.searchTracks(keyword);
+        candidateTracks = (searchRes.tracks || []).map((t) => ({
+          id: t.videoId,
+          name: t.title,
+          artist: t.channelTitle,
+          thumbnail: getValidThumbnailUrl(t.thumbNail) || '',
+        }));
+      } catch (err: any) {
+        this.logger.warn(`Extend queue search failed for keyword '${keyword}': ${err.message}`);
+      }
+    }
+
+    // STEP 2: Augment with personalized recommendations
+    const recRes = await this.getRecommendations(userId, 20);
+    const recTracks = (recRes.recommendations || []).map((t) => ({
+      id: t.videoId,
+      name: t.title,
+      artist: t.artist,
+      thumbnail: getValidThumbnailUrl(t.thumbNail) || '',
+    }));
+
+    const combinedCandidates = [...candidateTracks, ...recTracks];
+    const newTracks: Array<{ id: string; name: string; artist: string; thumbnail: string }> = [];
+
+    for (const track of combinedCandidates) {
+      if (track.id && !usedIds.has(track.id)) {
+        usedIds.add(track.id);
+        newTracks.push(track);
+        if (newTracks.length >= 10) break; // Fetch 10 fresh tracks
+      }
+    }
+
+    return newTracks;
   }
 
   /**

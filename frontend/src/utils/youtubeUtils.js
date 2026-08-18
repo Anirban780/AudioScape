@@ -2,37 +2,32 @@ import placeholder from "@/assets/placeholder.jpg";
 
 /**
  * ============================================================================
- * UTILITY: YOUTUBE THUMBNAIL DOMAIN SANITIZER & FALLBACK HANDLER
+ * UTILITY: YOUTUBE THUMBNAIL DOMAIN SANITIZER & ULTRA HIGH-RES RESOLUTION HANDLER
  * ============================================================================
  * 
- * TODO: TEMPORARY BYPASS FOR ENDPOINT WEB FILTERING
- * Bitdefender and certain security software block requests to 'i.ytimg.com'.
- * This utility dynamically rewrites YouTube thumbnail URLs to an alternative
- * unblocked domain ('img.youtube.com') during data fetching or UI rendering.
- * 
- * Centralized Thumbnail Fallback:
- * Manages HTTP errors and YouTube's 120x90 gray broken image response in ONE place.
+ * Centralized High-Res Resolution Tier:
+ * 1. maxresdefault.jpg (1920x1080 / 1280x720 Ultra HD)
+ * 2. sddefault.jpg     (640x480 Standard Def)
+ * 3. hqdefault.jpg     (480x360 High Def)
+ * 4. mqdefault.jpg     (320x180 Medium Def)
+ * 5. default.jpg       (120x90 Small)
  * ============================================================================
  */
 
-/**
- * Configurable target domain for rewriting YouTube thumbnail URLs.
- * Modify or update this constant if alternative CDN domains are required.
- */
 export const TARGET_YOUTUBE_THUMBNAIL_DOMAIN = "img.youtube.com";
-
-/**
- * Known blocked YouTube thumbnail domain.
- */
 export const BLOCKED_YOUTUBE_THUMBNAIL_DOMAIN = "i.ytimg.com";
 
 /**
- * Dynamically rewrites YouTube thumbnail URLs from blocked domains (e.g., 'i.ytimg.com')
- * to configured alternative domains (e.g., 'img.youtube.com').
- *
- * @param {string|null|undefined} originalUrl - The original YouTube thumbnail URL
- * @returns {string|null|undefined} Sanitized thumbnail URL with updated domain, or original if inapplicable
+ * Ordered YouTube CDN thumbnail resolution tiers for graceful error degradation.
  */
+export const RESOLUTION_TIERS = [
+  "maxresdefault.jpg",
+  "sddefault.jpg",
+  "hqdefault.jpg",
+  "mqdefault.jpg",
+  "default.jpg",
+];
+
 export function getValidThumbnailUrl(originalUrl) {
   if (!originalUrl || typeof originalUrl !== "string") {
     return originalUrl;
@@ -45,31 +40,35 @@ export function getValidThumbnailUrl(originalUrl) {
   return originalUrl;
 }
 
-/**
- * Helper to check if a string is a valid 11-character YouTube Video ID.
- */
 export function isValidYouTubeId(id) {
   return typeof id === "string" && /^[a-zA-Z0-9_-]{11}$/.test(id.trim());
 }
 
 /**
- * Converts any standard YouTube thumbnail URL (mqdefault, hqdefault, default)
- * into its highest available HD resolution tier (hqdefault).
+ * Extract an 11-character YouTube video ID from a URL or string.
+ */
+export function extractYouTubeId(url) {
+  if (!url || typeof url !== "string") return null;
+  const match = url.match(/(?:vi\/|v=|vi=|\/embed\/|youtu\.be\/|\/v\/)([a-zA-Z0-9_-]{11})/);
+  return match ? match[1] : null;
+}
+
+/**
+ * Converts any YouTube thumbnail URL into its HIGHEST available Ultra HD resolution tier (maxresdefault.jpg).
  * 
  * @param {string} url - Original thumbnail URL
  * @param {string} videoId - YouTube Video ID fallback
- * @returns {string|null} High-res YouTube thumbnail URL with sanitized domain, or null
+ * @returns {string|null} Ultra HD YouTube thumbnail URL with sanitized domain, or null
  */
 export function getHighResThumbnailUrl(url, videoId) {
   let target = url;
-  if (!target && videoId && isValidYouTubeId(videoId)) {
-    target = `https://${TARGET_YOUTUBE_THUMBNAIL_DOMAIN}/vi/${videoId}/hqdefault.jpg`;
+  const id = videoId || extractYouTubeId(url);
+  
+  if (id && isValidYouTubeId(id)) {
+    target = `https://${TARGET_YOUTUBE_THUMBNAIL_DOMAIN}/vi/${id}/maxresdefault.jpg`;
   } else if (typeof target === "string" && (target.includes("ytimg.com") || target.includes("youtube.com"))) {
     target = target
-      .replace("/default.jpg", "/hqdefault.jpg")
-      .replace("/mqdefault.jpg", "/hqdefault.jpg")
-      .replace("/maxresdefault.jpg", "/hqdefault.jpg")
-      .replace("/sddefault.jpg", "/hqdefault.jpg");
+      .replace(/\/default\.jpg|\/mqdefault\.jpg|\/hqdefault\.jpg|\/sddefault\.jpg/, "/maxresdefault.jpg");
   } else if (!target) {
     return null;
   }
@@ -77,22 +76,8 @@ export function getHighResThumbnailUrl(url, videoId) {
 }
 
 /**
- * Ordered YouTube CDN thumbnail resolution tiers for graceful error degradation.
- */
-const RESOLUTION_TIERS = [
-  "hqdefault.jpg",
-  "mqdefault.jpg",
-  "default.jpg",
-];
-
-/**
  * Declarative resolution step-down helper for image error handling.
- * Eliminates nested if/else statements in component render methods.
- *
- * @param {string} currentSrc - Current failing image src URL
- * @param {string} videoId - YouTube Video ID fallback
- * @param {string} placeholderAsset - Fallback placeholder image asset
- * @returns {string} Next lower resolution thumbnail URL or placeholder
+ * Step-downs: maxresdefault -> sddefault -> hqdefault -> mqdefault -> default -> placeholder.jpg
  */
 export function getNextFallbackThumbnailUrl(currentSrc, videoId, placeholderAsset) {
   if (!currentSrc || typeof currentSrc !== "string") {
@@ -103,22 +88,17 @@ export function getNextFallbackThumbnailUrl(currentSrc, videoId, placeholderAsse
     ? TARGET_YOUTUBE_THUMBNAIL_DOMAIN
     : BLOCKED_YOUTUBE_THUMBNAIL_DOMAIN;
 
+  const id = videoId || extractYouTubeId(currentSrc);
   const currentTierIndex = RESOLUTION_TIERS.findIndex((tier) => currentSrc.includes(tier));
 
-  if (currentTierIndex !== -1 && currentTierIndex < RESOLUTION_TIERS.length - 1 && isValidYouTubeId(videoId)) {
+  if (currentTierIndex !== -1 && currentTierIndex < RESOLUTION_TIERS.length - 1 && isValidYouTubeId(id)) {
     const nextTier = RESOLUTION_TIERS[currentTierIndex + 1];
-    return `https://${domain}/vi/${videoId}/${nextTier}`;
+    return `https://${domain}/vi/${id}/${nextTier}`;
   }
 
   return placeholderAsset;
 }
 
-/**
- * Decodes standard HTML entities in song titles (e.g., &quot; -> ", &#39; -> ', &amp; -> &).
- *
- * @param {string} text - Raw text string with potential HTML entities
- * @returns {string} Decoded clean text string
- */
 export function decodeHtmlEntities(text) {
   if (!text || typeof text !== "string") return text || "";
   return text
@@ -129,27 +109,16 @@ export function decodeHtmlEntities(text) {
     .replace(/&gt;/g, ">");
 }
 
-/**
- * Centralized onLoad handler to detect YouTube's 120x90 gray broken image artifact.
- * When detected, automatically replaces src with local placeholder.jpg.
- *
- * @param {Event} e - Image load event
- */
 export function handleThumbnailLoad(e) {
   if (!e || !e.target) return;
   if (e.target.naturalWidth === 120 && e.target.naturalHeight === 90 && !e.target.src.includes("placeholder")) {
-    e.target.onerror = null;
-    e.target.src = placeholder;
+    const current = e.target.src;
+    const videoId = extractYouTubeId(current);
+    const nextSrc = getNextFallbackThumbnailUrl(current, videoId, placeholder);
+    e.target.src = nextSrc;
   }
 }
 
-/**
- * Centralized onError handler for YouTube thumbnail degradation & fallback.
- * Step-downs: hqdefault -> mqdefault -> default -> placeholder.jpg
- *
- * @param {Event} e - Image error event
- * @param {string} videoId - Optional YouTube Video ID
- */
 export function handleThumbnailError(e, videoId) {
   if (!e || !e.target) return;
   const current = e.target.src;
@@ -157,7 +126,8 @@ export function handleThumbnailError(e, videoId) {
     e.target.onerror = null;
     return;
   }
-  const nextSrc = getNextFallbackThumbnailUrl(current, videoId, placeholder);
+  const id = videoId || extractYouTubeId(current);
+  const nextSrc = getNextFallbackThumbnailUrl(current, id, placeholder);
   if (!nextSrc || nextSrc === current || nextSrc === placeholder) {
     e.target.onerror = null;
     e.target.dataset.fallbackDone = "true";
@@ -166,6 +136,3 @@ export function handleThumbnailError(e, videoId) {
     e.target.src = nextSrc;
   }
 }
-
-
-
