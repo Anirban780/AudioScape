@@ -21,7 +21,7 @@ import toast from 'react-hot-toast';
  * ============================================================================
  */
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '353989815138-3j5kic0oc711i52noq80e96n4c0efnuc.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 // Singleton flag ensuring google.accounts.id.initialize is called only once per session
 let isGisInitialized = false;

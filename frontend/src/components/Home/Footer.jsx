@@ -15,11 +15,26 @@ import { Link } from "react-router-dom";
 
 /**
  * ============================================================================
+ * EXTERNAL LINKS & CONFIGURABLE ENVIRONMENT VARIABLES
+ * ============================================================================
+ * Edit these environment variables in your `.env` file or directly here at the top
+ * of the file for future social, privacy, and terms links updates.
+ */
+const GITHUB_URL = import.meta.env.VITE_GITHUB_URL || "https://github.com";
+const TWITTER_URL = import.meta.env.VITE_TWITTER_URL || "https://twitter.com";
+const INSTAGRAM_URL = import.meta.env.VITE_INSTAGRAM_URL || "https://instagram.com";
+const PRIVACY_POLICY_URL = import.meta.env.VITE_PRIVACY_POLICY_URL || "#privacy";
+const TERMS_OF_SERVICE_URL = import.meta.env.VITE_TERMS_OF_SERVICE_URL || "#terms";
+
+/**
+ * ============================================================================
  * EQUIDISTANT MULTI-COLUMN MUSIC FOOTER (Footer.jsx)
  * ============================================================================
+ * @module Frontend/Components/Footer
  * 
  * WHAT THIS FILE DOES:
- * Renders a 4-column music platform footer with centered container layout (`max-w-7xl mx-auto px-6`).
+ * Renders a 4-column music platform footer with centered container layout (`max-w-7xl mx-auto px-6`)
+ * using configurable environment variable links defined at top of file.
  */
 const Footer = () => {
   const currentYear = new Date().getFullYear();
@@ -118,7 +133,7 @@ const Footer = () => {
             </p>
             <div className="flex items-center gap-3">
               <a
-                href="https://github.com"
+                href={GITHUB_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2.5 rounded-xl bg-[var(--color-surface-base)] border border-[var(--color-border-default)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors cursor-pointer"
@@ -127,7 +142,7 @@ const Footer = () => {
                 <LucideGithub size={16} />
               </a>
               <a
-                href="https://twitter.com"
+                href={TWITTER_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2.5 rounded-xl bg-[var(--color-surface-base)] border border-[var(--color-border-default)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-colors cursor-pointer"
@@ -136,7 +151,7 @@ const Footer = () => {
                 <LucideTwitter size={16} />
               </a>
               <a
-                href="https://instagram.com"
+                href={INSTAGRAM_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="p-2.5 rounded-xl bg-[var(--color-surface-base)] border border-[var(--color-border-default)] hover:border-[var(--color-primary)] hover:text-pink-400 transition-colors cursor-pointer"
@@ -149,7 +164,7 @@ const Footer = () => {
 
         </div>
 
-        {/* Bottom Bar: Copyright & Legal */}
+        {/* Bottom Bar: Copyright & Legal Links */}
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs sm:text-sm font-medium">
           <div className="flex items-center gap-2 flex-wrap text-center sm:text-left">
             <span>&copy; {currentYear} AudioScape Inc. All rights reserved.</span>
@@ -158,9 +173,23 @@ const Footer = () => {
           </div>
 
           <div className="flex items-center gap-4 flex-wrap">
-            <span className="hover:text-[var(--color-primary)] transition-colors cursor-pointer">Privacy Policy</span>
+            <a
+              href={PRIVACY_POLICY_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[var(--color-primary)] transition-colors cursor-pointer"
+            >
+              Privacy Policy
+            </a>
             <span>•</span>
-            <span className="hover:text-[var(--color-primary)] transition-colors cursor-pointer">Terms of Service</span>
+            <a
+              href={TERMS_OF_SERVICE_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-[var(--color-primary)] transition-colors cursor-pointer"
+            >
+              Terms of Service
+            </a>
             <button
               onClick={scrollToTop}
               className="p-2 rounded-xl bg-[var(--color-primary)] text-[var(--color-text-on-primary)] hover:opacity-90 transition-opacity shadow-xs cursor-pointer ml-2"
