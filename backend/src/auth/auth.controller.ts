@@ -38,7 +38,7 @@ export class AuthController {
    */
   @Post('google')
   async googleLogin(@Body() dto: GoogleLoginDto) {
-    return this.authService.verifyAndSyncGoogleUser(dto.idToken);
+    return this.authService.verifyAndSyncGoogleUser(dto.idToken, dto.accessToken);
   }
 
   /**

@@ -60,22 +60,46 @@ export class GoogleAuthGuard implements CanActivate {
     let displayName: string;
     let photoUrl: string | null = null;
 
-    // Cryptographically verify direct Google OAuth 2.0 ID token
+    // Cryptographically verify Google OAuth 2.0 ID token or Access Token
     try {
-      const ticket = await this.googleClient.verifyIdToken({
-        idToken: token,
-        audience: process.env.GOOGLE_CLIENT_ID,
-      });
+      if (token.split('.').length === 3) {
+        // ID Token (JWT)
+        const ticket = await this.googleClient.verifyIdToken({
+          idToken: token,
+          audience: process.env.GOOGLE_CLIENT_ID,
+        });
 
-      const payload = ticket.getPayload();
-      if (!payload || !payload.email) {
-        throw new UnauthorizedException('Unauthorized: Invalid Google ID token payload (missing email)');
+        const payload = ticket.getPayload();
+        if (!payload || !payload.email) {
+          throw new UnauthorizedException('Unauthorized: Invalid Google ID token payload (missing email)');
+        }
+
+        email = payload.email;
+        authId = payload.sub;
+        displayName = payload.name || payload.given_name || payload.email.split('@')[0];
+        photoUrl = payload.picture || null;
+      } else {
+        // Access Token
+        const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${token}`);
+        if (!response.ok) {
+          throw new UnauthorizedException('Unauthorized: Invalid or expired Google access token');
+        }
+        const tokenInfo = await response.json();
+        email = tokenInfo.email;
+        authId = tokenInfo.sub;
+
+        const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (userRes.ok) {
+          const userInfo = await userRes.json();
+          displayName = userInfo.name || userInfo.given_name || email.split('@')[0];
+          photoUrl = userInfo.picture || null;
+        } else {
+          displayName = email.split('@')[0];
+        }
       }
-
-      email = payload.email;
-      authId = payload.sub;
-      displayName = payload.name || payload.given_name || payload.email.split('@')[0];
-      photoUrl = payload.picture || null;
     } catch (googleErr: any) {
       this.logger.error(`Google token verification failed in guard: ${googleErr.message}`);
       throw new UnauthorizedException(`Unauthorized: Google OAuth verification failed (${googleErr.message})`);
