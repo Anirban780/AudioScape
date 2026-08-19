@@ -136,6 +136,8 @@ export async function fetchUserLikedSongs(userId) {
                 thumbnail: thumb,
                 thumbNail: thumb,
                 liked: true,
+                playCount: item.playCount || track?.playCount || 0,
+                likedAt: item.likedAt || track?.likedAt || null,
             };
         });
     } catch (error) {
