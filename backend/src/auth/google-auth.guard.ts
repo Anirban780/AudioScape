@@ -10,21 +10,21 @@ import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * ============================================================================
- * CAN ACTIVATE GUARD: DUAL GOOGLE OAUTH & FIREBASE EMAIL FALLBACK GUARD
+ * CAN ACTIVATE GUARD: DIRECT GOOGLE OAUTH 2.0 GUARD
  * ============================================================================
  * @module AuthModule
  * 
- * PURPOSE:
+ * WHAT THIS FILE DOES:
  * Intercepts incoming HTTP requests, extracts the Bearer token from the
- * `Authorization: Bearer <id_token>` header, verifies it via Google OAuth 2.0,
- * or falls back to email-based resolution for legacy/Firebase users without direct Google OAuth set up.
+ * `Authorization: Bearer <id_token>` header, verifies it directly against Google OAuth 2.0
+ * servers using `google-auth-library`, and synchronizes/attaches the PostgreSQL user record.
  *
- * WHY THIS IS NEEDED FOR PRODUCTION:
- * - Direct Google OAuth 2.0: Verifies direct Google ID tokens against Google certs.
- * - Legacy Firebase Fallback: Resolves legacy Firebase users by verified email address when
- *   direct Google OAuth is not configured for that user account.
- * - Automatic Account Linking: Automatically links the verified Google/Firebase `authId`
- *   to existing PostgreSQL user records matching the Gmail address.
+ * WHY THIS WAS SIMPLIFIED (Component 2):
+ * 1. Single Auth Path: Removed legacy Firebase JWT decoding fallbacks. All client
+ *    requests now pass direct Google OAuth 2.0 ID tokens.
+ * 2. Automatic Legacy Account Linking: Matches existing users by `email` first, automatically
+ *    updating the user's `authId` to their verified Google `sub` claim on first login.
+ * 3. High Efficiency: Reduces guard logic complexity and eliminates unverified JWT decoding.
  * ============================================================================
  */
 @Injectable()
@@ -34,22 +34,6 @@ export class GoogleAuthGuard implements CanActivate {
 
   constructor(private readonly prisma: PrismaService) {
     this.googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-  }
-
-  /**
-   * Helper safely parsing JWT payload claims for legacy/Firebase token fallback.
-   */
-  private decodeJwtPayload(token: string): any {
-    try {
-      const parts = token.split('.');
-      if (parts.length !== 3) return null;
-      const base64Url = parts[1];
-      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-      const jsonPayload = Buffer.from(base64, 'base64').toString('utf-8');
-      return JSON.parse(jsonPayload);
-    } catch (e) {
-      return null;
-    }
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -71,55 +55,54 @@ export class GoogleAuthGuard implements CanActivate {
       throw new UnauthorizedException('Unauthorized: Bearer token string is empty');
     }
 
-    let email: string | null = null;
-    let authId: string | null = null;
-    let displayName: string = 'AudioScape User';
+    let email: string;
+    let authId: string;
+    let displayName: string;
     let photoUrl: string | null = null;
-    let authMethod: 'DIRECT_GOOGLE_OAUTH' | 'FIREBASE_EMAIL_FALLBACK' = 'DIRECT_GOOGLE_OAUTH';
 
-    // Strategy 1: Attempt direct Google OAuth 2.0 certificate verification
+    // Cryptographically verify Google OAuth 2.0 ID token or Access Token
     try {
-      const ticket = await this.googleClient.verifyIdToken({
-        idToken: token,
-        audience: process.env.GOOGLE_CLIENT_ID,
-      });
+      if (token.split('.').length === 3) {
+        // ID Token (JWT)
+        const ticket = await this.googleClient.verifyIdToken({
+          idToken: token,
+          audience: process.env.GOOGLE_CLIENT_ID,
+        });
 
-      const payload = ticket.getPayload();
-      if (payload && payload.email) {
+        const payload = ticket.getPayload();
+        if (!payload || !payload.email) {
+          throw new UnauthorizedException('Unauthorized: Invalid Google ID token payload (missing email)');
+        }
+
         email = payload.email;
         authId = payload.sub;
         displayName = payload.name || payload.given_name || payload.email.split('@')[0];
         photoUrl = payload.picture || null;
+      } else {
+        // Access Token
+        const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${token}`);
+        if (!response.ok) {
+          throw new UnauthorizedException('Unauthorized: Invalid or expired Google access token');
+        }
+        const tokenInfo = await response.json();
+        email = tokenInfo.email;
+        authId = tokenInfo.sub;
+
+        const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (userRes.ok) {
+          const userInfo = await userRes.json();
+          displayName = userInfo.name || userInfo.given_name || email.split('@')[0];
+          photoUrl = userInfo.picture || null;
+        } else {
+          displayName = email.split('@')[0];
+        }
       }
     } catch (googleErr: any) {
-      // Direct Google OAuth verification skipped (e.g. Firebase token issued by securetoken.google.com)
-      authMethod = 'FIREBASE_EMAIL_FALLBACK';
-    }
-
-    // Strategy 2: Firebase / Legacy Email Fallback
-    if (!email) {
-      const payload = this.decodeJwtPayload(token);
-      if (!payload) {
-        throw new UnauthorizedException('Unauthorized: Authentication token is malformed or invalid');
-      }
-
-      // Check token expiration
-      if (payload.exp && payload.exp * 1000 < Date.now()) {
-        throw new UnauthorizedException('Unauthorized: Authentication token has expired. Please log in again.');
-      }
-
-      if (payload.email) {
-        email = payload.email;
-        authId = payload.sub || payload.user_id || payload.uid || payload.email;
-        displayName = payload.name || payload.given_name || payload.email.split('@')[0];
-        photoUrl = payload.picture || null;
-      } else {
-        throw new UnauthorizedException('Unauthorized: Could not resolve email from authentication token');
-      }
-    }
-
-    if (!email || !authId) {
-      throw new UnauthorizedException('Unauthorized: Unable to resolve user identity from authentication token');
+      this.logger.error(`Google token verification failed in guard: ${googleErr.message}`);
+      throw new UnauthorizedException(`Unauthorized: Google OAuth verification failed (${googleErr.message})`);
     }
 
     try {
@@ -129,7 +112,7 @@ export class GoogleAuthGuard implements CanActivate {
       });
 
       if (!dbUser) {
-        this.logger.log(`Creating new PostgreSQL user for email "${email}" (${authMethod})`);
+        this.logger.log(`Creating new PostgreSQL user for email "${email}" (Google OAuth 2.0)`);
         dbUser = await this.prisma.user.create({
           data: {
             authId,
@@ -140,10 +123,10 @@ export class GoogleAuthGuard implements CanActivate {
           },
         });
       } else {
-        // If user matched by email fallback, link their current verified authId
+        // If existing user was found by email, link their current verified Google sub authId
         const updateData: any = { lastLoginAt: new Date() };
         if (dbUser.authId !== authId) {
-          this.logger.log(`[Account Link] Linking authId "${authId}" to existing user matching email "${email}"`);
+          this.logger.log(`[Account Link] Linking Google authId "${authId}" to existing user matching email "${email}"`);
           updateData.authId = authId;
         }
 

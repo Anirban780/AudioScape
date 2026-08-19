@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import AppLayout from '@/components/Layout/AppLayout';
-import { useAuth } from '@/context/AuthContext';
+import useAuthStore from '@/store/useAuthStore';
 import { fetchUserLikedSongs } from '@/utils/api';
 import MusicCard from '@/components/Cards/MusicCard';
 import usePlayerStore from "@/store/usePlayerStore";
@@ -16,21 +16,9 @@ import MediaGrid from '@/components/Layout/MediaGrid';
  * 
  * WHAT THIS FILE DOES:
  * Renders the authenticated user's liked/favourited music collection.
- * 
- * WHY IT WAS DESIGNED THIS WAY:
- * 1. AppLayout Shell Unification: Wraps content cleanly in `<AppLayout>` to inherit
- *    the global sidebar, sticky search header, theme toggle, and bottom player padding.
- * 2. In-Page Smooth Loader: Uses in-page `<Loader message="Loading your favourites..." />`
- *    so page switching feels natural and unforced.
- * 3. Firestore Sync: Queries `fetchUserLikedSongs(user.uid)` from `@/utils/api`.
- * 
- * HOW IT WORKS:
- * - On mount, checks `user?.uid` and triggers async fetch of liked songs.
- * - Displays in-page spinner via `Loader` while data resolves.
- * - Renders a responsive grid of `MusicCard` components for each liked song.
  */
 const FavoritesPage = () => {
-    const { user } = useAuth();
+    const user = useAuthStore((s) => s.user);
     const [likedSongs, setLikedSongs] = useState([]);
     const { setTrack } = usePlayerStore();
     const [loading, setLoading] = useState(true);
@@ -40,7 +28,7 @@ const FavoritesPage = () => {
             try {
                 setLoading(true);
 
-                const favorites = await fetchUserLikedSongs(user?.uid);
+                const favorites = await fetchUserLikedSongs(user?.id);
                 if (!favorites) {
                     toast.error('Failed to fetch liked songs.');
                     return;

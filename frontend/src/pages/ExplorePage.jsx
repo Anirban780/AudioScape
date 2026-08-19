@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from "react";
 import AppLayout from "@/components/Layout/AppLayout";
-import { useAuth } from "@/context/AuthContext";
+import useAuthStore from "@/store/useAuthStore";
 import { fetchYoutubeMusic } from "@/utils/youtube";
 import { fetchExploreFeed } from "@/utils/api";
 import Loader from "@/components/Home/Loader";
@@ -17,35 +17,17 @@ import ExploreSection from "@/components/Explore/ExploreSection";
  * ============================================================================
  * 
  * WHAT THIS FILE DOES:
- * Assembles the primary Stitch Music Discovery & Search view. Features:
- * 1. Clean Vector Icon Page Header: `<Compass>` Lucide icon title.
- * 2. Category Filter Bar (`ExploreFilterBar.jsx`): Compact category filter pills.
- * 3. Spotlight Hero Banner Carousel (`ExploreTrendingBanner.jsx`):
- *    - In "All" mode: Displays top #1 song from each category section (up to 8 tracks).
- *    - In Filtered mode: Displays top 5 trending songs of the selected category.
- * 4. Categorized Music Track Sections (`ExploreSection.jsx`): Filtered or full category sections.
- * 
- * WHY IT WAS DESIGNED THIS WAY:
- * 1. Declarative React Curation (`useMemo`): Replaced imperative if/else mutations with
- *    declarative `useMemo` hooks for reactive, optimized track & section filtering.
- * 2. Adjustable Hero Image Position: Passes `imageObjectPosition` prop ("center center" by default)
- *    to easily shift background artwork up or down.
- * 
- * HOW TO MOVE THE HERO BANNER IMAGE UP OR DOWN:
- * Edit line ~158 below or change `imageObjectPosition` value:
- * - "center top" or "center 15%"  -> Moves image UP (shows top of picture)
- * - "center center" or "center 50%" -> Default centered alignment
- * - "center bottom" or "center 85%" -> Moves image DOWN (shows bottom of picture)
+ * Assembles the primary Stitch Music Discovery & Search view.
  */
 
 const ExplorePage = () => {
-  const { user } = useAuth();
+  const user = useAuthStore((s) => s.user);
   const [exploreFeed, setExploreFeed] = useState([]);
   const [visibleTracks, setVisibleTracks] = useState({});
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState("All");
 
-  const userId = user?.uid || "";
+  const userId = user?.id || "";
 
   useEffect(() => {
     let isMounted = true;

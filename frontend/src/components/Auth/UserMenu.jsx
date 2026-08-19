@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { useAuth } from "@/context/AuthContext";
+import useAuthStore from "@/store/useAuthStore";
+import { signInWithGoogle, logout } from "@/auth/googleAuth";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,28 +21,18 @@ import { useNavigate } from "react-router-dom";
  * WHAT THIS FILE DOES:
  * Renders the top-right user profile avatar dropdown menu (for authenticated users)
  * or a Google Sign-In button (for guest visitors).
- * 
- * WHY IT WAS DESIGNED THIS WAY:
- * 1. Stitch Surface Tokens: Replaced hardcoded `bg-gray-900` / `bg-white` with
- *    `bg-[var(--color-surface-overlay)]`, `border-[var(--color-border-default)]`, and
- *    `hover:bg-[var(--color-state-hover)]`.
- * 2. High-res Avatar Resolution: Appends `?sz=200` parameter to Google OAuth photo URLs
- *    to prevent pixelated avatar images.
- * 
- * HOW IT WORKS:
- * - Reads `user`, `signInWithGoogle`, and `logout` from `useAuth()`.
- * - Toggles dropdown content displaying user name, email, navigation links, and logout action.
  */
 const UserMenu = () => {
-  const { user, signInWithGoogle, logout } = useAuth();
+  const user = useAuthStore((s) => s.user);
   const [avatarUrl, setAvatarUrl] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (user && user.photoURL) {
-      const url = user.photoURL.includes("?")
-        ? `${user.photoURL}&sz=200`
-        : `${user.photoURL}?sz=200`;
+    const photo = user?.photoUrl || user?.photoURL;
+    if (user && photo) {
+      const url = photo.includes("?")
+        ? `${photo}&sz=200`
+        : `${photo}?sz=200`;
 
       setAvatarUrl(url);
     } else {

@@ -4,17 +4,17 @@ import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * ============================================================================
- * AUTHENTICATION SERVICE: GOOGLE OAUTH 2.0 PIPELINE
+ * AUTHENTICATION SERVICE: DIRECT GOOGLE OAUTH 2.0 PIPELINE
  * ============================================================================
  * @module AuthModule
  * 
- * PURPOSE:
+ * WHAT THIS FILE DOES:
  * Core authentication service executing Google ID Token verification directly with
- * Google OAuth 2.0 servers and synchronizing user profiles in PostgreSQL via Prisma.
+ * Google OAuth 2.0 servers using `google-auth-library` and synchronizing user profiles in PostgreSQL via Prisma.
  *
  * WHY THIS IS NEEDED FOR PRODUCTION:
  * - Single Sign-On (SSO): Uses Google ID Tokens as the primary authorization mechanism.
- * - Zero Data Loss Migration: Matches legacy backfilled Firestore users by `email`.
+ * - Automatic Account Linking: Matches existing user records by `email` and links Google `sub` as `authId`.
  * ============================================================================
  */
 @Injectable()
@@ -27,28 +27,66 @@ export class AuthService {
   }
 
   /**
-   * Cryptographically verifies Google ID Token and upserts user record in PostgreSQL.
+   * Cryptographically verifies Google ID Token or Access Token and upserts user record in PostgreSQL.
    *
-   * @param idToken - Raw Google OAuth 2.0 ID Token string from client
+   * @param idToken - Optional Google ID Token string
+   * @param accessToken - Optional Google Access Token string
    * @returns Synchronized user record from PostgreSQL
    */
-  async verifyAndSyncGoogleUser(idToken: string) {
+  async verifyAndSyncGoogleUser(idToken?: string, accessToken?: string) {
+    if (!idToken && !accessToken) {
+      throw new UnauthorizedException('Either idToken or accessToken is required for Google login');
+    }
+
     try {
-      const ticket = await this.googleClient.verifyIdToken({
-        idToken,
-        audience: process.env.GOOGLE_CLIENT_ID,
-      });
+      let googleId: string;
+      let email: string;
+      let displayName: string;
+      let photoUrl: string | null = null;
 
-      const payload = ticket.getPayload();
+      if (idToken) {
+        const ticket = await this.googleClient.verifyIdToken({
+          idToken,
+          audience: process.env.GOOGLE_CLIENT_ID,
+        });
 
-      if (!payload || !payload.email) {
-        throw new UnauthorizedException('Invalid Google ID token payload: missing email claim');
+        const payload = ticket.getPayload();
+        if (!payload || !payload.email) {
+          throw new UnauthorizedException('Invalid Google ID token payload: missing email claim');
+        }
+
+        googleId = payload.sub;
+        email = payload.email;
+        displayName = payload.name || payload.given_name || 'Google User';
+        photoUrl = payload.picture || null;
+      } else {
+        // Verify access_token against Google's tokeninfo API
+        const tokenInfoRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?access_token=${accessToken}`);
+        if (!tokenInfoRes.ok) {
+          throw new UnauthorizedException('Invalid or expired Google Access Token');
+        }
+
+        const tokenInfo = await tokenInfoRes.json();
+        googleId = tokenInfo.sub;
+        email = tokenInfo.email;
+
+        if (!email) {
+          throw new UnauthorizedException('Invalid Google Access Token: missing email');
+        }
+
+        // Fetch detailed profile info from Google userinfo API
+        const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        if (userInfoRes.ok) {
+          const userInfo = await userInfoRes.json();
+          displayName = userInfo.name || userInfo.given_name || email.split('@')[0];
+          photoUrl = userInfo.picture || null;
+        } else {
+          displayName = email.split('@')[0];
+        }
       }
-
-      const googleId = payload.sub;
-      const email = payload.email;
-      const displayName = payload.name || payload.given_name || 'Google User';
-      const photoUrl = payload.picture || null;
 
       this.logger.log(`Google OAuth verified for: ${email} (${googleId})`);
 

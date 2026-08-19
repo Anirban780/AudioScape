@@ -1,19 +1,14 @@
-import { auth } from "../firebase/firebaseConfig";
+import useAuthStore from "../store/useAuthStore";
 import { getBackendURL } from "./api";
 import { getValidThumbnailUrl } from "./youtubeUtils";
 
 /**
- * Helper to retrieve Firebase ID Token for NestJS Authorization header.
+ * Helper to retrieve Google OAuth ID Token from useAuthStore for NestJS Authorization header.
  */
 async function getAuthHeader() {
-    if (!auth.currentUser) return {};
-    try {
-        const token = await auth.currentUser.getIdToken();
-        return { Authorization: `Bearer ${token}` };
-    } catch (err) {
-        console.error("Error getting auth token:", err);
-        return {};
-    }
+    const { idToken } = useAuthStore.getState();
+    if (!idToken) return {};
+    return { Authorization: `Bearer ${idToken}` };
 }
 
 /**
