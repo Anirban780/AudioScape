@@ -13,7 +13,6 @@ COPY vite.config.js jsconfig.json components.json ./
 COPY index.html ./
 COPY public/ ./public
 COPY frontend/ ./frontend
-COPY utils/ ./utils
 
 # Expose port
 EXPOSE 5173

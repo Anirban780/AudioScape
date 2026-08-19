@@ -30,10 +30,7 @@ export default defineConfig({
     environment: 'jsdom',
     // Wire up @testing-library/jest-dom matchers (toBeInTheDocument, etc.) for all test files
     setupFiles: ['@testing-library/jest-dom'],
-    // Re-expose the same path aliases as production so vi.mock paths resolve correctly
-    alias: {
-      '@':    path.resolve(__dirname, './utils'),
-      'utils': path.resolve(__dirname, './utils'),
-    },
+    // Only run frontend tests, avoid backend NestJS spec files
+    include: ['frontend/src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
   },
 })

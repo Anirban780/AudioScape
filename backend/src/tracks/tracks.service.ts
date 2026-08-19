@@ -206,7 +206,7 @@ export class TracksService {
           LIMIT 15;
         `;
 
-        if (localMatches && (dbOnly || localMatches.length >= FTS_MATCH_THRESHOLD)) {
+        if (localMatches && localMatches.length > 0 && (dbOnly || localMatches.length >= FTS_MATCH_THRESHOLD)) {
           this.logger.log(
             `Cache HIT (Local PostgreSQL FTS) for query: "${query}" (${localMatches.length} local track matches, dbOnly=${dbOnly}). Skipping YouTube API.`,
           );

@@ -16,6 +16,7 @@ RUN npm install
 COPY . .
 
 # Generate Prisma Client
+ENV DATABASE_URL="postgresql://postgres:postgrespassword@localhost:5432/audioscape?schema=public"
 RUN npx prisma generate
 
 # Stage 2: Runner stage

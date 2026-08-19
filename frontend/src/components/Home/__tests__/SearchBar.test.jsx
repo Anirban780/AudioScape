@@ -142,7 +142,7 @@ describe('SearchBar Component — QA Test Suite', () => {
     });
 
     render(<SearchBar onSelectTrack={mockOnSelectTrack} />);
-    const input = screen.getByPlaceholderText('Search for songs...');
+    const input = screen.getByPlaceholderText(/Search songs, artists/i);
 
     fireEvent.change(input, { target: { value: 'l' } });
     fireEvent.change(input, { target: { value: 'lo' } });
@@ -172,7 +172,7 @@ describe('SearchBar Component — QA Test Suite', () => {
     });
 
     render(<SearchBar onSelectTrack={mockOnSelectTrack} />);
-    const input = screen.getByPlaceholderText('Search for songs...');
+    const input = screen.getByPlaceholderText(/Search songs, artists/i);
 
     fireEvent.change(input, { target: { value: 'jazz' } });
 
@@ -195,7 +195,7 @@ describe('SearchBar Component — QA Test Suite', () => {
     });
 
     render(<SearchBar onSelectTrack={mockOnSelectTrack} />);
-    const input = screen.getByPlaceholderText('Search for songs...');
+    const input = screen.getByPlaceholderText(/Search songs, artists/i);
 
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'lofi' } });
@@ -228,7 +228,7 @@ describe('SearchBar Component — QA Test Suite', () => {
     });
 
     render(<SearchBar onSelectTrack={mockOnSelectTrack} />);
-    const input = screen.getByPlaceholderText('Search for songs...');
+    const input = screen.getByPlaceholderText(/Search songs, artists/i);
 
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'lofi' } });
@@ -263,7 +263,7 @@ describe('SearchBar Component — QA Test Suite', () => {
     });
 
     render(<SearchBar onSelectTrack={mockOnSelectTrack} />);
-    const input = screen.getByPlaceholderText('Search for songs...');
+    const input = screen.getByPlaceholderText(/Search songs, artists/i);
 
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'lofi' } });
@@ -296,7 +296,7 @@ describe('SearchBar Component — QA Test Suite', () => {
     });
 
     render(<SearchBar onSelectTrack={mockOnSelectTrack} />);
-    const input = screen.getByPlaceholderText('Search for songs...');
+    const input = screen.getByPlaceholderText(/Search songs, artists/i);
 
     fireEvent.focus(input);
     fireEvent.change(input, { target: { value: 'lofi' } });
