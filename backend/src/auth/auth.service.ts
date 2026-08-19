@@ -4,17 +4,17 @@ import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * ============================================================================
- * AUTHENTICATION SERVICE: GOOGLE OAUTH 2.0 PIPELINE
+ * AUTHENTICATION SERVICE: DIRECT GOOGLE OAUTH 2.0 PIPELINE
  * ============================================================================
  * @module AuthModule
  * 
- * PURPOSE:
+ * WHAT THIS FILE DOES:
  * Core authentication service executing Google ID Token verification directly with
- * Google OAuth 2.0 servers and synchronizing user profiles in PostgreSQL via Prisma.
+ * Google OAuth 2.0 servers using `google-auth-library` and synchronizing user profiles in PostgreSQL via Prisma.
  *
  * WHY THIS IS NEEDED FOR PRODUCTION:
  * - Single Sign-On (SSO): Uses Google ID Tokens as the primary authorization mechanism.
- * - Zero Data Loss Migration: Matches legacy backfilled Firestore users by `email`.
+ * - Automatic Account Linking: Matches existing user records by `email` and links Google `sub` as `authId`.
  * ============================================================================
  */
 @Injectable()
