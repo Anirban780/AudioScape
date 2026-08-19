@@ -1,4 +1,4 @@
-import { auth } from "../firebase/firebaseConfig";
+import useAuthStore from "../store/useAuthStore";
 import { getValidThumbnailUrl } from "./youtubeUtils";
 
 const LOCAL_API_URL = "http://localhost:5000";
@@ -21,17 +21,12 @@ export async function getBackendURL() {
 }
 
 /**
- * Helper to retrieve Firebase ID Token for NestJS Authorization header.
+ * Helper to retrieve Google OAuth ID Token from useAuthStore for NestJS Authorization header.
  */
 async function getAuthHeader() {
-    if (!auth.currentUser) return {};
-    try {
-        const token = await auth.currentUser.getIdToken();
-        return { Authorization: `Bearer ${token}` };
-    } catch (err) {
-        console.error("Error getting auth token:", err);
-        return {};
-    }
+    const { idToken } = useAuthStore.getState();
+    if (!idToken) return {};
+    return { Authorization: `Bearer ${idToken}` };
 }
 
 /**
@@ -232,7 +227,7 @@ export const getRecommendations = async (topN = 10) => {
     try {
         const headers = await getAuthHeader();
         const API_URL = await getBackendURL();
-        const userId = auth.currentUser?.uid;
+        const userId = useAuthStore.getState().user?.id;
 
         const response = await fetch(`${API_URL}/api/music/recommend`, {
             method: "POST",

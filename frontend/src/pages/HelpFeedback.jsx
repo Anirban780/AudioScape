@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import Footer from "@/components/Home/Footer";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/context/AuthContext";
+import useAuthStore from "@/store/useAuthStore";
 import { MessageCircleQuestion } from "lucide-react";
 
 /**
@@ -16,19 +16,9 @@ import { MessageCircleQuestion } from "lucide-react";
  * WHAT THIS FILE DOES:
  * Renders the user support page containing FAQs, direct email support contact,
  * and a feedback submission form.
- * 
- * WHY IT WAS DESIGNED THIS WAY:
- * 1. AppLayout Unification: Wrapped in `<AppLayout>` to inherit top navigation header,
- *    sidebar navigation, and consistent theme surface tokens.
- * 2. Unauthenticated Safety: Guarded `user?.displayName` optional chaining (Known Bug #3 fix)
- *    so unauthenticated visitors can view support documentation without runtime crashes.
- * 
- * HOW IT WORKS:
- * - `handleFeedbackSubmit`: Formats feedback query into a prefabricated `mailto:` / Gmail link.
- * - Form fields use Stitch surface tokens for consistent dark/light inputs.
  */
 const HelpFeedback = () => {
-  const { user } = useAuth();
+  const user = useAuthStore((s) => s.user);
   const [feedback, setFeedback] = useState("");
   const [email, setEmail] = useState("");
   const navigate = useNavigate();

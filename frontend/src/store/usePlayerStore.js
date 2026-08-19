@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { saveLikeSong, fetchLikedStatus } from '@/utils/api';
-import { auth } from "@/firebase/firebaseConfig";
+import useAuthStore from "@/store/useAuthStore";
 import toast from 'react-hot-toast';
 
 /**
@@ -34,11 +34,11 @@ const usePlayerStore = create((set, get) => ({
     // ------------------------------------------------------------------------
 
     setTrack: async (track) => {
-        const user = auth.currentUser;
+        const user = useAuthStore.getState().user;
         let liked = false;
 
         if (user && track?.id) {
-            liked = await fetchLikedStatus(user.uid, track.id);
+            liked = await fetchLikedStatus(user.id, track.id);
         }
 
         set({ track, isLiked: liked });
@@ -106,7 +106,7 @@ const usePlayerStore = create((set, get) => ({
     
     toggleLike: async () => {
         const { track, isLiked } = get();
-        const user = auth.currentUser;
+        const user = useAuthStore.getState().user;
 
         if (!track?.id || !user) {
             console.warn("⚠️ Error: Track ID or User not found");
@@ -114,7 +114,7 @@ const usePlayerStore = create((set, get) => ({
         }
 
         const newLiked = !isLiked;
-        await saveLikeSong(user.uid, track, newLiked);
+        await saveLikeSong(user.id, track, newLiked);
         toast.success(newLiked ? "Added to favourites" : "Removed from favourites");
 
         set({
