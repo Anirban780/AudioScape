@@ -5,6 +5,7 @@ import { fetchUserLikedSongs, saveLikeSong } from '@/utils/api';
 import MusicCard from '@/components/Cards/MusicCard';
 import usePlayerStore from "@/store/usePlayerStore";
 import usePlaylistStore from '@/store/usePlaylistStore';
+import { useRefreshOn } from "@/store/useDataRefreshStore";
 import Loader from '@/components/Home/Loader';
 import toast from 'react-hot-toast';
 import { Heart } from 'lucide-react';
@@ -45,32 +46,35 @@ const FavoritesPage = () => {
         localStorage.setItem("audioscape-favorites-view", viewMode);
     }, [viewMode]);
 
-    useEffect(() => {
-        const fetchLikedSongs = async () => {
-            try {
-                setLoading(true);
+    const fetchLikedSongs = async (showLoader = true) => {
+        try {
+            if (showLoader) setLoading(true);
 
-                const favorites = await fetchUserLikedSongs(userId);
-                if (!favorites) {
-                    toast.error('Failed to fetch liked songs.');
-                    return;
-                }
-
-                setLikedSongs(favorites);
-
-            } catch (error) {
-                toast.error('Failed to fetch liked songs.');
-            } finally {
-                setLoading(false);
+            const favorites = await fetchUserLikedSongs(userId);
+            if (!favorites) {
+                if (showLoader) toast.error('Failed to fetch liked songs.');
+                return;
             }
-        };
 
+            setLikedSongs(favorites);
+
+        } catch (error) {
+            if (showLoader) toast.error('Failed to fetch liked songs.');
+        } finally {
+            if (showLoader) setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         if (userId) {
-            fetchLikedSongs();
+            fetchLikedSongs(true);
         } else {
             setLoading(false);
         }
     }, [userId]);
+
+    // Automatically refetch favorites 5 seconds after any like/unlike mutation
+    useRefreshOn("favorites", () => fetchLikedSongs(false), 5000);
 
     // Handle Remove from Favorites
     const handleRemoveFavorite = async (song) => {

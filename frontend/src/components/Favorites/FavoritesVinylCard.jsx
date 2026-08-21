@@ -92,7 +92,7 @@ const FavoritesVinylCard = ({
       </div>
 
       {/* Main Album Sleeve Card */}
-      <div className="relative w-full aspect-square rounded-xl sm:rounded-2xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.4)] z-10 border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] transition-transform duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_15px_40px_rgb(0,0,0,0.5)]">
+      <div className="relative w-full aspect-square rounded-xl sm:rounded-2xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.4)] z-10 border-2 border-[var(--color-border-subtle)] group-hover:border-pink-500 bg-[var(--color-surface-raised)] transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_15px_40px_rgba(236,72,153,0.4)]">
         <img
           src={imgUrl}
           alt={title}
@@ -144,8 +144,8 @@ const FavoritesVinylCard = ({
           className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300"
           onClick={() => onPlay(song)}
         >
-          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-[var(--color-primary)]/90 backdrop-blur-sm flex items-center justify-center shadow-2xl hover:scale-110 hover:bg-[var(--color-primary)] transition-transform cursor-pointer group/play">
-            <Play size={20} className="sm:w-7 sm:h-7 text-[var(--color-text-on-primary)] ml-1 group-hover/play:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" fill="currentColor" />
+          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-pink-600/90 backdrop-blur-sm flex items-center justify-center shadow-2xl hover:scale-110 hover:bg-pink-500 transition-transform cursor-pointer group/play">
+            <Play size={20} className="sm:w-7 sm:h-7 text-white ml-1 group-hover/play:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" fill="currentColor" />
           </div>
         </div>
         

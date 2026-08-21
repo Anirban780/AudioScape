@@ -112,18 +112,31 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
         {/* Background Ambient Glow */}
         <div className="absolute top-0 right-0 w-48 h-48 bg-[var(--color-primary)]/10 rounded-full blur-3xl pointer-events-none group-hover:bg-[var(--color-primary)]/20 transition-all duration-500" />
 
-        {/* Artwork Image */}
-        <div className="relative w-full sm:w-44 aspect-square rounded-2xl overflow-hidden shrink-0 border border-[var(--color-border-strong)] shadow-lg">
-          <img
-            src={hdImage}
-            alt={cleanName}
-            onLoad={handleThumbnailLoad}
-            onError={(e) => handleThumbnailError(e, id)}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
-          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-            <div className="w-12 h-12 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
-              <Play size={22} fill="currentColor" className="ml-0.5" />
+        {/* Artwork Image with Vinyl Peeking Effect */}
+        <div className="relative w-full sm:w-44 aspect-square rounded-2xl shrink-0 overflow-visible">
+          {/* Dark Vinyl Disc Peeking Out on Hover */}
+          <div className="absolute top-1.5 right-1.5 w-[85%] h-[85%] rounded-full bg-neutral-900 border-4 border-neutral-800 shadow-xl flex items-center justify-center transition-all duration-500 group-hover:translate-x-5 group-hover:rotate-45 pointer-events-none z-0">
+            <div className="w-[70%] h-[70%] rounded-full border border-neutral-700/50 flex items-center justify-center">
+              <div className="w-[45%] h-[45%] rounded-full border border-neutral-700/50 flex items-center justify-center">
+                <div className="w-[30%] h-[30%] rounded-full bg-[var(--color-primary)]/80 border border-white/40 flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 rounded-full bg-black" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="relative z-10 w-full h-full rounded-2xl overflow-hidden border border-[var(--color-border-strong)] shadow-lg group-hover:-translate-x-2 transition-transform duration-500 bg-[var(--color-surface-base)]">
+            <img
+              src={hdImage}
+              alt={cleanName}
+              onLoad={handleThumbnailLoad}
+              onError={(e) => handleThumbnailError(e, id)}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
+                <Play size={22} fill="currentColor" className="ml-0.5" />
+              </div>
             </div>
           </div>
         </div>
@@ -166,13 +179,13 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
   /* -------------------------------------------------------------------------- */
   return (
     <Card
-      className="relative cursor-pointer overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 w-full group bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] hover:border-[var(--color-border-strong)] rounded-2xl"
+      className="relative cursor-pointer overflow-visible shadow-md hover:shadow-xl transition-all duration-300 w-full group bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] hover:border-[var(--color-primary)]/50 rounded-2xl"
       onClick={() => onClick(id)}
     >
       {/* Add to Playlist Action Button */}
       <button
         onClick={handlePlaylistClick}
-        className="absolute top-2 right-2 z-10 p-1.5 rounded-full bg-black/60 hover:bg-[var(--color-primary)] text-white transition-all shadow-md cursor-pointer"
+        className="absolute top-2 right-2 z-20 p-1.5 rounded-full bg-black/60 hover:bg-[var(--color-primary)] text-white transition-all shadow-md cursor-pointer opacity-0 group-hover:opacity-100"
         title="Add to playlist"
         aria-label="Add song to playlist"
       >
@@ -180,35 +193,51 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
       </button>
 
       <CardContent className="p-3 flex flex-col items-center relative">
-        {/* Artwork Image with Hover Play Overlay */}
-        <div
-          className="relative w-full aspect-square overflow-hidden rounded-xl"
-          onMouseEnter={() => setIsHovered(true)}
-          onMouseLeave={() => setIsHovered(false)}
-        >
-          <img
-            src={hdImage}
-            alt={cleanName}
-            onLoad={handleThumbnailLoad}
-            onError={(e) => handleThumbnailError(e, id)}
-            className={`w-full h-full object-cover transition-all duration-300 ${
-              isHovered ? "scale-105 opacity-80" : "scale-100 opacity-100"
-            }`}
-          />
-
-          {/* Hover Play Button (Stitch Primary Token - Zero Green) */}
-          {isHovered && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px] rounded-xl transition-opacity">
-              <div className="p-3 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] shadow-lg transform transition-transform scale-100 group-hover:scale-110">
-                <Play size={24} className="fill-current ml-0.5" />
+        {/* Artwork Image Container with Vinyl Peeking Effect */}
+        <div className="relative w-full aspect-square overflow-visible rounded-xl">
+          {/* Dark Vinyl Disc Peeking Out on Hover */}
+          <div className="absolute top-1.5 right-1.5 w-[85%] h-[85%] rounded-full bg-neutral-900 border-4 border-neutral-800 shadow-xl flex items-center justify-center transition-all duration-500 group-hover:translate-x-4 group-hover:rotate-45 pointer-events-none z-0">
+            {/* Vinyl Grooves Pattern */}
+            <div className="w-[70%] h-[70%] rounded-full border border-neutral-700/50 flex items-center justify-center">
+              <div className="w-[45%] h-[45%] rounded-full border border-neutral-700/50 flex items-center justify-center">
+                {/* Center Vinyl Label */}
+                <div className="w-[30%] h-[30%] rounded-full bg-[var(--color-primary)]/80 border border-white/40 flex items-center justify-center">
+                  <div className="w-1.5 h-1.5 rounded-full bg-black" />
+                </div>
               </div>
             </div>
-          )}
+          </div>
+
+          {/* Sleeve & Artwork */}
+          <div
+            className="relative z-10 w-full h-full rounded-xl overflow-hidden shadow-md group-hover:-translate-x-1.5 transition-transform duration-500 bg-[var(--color-surface-base)]"
+            onMouseEnter={() => setIsHovered(true)}
+            onMouseLeave={() => setIsHovered(false)}
+          >
+            <img
+              src={hdImage}
+              alt={cleanName}
+              onLoad={handleThumbnailLoad}
+              onError={(e) => handleThumbnailError(e, id)}
+              className={`w-full h-full object-cover transition-all duration-300 ${
+                isHovered ? "scale-105 opacity-80" : "scale-100 opacity-100"
+              }`}
+            />
+
+            {/* Hover Play Button (Stitch Primary Token - Zero Green) */}
+            {isHovered && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-[2px] rounded-xl transition-opacity">
+                <div className="p-3 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] shadow-lg transform transition-transform scale-100 group-hover:scale-110">
+                  <Play size={24} className="fill-current ml-0.5" />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Song Info */}
         <div className="w-full mt-3 text-left">
-          <p className="font-semibold text-sm truncate text-[var(--color-on-surface)]" title={cleanName}>
+          <p className="font-bold text-sm truncate text-[var(--color-on-surface)] group-hover:text-[var(--color-primary)] transition-colors" title={cleanName}>
             {cleanName}
           </p>
           {artist && (

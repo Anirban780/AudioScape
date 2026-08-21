@@ -117,7 +117,7 @@ const FavoritesHeroBanner = ({
           <div className="flex items-center gap-3">
             <button
               onClick={onPlayAll}
-              className="bg-[var(--color-primary)] text-[var(--color-text-on-primary)] px-7 py-3 rounded-full font-bold text-xs sm:text-sm tracking-wider hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center gap-2.5 cursor-pointer"
+              className="bg-pink-600 text-white px-7 py-3 rounded-full font-bold text-xs sm:text-sm tracking-wider hover:scale-105 active:scale-95 transition-all shadow-xl flex items-center gap-2.5 cursor-pointer"
             >
               <Play size={17} fill="currentColor" className="ml-0.5" />
               <span>PLAY ALL</span>
@@ -151,7 +151,7 @@ const FavoritesHeroBanner = ({
                     onClick={() => setCurrentIndex(idx)}
                     className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
                       idx === currentIndex
-                        ? "w-6 bg-[var(--color-primary)]"
+                        ? "w-6 bg-pink-600"
                         : "w-2 bg-white/40 hover:bg-white"
                     }`}
                     title={`Go to slide ${idx + 1}`}

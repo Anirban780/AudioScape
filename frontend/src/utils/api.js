@@ -1,4 +1,5 @@
 import useAuthStore from "../store/useAuthStore";
+import useDataRefreshStore from "../store/useDataRefreshStore";
 import { getValidThumbnailUrl } from "./youtubeUtils";
 
 const LOCAL_API_URL = "http://localhost:5000";
@@ -54,6 +55,8 @@ export async function saveSongListen(videoId) {
         }
 
         console.log("Song saved to database successfully");
+        // Trigger delayed invalidation for playback history subscribers
+        useDataRefreshStore.getState().invalidate("history");
     } catch (error) {
         console.error("Error saving song/track:", error);
     }
@@ -172,6 +175,10 @@ export async function saveLikeSong(userId, track, liked) {
         if (!response.ok) {
             throw new Error(`Failed to save like status: ${response.status}`);
         }
+
+        // Trigger delayed invalidation for favorites and recommendations subscribers
+        useDataRefreshStore.getState().invalidate("favorites");
+        useDataRefreshStore.getState().invalidate("recommendations");
     } catch (error) {
         console.error("Error saving like status:", error);
     }
