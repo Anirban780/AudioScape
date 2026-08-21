@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getBackendURL } from '../utils/api';
 
 /**
  * ============================================================================
@@ -8,15 +9,15 @@ import { create } from 'zustand';
  * 
  * WHAT THIS FILE DOES:
  * Primary state management for user authentication in AudioScape using direct
- * Google OAuth 2.0 (Google Identity Services - GIS) and backend user session state.
+ * Google OAuth 2.0 (Google Identity Services - GIS) and backend server-issued JWT sessions.
  * 
  * WHY THIS WAS DESIGNED THIS WAY:
- * 1. Session Token Persistence: Persists `user` and `idToken` in `sessionStorage`
- *    so page refreshes within the active tab maintain full Bearer token authentication
- *    without throwing 401 Unauthorized errors on history/favorites endpoints.
- * 2. Store Consistency: Aligns authentication state management with other global
+ * 1. Session Token Persistence: Persists `user` and `idToken` (JWT Access Token) in `localStorage`
+ *    so browser restarts and tab refreshes maintain full Bearer token authentication.
+ * 2. Silent Token Refresh: Supports 30-day HttpOnly refresh cookies via `refreshAuthSession()`.
+ * 3. Store Consistency: Aligns authentication state management with other global
  *    stores (usePlayerStore, usePlaylistStore, useSidebarStore).
- * 3. Non-React Accessibility: API utility modules (api.js, playlists.js) can read
+ * 4. Non-React Accessibility: API utility modules (api.js, playlists.js) can read
  *    token/user state directly via `useAuthStore.getState()`.
  * ============================================================================
  */
@@ -25,11 +26,11 @@ const STORAGE_KEY_USER = 'audioscape_user_session';
 const STORAGE_KEY_TOKEN = 'audioscape_auth_token';
 
 /**
- * Safely restores persisted basic user profile from sessionStorage (if valid).
+ * Safely restores persisted basic user profile from localStorage (if valid).
  */
 const getInitialUser = () => {
     try {
-        const stored = sessionStorage.getItem(STORAGE_KEY_USER);
+        const stored = localStorage.getItem(STORAGE_KEY_USER);
         return stored ? JSON.parse(stored) : null;
     } catch {
         return null;
@@ -37,11 +38,11 @@ const getInitialUser = () => {
 };
 
 /**
- * Safely restores persisted Google ID Token string from sessionStorage (if valid).
+ * Safely restores persisted JWT string from localStorage (if valid).
  */
 const getInitialToken = () => {
     try {
-        return sessionStorage.getItem(STORAGE_KEY_TOKEN) || null;
+        return localStorage.getItem(STORAGE_KEY_TOKEN) || null;
     } catch {
         return null;
     }
@@ -65,18 +66,18 @@ const useAuthStore = create((set, get) => ({
     // ------------------------------------------------------------------------
 
     /**
-     * Sets active authenticated user and Google ID Token.
+     * Sets active authenticated user and JWT Access Token.
      * @param {Object} user - User record returned by PostgreSQL backend
-     * @param {string} idToken - Raw Google OAuth 2.0 ID Token string
+     * @param {string} idToken - Server-issued JWT Access Token string
      */
     setAuth: (user, idToken) => {
         try {
-            sessionStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
+            localStorage.setItem(STORAGE_KEY_USER, JSON.stringify(user));
             if (idToken) {
-                sessionStorage.setItem(STORAGE_KEY_TOKEN, idToken);
+                localStorage.setItem(STORAGE_KEY_TOKEN, idToken);
             }
         } catch (e) {
-            console.warn('Unable to persist user session info to sessionStorage:', e);
+            console.warn('Unable to persist user session info to localStorage:', e);
         }
 
         set({
@@ -93,8 +94,8 @@ const useAuthStore = create((set, get) => ({
      */
     clearAuth: () => {
         try {
-            sessionStorage.removeItem(STORAGE_KEY_USER);
-            sessionStorage.removeItem(STORAGE_KEY_TOKEN);
+            localStorage.removeItem(STORAGE_KEY_USER);
+            localStorage.removeItem(STORAGE_KEY_TOKEN);
         } catch (e) {
             console.warn('Error clearing user session storage:', e);
         }
@@ -106,6 +107,37 @@ const useAuthStore = create((set, get) => ({
             isLoading: false,
             authError: null,
         });
+    },
+
+    /**
+     * Silently refreshes user authentication session using HttpOnly refresh cookie.
+     */
+    refreshAuthSession: async () => {
+        try {
+            get().setIsLoading(true);
+            const backendUrl = await getBackendURL();
+            const response = await fetch(`${backendUrl}/api/auth/refresh`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                if (data.user && data.accessToken) {
+                    get().setAuth(data.user, data.accessToken);
+                    return true;
+                }
+            } else {
+                // If refresh cookie is missing or invalid, clear stale auth state
+                get().clearAuth();
+            }
+        } catch (err) {
+            console.warn('Silent auth session refresh failed:', err);
+        } finally {
+            get().setIsLoading(false);
+        }
+        return false;
     },
 
     /**
@@ -121,12 +153,23 @@ const useAuthStore = create((set, get) => ({
     setAuthError: (authError) => set({ authError, isLoading: false }),
 
     /**
-     * Performs clean sign-out: clears state and disables GIS auto-select.
+     * Performs clean sign-out: clears state, revokes refresh cookie, and disables GIS auto-select.
      */
-    logout: () => {
+    logout: async () => {
         if (window.google?.accounts?.id) {
             window.google.accounts.id.disableAutoSelect();
         }
+
+        try {
+            const backendUrl = await getBackendURL();
+            await fetch(`${backendUrl}/api/auth/logout`, {
+                method: 'POST',
+                credentials: 'include',
+            }).catch(() => {});
+        } catch (e) {
+            // Ignore sign-out network errors
+        }
+
         get().clearAuth();
     },
 }));

@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
+import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 
@@ -14,14 +15,18 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
  *
  * PRODUCTION FEATURES CONFIGURED:
  * 1. Global CORS: Restricts origins to configured frontend deployment domains (`PROD_FRONTEND_URL`, `FRONTEND_URL`, `localhost:5173`).
- * 2. Global ValidationPipe: Automatically sanitizes, validates, and transforms request payloads using DTO definitions.
- * 3. AllExceptionsFilter: Formats uncaught exceptions into clean, uniform JSON error responses.
- * 4. Graceful Shutdown Hooks: Enables process signal handlers (`SIGTERM`, `SIGINT`) for clean database disconnection.
+ * 2. Cookie Parser: Parses incoming HttpOnly cookies for persistent refresh tokens (`audioscape_refresh_token`).
+ * 3. Global ValidationPipe: Automatically sanitizes, validates, and transforms request payloads using DTO definitions.
+ * 4. AllExceptionsFilter: Formats uncaught exceptions into clean, uniform JSON error responses.
+ * 5. Graceful Shutdown Hooks: Enables process signal handlers (`SIGTERM`, `SIGINT`) for clean database disconnection.
  * ============================================================================
  */
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
+
+  // Enable cookie parsing middleware for HttpOnly refresh cookies
+  app.use(cookieParser());
 
   // Enable graceful shutdown hooks for container orchestrators (Render / Kubernetes)
   app.enableShutdownHooks();

@@ -6,25 +6,19 @@ import {
   Logger,
 } from '@nestjs/common';
 import { OAuth2Client } from 'google-auth-library';
+import * as jwt from 'jsonwebtoken';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * ============================================================================
- * CAN ACTIVATE GUARD: DIRECT GOOGLE OAUTH 2.0 GUARD
+ * CAN ACTIVATE GUARD: SERVER JWT & GOOGLE OAUTH GUARD
  * ============================================================================
  * @module AuthModule
  * 
  * WHAT THIS FILE DOES:
  * Intercepts incoming HTTP requests, extracts the Bearer token from the
- * `Authorization: Bearer <id_token>` header, verifies it directly against Google OAuth 2.0
- * servers using `google-auth-library`, and synchronizes/attaches the PostgreSQL user record.
- *
- * WHY THIS WAS SIMPLIFIED (Component 2):
- * 1. Single Auth Path: Removed legacy Firebase JWT decoding fallbacks. All client
- *    requests now pass direct Google OAuth 2.0 ID tokens.
- * 2. Automatic Legacy Account Linking: Matches existing users by `email` first, automatically
- *    updating the user's `authId` to their verified Google `sub` claim on first login.
- * 3. High Efficiency: Reduces guard logic complexity and eliminates unverified JWT decoding.
+ * `Authorization: Bearer <token>` header, first verifies server-issued JWT access tokens
+ * locally, and falls back to Google OAuth verification when raw Google tokens are passed.
  * ============================================================================
  */
 @Injectable()
@@ -34,6 +28,10 @@ export class GoogleAuthGuard implements CanActivate {
 
   constructor(private readonly prisma: PrismaService) {
     this.googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+  }
+
+  private getJwtSecret(): string {
+    return process.env.JWT_SECRET || 'audioscape_jwt_secret_key_default';
   }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -55,12 +53,29 @@ export class GoogleAuthGuard implements CanActivate {
       throw new UnauthorizedException('Unauthorized: Bearer token string is empty');
     }
 
+    // 1. First attempt verifying as a Server-Issued JWT Access Token (Fastest & Stateless)
+    try {
+      const decoded = jwt.verify(token, this.getJwtSecret()) as any;
+      if (decoded && decoded.sub) {
+        const dbUser = await this.prisma.user.findUnique({
+          where: { id: decoded.sub },
+        });
+
+        if (dbUser) {
+          request.user = dbUser;
+          return true;
+        }
+      }
+    } catch {
+      // Token is not a valid server-issued JWT; fallback to Google OAuth verification below
+    }
+
+    // 2. Fallback: Cryptographically verify direct Google OAuth 2.0 ID token or Access Token
     let email: string;
     let authId: string;
     let displayName: string;
     let photoUrl: string | null = null;
 
-    // Cryptographically verify Google OAuth 2.0 ID token or Access Token
     try {
       if (token.split('.').length === 3) {
         // ID Token (JWT)
@@ -102,7 +117,7 @@ export class GoogleAuthGuard implements CanActivate {
       }
     } catch (googleErr: any) {
       this.logger.error(`Google token verification failed in guard: ${googleErr.message}`);
-      throw new UnauthorizedException(`Unauthorized: Google OAuth verification failed (${googleErr.message})`);
+      throw new UnauthorizedException(`Unauthorized: OAuth verification failed (${googleErr.message})`);
     }
 
     try {
