@@ -72,13 +72,14 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
     queue,
     nextTrack,
     prevTrack,
+    miniPlayerMode: mode,
+    setMiniPlayerMode: setMode,
   } = usePlayerStore();
 
   const { isSidebarCollapsed } = useSidebarStore();
 
-  // Mode state: defaults to 'float' mode
-  const [mode, setMode] = useState('float');
   const [showLayoutMenu, setShowLayoutMenu] = useState(false);
+  const [showCornerLayoutMenu, setShowCornerLayoutMenu] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [rndSize, setRndSize] = useState({ width: 450, height: 84 });
   const [isDraggingCorner, setIsDraggingCorner] = useState(false);
@@ -418,21 +419,31 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
           height: 112,
         }}
         enableResizing={false}
-        bounds="window"
         onDragStart={() => setIsDraggingCorner(true)}
         onDragStop={() => setTimeout(() => setIsDraggingCorner(false), 150)}
-        className="z-50 group/bubble"
+        className="z-50"
+        style={{ overflow: 'visible' }}
+        dragHandleClassName="corner-drag-handle"
       >
-        <div className="relative w-full h-full">
+        {/* Outer container — perfectly square so rounded-full = true circle */}
+        <div
+          className="relative"
+          style={{ width: 112, height: 112 }}
+          onMouseEnter={() => !isDraggingCorner && setShowLayoutMenu(true)}
+          onMouseLeave={() => setShowLayoutMenu(false)}
+        >
 
-          {/* Hover-expand info card (hidden when dragging!) */}
-          <div className={`absolute bottom-full right-0 mb-3 w-64 mini-player-capsule rounded-2xl p-3.5 flex flex-col gap-2.5 transition-all duration-300 shadow-2xl before:absolute before:inset-x-0 before:-bottom-6 before:h-7 before:w-full ${
-            !isDraggingCorner && showLayoutMenu
-              ? 'opacity-100 pointer-events-auto translate-y-0'
-              : !isDraggingCorner
-              ? 'opacity-0 group-hover/bubble:opacity-100 pointer-events-none group-hover/bubble:pointer-events-auto translate-y-2 group-hover/bubble:translate-y-0'
-              : 'opacity-0 pointer-events-none'
-          }`}>
+          {/* ---------------------------------------------------------------- */}
+          {/* Hover-expand info card — shown when showLayoutMenu = true        */}
+          {/* ---------------------------------------------------------------- */}
+          <div
+            className={`absolute bottom-[calc(100%+12px)] right-0 w-64 mini-player-capsule rounded-2xl p-3.5 flex flex-col gap-2.5 shadow-2xl transition-all duration-200 before:absolute before:inset-x-0 before:-bottom-6 before:h-8 before:w-full ${
+              showLayoutMenu && !isDraggingCorner
+                ? 'opacity-100 pointer-events-auto translate-y-0'
+                : 'opacity-0 pointer-events-none translate-y-2'
+            }`}
+            style={{ zIndex: 60 }}
+          >
             {/* Track info */}
             <div className="flex items-center gap-3">
               <img src={thumbnailUrl} alt={cleanTitle} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-[var(--color-border-strong)]" />
@@ -443,42 +454,155 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
             </div>
 
             {/* Mini progress bar */}
-            <div className="relative w-full h-1 bg-[var(--color-surface-overlay)] rounded-full overflow-hidden cursor-pointer" onClick={handleSeekClick} ref={progressBarRef}>
-              <div className="h-full bg-gradient-to-r from-[var(--color-primary)] via-[#c084fc] to-[var(--color-secondary)] transition-all duration-100" style={{ width: `${percentage}%` }} />
+            <div
+              className="relative w-full h-1.5 bg-[var(--color-surface-overlay)] rounded-full overflow-hidden cursor-pointer hover:h-2 transition-all"
+              onClick={handleSeekClick}
+              ref={progressBarRef}
+            >
+              <div
+                className="h-full bg-gradient-to-r from-[var(--color-primary)] via-[#c084fc] to-[var(--color-secondary)] transition-all duration-100"
+                style={{ width: `${percentage}%` }}
+              />
             </div>
 
-            {/* Controls row inside tooltip card */}
-            <div className="flex items-center justify-between gap-1 pt-0.5">
-              <button onClick={toggleLike} className={`p-1.5 rounded-full transition-colors cursor-pointer ${isLiked ? 'text-pink-500' : 'text-[var(--color-on-surface-variant)] hover:text-pink-400'}`} aria-label="Like"><Heart size={14} fill={isLiked ? 'currentColor' : 'none'} /></button>
-              <button onClick={prevTrack} className="p-1.5 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] rounded-full transition-colors cursor-pointer" aria-label="Previous"><SkipBack size={14} /></button>
-              {renderPlayBtn(9, 15)}
-              <button onClick={nextTrack} className="p-1.5 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] rounded-full transition-colors cursor-pointer" aria-label="Next"><SkipForward size={14} /></button>
-              {renderLayoutMenu}
-              {renderExpandBtn}
+            {/* Controls row */}
+            <div className="flex items-center justify-between gap-1">
+              <button
+                onClick={toggleLike}
+                className={`p-1.5 rounded-full transition-colors cursor-pointer ${isLiked ? 'text-pink-500' : 'text-[var(--color-on-surface-variant)] hover:text-pink-400'}`}
+                aria-label="Like"
+              >
+                <Heart size={14} fill={isLiked ? 'currentColor' : 'none'} />
+              </button>
+
+              <button
+                onClick={prevTrack}
+                className="p-1.5 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] rounded-full transition-colors cursor-pointer"
+                aria-label="Previous"
+              >
+                <SkipBack size={14} />
+              </button>
+
+              {/* Play/Pause */}
+              <button
+                onClick={togglePlayPause}
+                className="w-9 h-9 rounded-full bg-gradient-to-tr from-[var(--color-primary)] via-[#c084fc] to-[#e8ddff] text-white shadow-[0_0_14px_rgba(167,139,250,0.5)] ring-2 ring-white/30 ring-inset flex items-center justify-center shrink-0 transition-all duration-200 hover:scale-105 active:scale-95 cursor-pointer"
+                title={isPlaying ? 'Pause' : 'Play'}
+                aria-label={isPlaying ? 'Pause' : 'Play'}
+              >
+                {isPlaying
+                  ? <Pause size={15} className="fill-current" />
+                  : <Play  size={15} className="fill-current ml-0.5" />
+                }
+              </button>
+
+              <button
+                onClick={nextTrack}
+                className="p-1.5 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] rounded-full transition-colors cursor-pointer"
+                aria-label="Next"
+              >
+                <SkipForward size={14} />
+              </button>
+
+              {/* Layout mode selector — opens upward relative to card */}
+              <div className="relative">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowCornerLayoutMenu((prev) => !prev);
+                  }}
+                  className={`p-1.5 rounded-full transition-colors cursor-pointer ${
+                    showCornerLayoutMenu
+                      ? 'text-[var(--color-primary)] bg-[var(--color-primary)]/20'
+                      : 'text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-surface-overlay)]'
+                  }`}
+                  aria-label="Change layout"
+                  title="Change player layout"
+                >
+                  <MoreVertical size={14} />
+                </button>
+
+                {/* Layout dropdown — toggles on click */}
+                {showCornerLayoutMenu && (
+                  <div className="absolute bottom-full right-0 mb-2 w-56 rounded-xl bg-[var(--color-surface-raised)] border border-[var(--color-border-strong)] shadow-2xl backdrop-blur-2xl p-1.5" style={{ zIndex: 80 }}>
+                    {LAYOUT_OPTIONS.map((opt) => {
+                      const isSelected = mode === opt.id;
+                      const OptionIcon = opt.Icon;
+                      return (
+                        <button
+                          key={opt.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            selectMode(opt.id);
+                            setShowCornerLayoutMenu(false);
+                          }}
+                          className={`w-full flex items-center gap-2 p-2 rounded-lg text-left text-xs transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)] font-bold'
+                              : 'text-[var(--color-on-surface)] hover:bg-[var(--color-state-hover)]'
+                          }`}
+                        >
+                          <OptionIcon size={12} />
+                          {opt.label}
+                          {isSelected && <Check size={12} className="ml-auto text-[var(--color-primary)]" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Expand to fullscreen */}
+              <button
+                onClick={() => setIsFullScreen(true)}
+                className="p-1.5 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] rounded-full transition-colors cursor-pointer"
+                aria-label="Fullscreen"
+                title="Open fullscreen player"
+              >
+                <Maximize2 size={14} />
+              </button>
             </div>
           </div>
 
-          {/* Main 112px circular artwork bubble button (Draggable handle) */}
-          <div className="relative group/circle cursor-move w-full h-full" onClick={togglePlayPause}>
+          {/* ---------------------------------------------------------------- */}
+          {/* Circular artwork bubble                                          */}
+          {/* ---------------------------------------------------------------- */}
+          <div
+            className="absolute inset-0 cursor-pointer corner-drag-handle"
+            onClick={!isDraggingCorner ? togglePlayPause : undefined}
+            style={{ width: 112, height: 112 }}
+          >
             {/* Pulsing glow ring when playing */}
             {isPlaying && (
-              <div className="absolute inset-0 rounded-full bg-[var(--color-primary)]/35 animate-ping scale-105 pointer-events-none" />
+              <div
+                className="absolute inset-0 bg-[var(--color-primary)]/30 animate-ping scale-105 pointer-events-none"
+                style={{ borderRadius: '50%' }}
+              />
             )}
-            
-            <div className="relative w-full h-full rounded-full shadow-[0_0_30px_rgba(167,139,250,0.5)] ring-4 ring-[var(--color-primary)]/60 border-2 border-white/30 overflow-hidden transition-all duration-300 group-hover/circle:scale-105">
-              <img src={thumbnailUrl} alt={cleanTitle} className="w-full h-full object-cover pointer-events-none" />
-              
-              {/* Semi-transparent play/pause hover overlay */}
-              <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center opacity-0 group-hover/circle:opacity-100 transition-opacity duration-200">
+
+            {/* Perfect circle image container */}
+            <div
+              className="absolute inset-0 shadow-[0_0_30px_rgba(167,139,250,0.5)] ring-4 ring-[var(--color-primary)]/60 border-2 border-white/30 overflow-hidden transition-transform duration-300 hover:scale-105"
+              style={{ borderRadius: '50%' }}
+            >
+              <img
+                src={thumbnailUrl}
+                alt={cleanTitle}
+                className="w-full h-full object-cover pointer-events-none"
+                draggable={false}
+              />
+
+              {/* Play/pause hover overlay */}
+              <div className="absolute inset-0 bg-black/40 backdrop-blur-[1px] flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity duration-200">
                 {isPlaying
                   ? <Pause size={28} className="fill-white text-white drop-shadow-md" />
                   : <Play  size={28} className="fill-white text-white ml-1 drop-shadow-md" />
                 }
               </div>
 
-              {/* Equalizer overlay indicator when playing */}
+              {/* Equalizer when playing */}
               {isPlaying && (
-                <div className="absolute bottom-2 inset-x-0 flex justify-center items-center gap-0.5 bg-black/40 backdrop-blur-xs py-0.5">
+                <div className="absolute bottom-2 inset-x-0 flex justify-center items-center gap-0.5 bg-black/40 backdrop-blur-xs py-0.5 pointer-events-none">
                   <span className="w-0.5 bg-white rounded-full animate-eq-1 h-3" />
                   <span className="w-0.5 bg-white rounded-full animate-eq-2 h-3" />
                   <span className="w-0.5 bg-white rounded-full animate-eq-3 h-3" />
@@ -486,22 +610,23 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
               )}
             </div>
 
-            {/* Close button floats top-right of bubble */}
+            {/* Close button — top-right corner of bubble */}
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleClose();
-              }}
-              className="absolute top-0 right-0 w-6 h-6 bg-[var(--color-surface-overlay)] border border-[var(--color-border-strong)] rounded-full flex items-center justify-center text-[var(--color-on-surface-variant)] hover:text-red-400 hover:bg-red-500/15 transition-colors cursor-pointer shadow-lg z-10"
+              onClick={(e) => { e.stopPropagation(); handleClose(); }}
+              className="absolute top-0 right-0 w-6 h-6 bg-[var(--color-surface-overlay)] border border-[var(--color-border-strong)] rounded-full flex items-center justify-center text-[var(--color-on-surface-variant)] hover:text-red-400 hover:bg-red-500/15 transition-colors cursor-pointer shadow-lg"
+              style={{ zIndex: 65 }}
               title="Close"
               aria-label="Close player"
             >
               <X size={13} />
             </button>
 
-            {/* Queue badge */}
+            {/* Queue count badge — bottom-left corner */}
             {queue && queue.length > 1 && (
-              <span className="absolute bottom-0 left-0 w-6 h-6 bg-[var(--color-primary)] text-[var(--color-text-on-primary)] font-bold text-[11px] rounded-full flex items-center justify-center shadow-md ring-2 ring-[var(--color-surface-overlay)] z-10">
+              <span
+                className="absolute bottom-0 left-0 w-6 h-6 bg-[var(--color-primary)] text-[var(--color-text-on-primary)] font-bold text-[11px] rounded-full flex items-center justify-center shadow-md ring-2 ring-[var(--color-surface-overlay)]"
+                style={{ zIndex: 65 }}
+              >
                 {queue.length}
               </span>
             )}

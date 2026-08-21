@@ -1,19 +1,22 @@
 import { Injectable, Logger, UnauthorizedException, NotFoundException } from '@nestjs/common';
 import { OAuth2Client } from 'google-auth-library';
+import * as jwt from 'jsonwebtoken';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
  * ============================================================================
- * AUTHENTICATION SERVICE: DIRECT GOOGLE OAUTH 2.0 PIPELINE
+ * AUTHENTICATION SERVICE: DIRECT GOOGLE OAUTH 2.0 & JWT SESSION PIPELINE
  * ============================================================================
  * @module AuthModule
  * 
  * WHAT THIS FILE DOES:
- * Core authentication service executing Google ID Token verification directly with
- * Google OAuth 2.0 servers using `google-auth-library` and synchronizing user profiles in PostgreSQL via Prisma.
+ * Core authentication service executing Google ID/Access Token verification directly with
+ * Google OAuth 2.0 servers, issuing server-signed JWT access & refresh tokens, and synchronizing
+ * user profiles in PostgreSQL via Prisma.
  *
  * WHY THIS IS NEEDED FOR PRODUCTION:
- * - Single Sign-On (SSO): Uses Google ID Tokens as the primary authorization mechanism.
+ * - Single Sign-On (SSO): Uses Google OAuth as identity provider.
+ * - Persistent Sessions: Issues long-lived 30-day HttpOnly refresh cookies and 24-hour JWT access tokens.
  * - Automatic Account Linking: Matches existing user records by `email` and links Google `sub` as `authId`.
  * ============================================================================
  */
@@ -26,12 +29,31 @@ export class AuthService {
     this.googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
   }
 
+  private getJwtSecret(): string {
+    return process.env.JWT_SECRET || 'audioscape_jwt_secret_key_default';
+  }
+
+  private getJwtRefreshSecret(): string {
+    return process.env.JWT_REFRESH_SECRET || this.getJwtSecret();
+  }
+
+  /**
+   * Generates a 24-hour Access Token and 30-day Refresh Token pair for a user.
+   */
+  generateTokens(user: { id: string; email: string | null }) {
+    const payload = { sub: user.id, email: user.email };
+    const accessToken = jwt.sign(payload, this.getJwtSecret(), { expiresIn: '24h' });
+    const refreshToken = jwt.sign({ sub: user.id, type: 'refresh' }, this.getJwtRefreshSecret(), { expiresIn: '30d' });
+    return { accessToken, refreshToken };
+  }
+
   /**
    * Cryptographically verifies Google ID Token or Access Token and upserts user record in PostgreSQL.
+   * Returns PostgreSQL user object and generated JWT token pair.
    *
    * @param idToken - Optional Google ID Token string
    * @param accessToken - Optional Google Access Token string
-   * @returns Synchronized user record from PostgreSQL
+   * @returns {Promise<{ message: string, user: Object, accessToken: string, refreshToken: string }>}
    */
   async verifyAndSyncGoogleUser(idToken?: string, accessToken?: string) {
     if (!idToken && !accessToken) {
@@ -118,13 +140,55 @@ export class AuthService {
         });
       }
 
+      const { accessToken: jwtAccessToken, refreshToken: jwtRefreshToken } = this.generateTokens(user);
+
       return {
         message: 'Google OAuth authentication successful',
         user,
+        accessToken: jwtAccessToken,
+        refreshToken: jwtRefreshToken,
       };
     } catch (error: any) {
       this.logger.error(`Google token verification failed: ${error.message}`);
       throw new UnauthorizedException(`Google Authentication failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Validates long-lived Refresh Token and returns fresh Access Token and updated User profile.
+   *
+   * @param refreshToken - Signed JWT refresh token from HttpOnly cookie
+   */
+  async refreshSession(refreshToken: string) {
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token missing');
+    }
+
+    try {
+      const decoded = jwt.verify(refreshToken, this.getJwtRefreshSecret()) as any;
+      if (!decoded || !decoded.sub) {
+        throw new UnauthorizedException('Invalid refresh token payload');
+      }
+
+      const user = await this.prisma.user.findUnique({
+        where: { id: decoded.sub },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException('User associated with refresh token no longer exists');
+      }
+
+      const tokens = this.generateTokens(user);
+
+      return {
+        message: 'Session refreshed successfully',
+        user,
+        accessToken: tokens.accessToken,
+        refreshToken: tokens.refreshToken,
+      };
+    } catch (error: any) {
+      this.logger.warn(`Session refresh failed: ${error.message}`);
+      throw new UnauthorizedException('Invalid or expired refresh session');
     }
   }
 

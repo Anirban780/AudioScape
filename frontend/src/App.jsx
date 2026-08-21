@@ -42,6 +42,9 @@ function AppContent() {
   const { track } = usePlayerStore();
 
   useEffect(() => {
+    // Attempt silent auth session refresh on mount using HttpOnly refresh cookie
+    useAuthStore.getState().refreshAuthSession();
+
     // Initialize Google Identity Services SDK once on application mount
     const timer = setTimeout(() => {
       initGoogleAuth();

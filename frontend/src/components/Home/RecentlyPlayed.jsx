@@ -4,6 +4,7 @@ import placeholder from "@/assets/placeholder.jpg";
 import { Play, History, Music, ListPlus, RotateCcw } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
 import usePlaylistStore from "@/store/usePlaylistStore";
+import { useRefreshOn } from "@/store/useDataRefreshStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import SectionHeader from "@/components/Home/SectionHeader";
 import MusicCard from "@/components/Cards/MusicCard";
@@ -39,13 +40,11 @@ const RecentlyPlayed = ({ userId }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const { openModal } = usePlaylistStore();
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadRecentlyPlayed = (showLoader = true) => {
     if (userId) {
-      setLoading(true);
+      if (showLoader) setLoading(true);
       fetchLastPlayed(userId)
         .then((songs) => {
-          if (!isMounted) return;
           if (Array.isArray(songs) && songs.length > 0) {
             const uniqueSongs = Array.from(
               new Map(
@@ -61,18 +60,22 @@ const RecentlyPlayed = ({ userId }) => {
         })
         .catch((err) => {
           console.error("Error fetching recent tracks:", err);
-          if (isMounted) setRecentlyPlayed([]);
+          setRecentlyPlayed([]);
         })
         .finally(() => {
-          if (isMounted) setLoading(false);
+          if (showLoader) setLoading(false);
         });
     } else {
       setLoading(false);
     }
-    return () => {
-      isMounted = false;
-    };
+  };
+
+  useEffect(() => {
+    loadRecentlyPlayed(true);
   }, [userId]);
+
+  // Automatically refetch history 5 seconds after a track listen event
+  useRefreshOn("history", () => loadRecentlyPlayed(false), 5000);
 
   const handlePlayTrack = (song) => {
     usePlayerStore.getState().setTrack(song);

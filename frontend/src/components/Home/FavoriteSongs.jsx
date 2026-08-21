@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { ChevronRight, ChevronLeft, Heart, Music, Play, ListPlus } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
 import usePlaylistStore from "@/store/usePlaylistStore";
+import { useRefreshOn } from "@/store/useDataRefreshStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import SectionHeader from "@/components/Home/SectionHeader";
 import { getValidThumbnailUrl, getHighResThumbnailUrl, decodeHtmlEntities, handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
@@ -41,30 +42,32 @@ const FavoriteSongs = ({ userId }) => {
   const scrollRef = useRef(null);
   const { openModal } = usePlaylistStore();
 
-  useEffect(() => {
-    let isMounted = true;
+  const loadFavorites = (showLoader = true) => {
     if (userId) {
-      setLoading(true);
+      if (showLoader) setLoading(true);
       fetchUserLikedSongs(userId)
         .then((songs) => {
-          if (!isMounted) return;
           setFavoriteSongs(songs || []);
           setTimeout(() => handleScroll(), 100);
         })
         .catch((err) => {
           console.error("Error fetching favorite songs:", err);
-          if (isMounted) setFavoriteSongs([]);
+          setFavoriteSongs([]);
         })
         .finally(() => {
-          if (isMounted) setLoading(false);
+          if (showLoader) setLoading(false);
         });
     } else {
       setLoading(false);
     }
-    return () => {
-      isMounted = false;
-    };
+  };
+
+  useEffect(() => {
+    loadFavorites(true);
   }, [userId]);
+
+  // Automatically refetch favorites 5 seconds after any like/unlike mutation
+  useRefreshOn("favorites", () => loadFavorites(false), 5000);
 
   const handleScroll = () => {
     if (scrollRef.current) {

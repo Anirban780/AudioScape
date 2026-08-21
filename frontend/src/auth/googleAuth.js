@@ -40,6 +40,7 @@ export async function verifyGoogleTokenWithBackend(idToken = null, accessToken =
         headers: {
             'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({ idToken, accessToken }),
     });
 
@@ -49,7 +50,7 @@ export async function verifyGoogleTokenWithBackend(idToken = null, accessToken =
     }
 
     const data = await response.json();
-    return data.user;
+    return data;
 }
 
 /**
@@ -67,11 +68,11 @@ export async function handleCredentialResponse(response) {
         }
 
         // Verify ID token with NestJS API and sync PostgreSQL user
-        const user = await verifyGoogleTokenWithBackend(idToken, null);
+        const authData = await verifyGoogleTokenWithBackend(idToken, null);
 
         // Save auth state in Zustand store
-        setAuth(user, idToken);
-        toast.success(`Welcome back, ${user.displayName || 'Music Lover'}!`);
+        setAuth(authData.user, authData.accessToken);
+        toast.success(`Welcome back, ${authData.user?.displayName || 'Music Lover'}!`);
     } catch (err) {
         console.error('Error during Google sign-in:', err);
         setAuthError(err.message || 'Google sign-in failed');
@@ -147,11 +148,11 @@ export function initTokenClient() {
                     }
 
                     // Send access token to NestJS backend for verification & user sync
-                    const user = await verifyGoogleTokenWithBackend(null, accessToken);
+                    const authData = await verifyGoogleTokenWithBackend(null, accessToken);
 
                     // Save auth state in Zustand store
-                    setAuth(user, accessToken);
-                    toast.success(`Welcome back, ${user.displayName || 'Music Lover'}!`);
+                    setAuth(authData.user, authData.accessToken);
+                    toast.success(`Welcome back, ${authData.user?.displayName || 'Music Lover'}!`);
                 } catch (err) {
                     console.error('Error during Google sign-in:', err);
                     setAuthError(err.message || 'Google sign-in failed');

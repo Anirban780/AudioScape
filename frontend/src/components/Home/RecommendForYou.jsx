@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from "react";
-import MusicCard from "@/components/Cards/MusicCard";
 import placeholder from "@/assets/placeholder.jpg";
-import { Sparkles, Play, ChevronLeft, ChevronRight, Heart } from "lucide-react";
+import { Sparkles, Play, ChevronLeft, ChevronRight, Heart, ListPlus } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
+import usePlaylistStore from "@/store/usePlaylistStore";
+import { useRefreshOn } from "@/store/useDataRefreshStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getRecommendations, fetchExploreFeed } from "@/utils/api";
 import { fetchYoutubeMusic } from "@/utils/youtube";
-import { getHighResThumbnailUrl, handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
+import { getHighResThumbnailUrl, handleThumbnailLoad, handleThumbnailError, decodeHtmlEntities, getValidThumbnailUrl } from "@/utils/youtubeUtils";
 import MediaGrid from "@/components/Layout/MediaGrid";
 import SectionHeader from "@/components/Home/SectionHeader";
 import toast from "react-hot-toast";
@@ -49,61 +50,86 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
   const [loading, setLoading] = useState(true);
   const [bannerIndex, setBannerIndex] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showScrollRight, setShowScrollRight] = useState(false);
+  const [showScrollLeft, setShowScrollLeft] = useState(false);
+  const scrollRef = React.useRef(null);
+  const { openModal } = usePlaylistStore();
+
+  const loadRecommendations = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+
+    try {
+      let songs = [];
+      if (userId) {
+        songs = await getRecommendations(userId, 20);
+      }
+
+      if (!Array.isArray(songs) || songs.length === 0) {
+        const exploreData = await fetchExploreFeed();
+        if (exploreData && exploreData.length > 0 && exploreData[0].tracks) {
+          songs = exploreData.flatMap((sec) => sec.tracks).slice(0, 20);
+        }
+      }
+
+      if (!Array.isArray(songs) || songs.length === 0) {
+        const ytSongs = await fetchYoutubeMusic("pop hits", 20);
+        if (Array.isArray(ytSongs) && ytSongs.length > 0) {
+          songs = ytSongs;
+        }
+      }
+
+      if (Array.isArray(songs) && songs.length > 0) {
+        const uniqueSongs = Array.from(
+          new Map(
+            songs
+              .filter((song) => song && (song.id || song.videoId))
+              .map((song) => [song.id || song.videoId, song])
+          ).values()
+        );
+        setRecommendedSongs(uniqueSongs);
+      } else {
+        setRecommendedSongs(FALLBACK_RECOMMENDATIONS);
+      }
+    } catch (err) {
+      console.error("Error loading recommendations, using fallback:", err);
+      setRecommendedSongs(FALLBACK_RECOMMENDATIONS);
+    } finally {
+      if (showLoader) setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    let isMounted = true;
-
-    const loadRecommendations = async () => {
-      setLoading(true);
-
-      try {
-        let songs = [];
-        if (userId) {
-          songs = await getRecommendations(userId, 20);
-        }
-
-        if (!Array.isArray(songs) || songs.length === 0) {
-          const exploreData = await fetchExploreFeed();
-          if (exploreData && exploreData.length > 0 && exploreData[0].tracks) {
-            songs = exploreData.flatMap((sec) => sec.tracks).slice(0, 20);
-          }
-        }
-
-        if (!Array.isArray(songs) || songs.length === 0) {
-          const ytSongs = await fetchYoutubeMusic("pop hits", 20);
-          if (Array.isArray(ytSongs) && ytSongs.length > 0) {
-            songs = ytSongs;
-          }
-        }
-
-        if (!isMounted) return;
-
-        if (Array.isArray(songs) && songs.length > 0) {
-          const uniqueSongs = Array.from(
-            new Map(
-              songs
-                .filter((song) => song && (song.id || song.videoId))
-                .map((song) => [song.id || song.videoId, song])
-            ).values()
-          );
-          setRecommendedSongs(uniqueSongs);
-        } else {
-          setRecommendedSongs(FALLBACK_RECOMMENDATIONS);
-        }
-      } catch (err) {
-        console.error("Error loading recommendations, using fallback:", err);
-        if (isMounted) setRecommendedSongs(FALLBACK_RECOMMENDATIONS);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    loadRecommendations();
-
-    return () => {
-      isMounted = false;
-    };
+    loadRecommendations(true);
   }, [userId]);
+
+  // Automatically refetch recommendations 5 seconds after like/unlike mutations
+  useRefreshOn("recommendations", () => loadRecommendations(false), 5000);
+
+  const handleScroll = () => {
+    if (scrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = scrollRef.current;
+      setShowScrollLeft(scrollLeft > 10);
+      setShowScrollRight(scrollLeft + clientWidth < scrollWidth - 10);
+    }
+  };
+
+  useEffect(() => {
+    if (!loading && recommendedSongs.length > 0) {
+      setTimeout(() => handleScroll(), 100);
+    }
+  }, [loading, recommendedSongs]);
+
+  const handleScrollRight = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollBy({ left: 320, behavior: "smooth" });
+    }
+  };
+
+  const handleScrollLeft = () => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollBy({ left: -320, behavior: "smooth" });
+    }
+  };
 
   const featuredTracks = recommendedSongs.slice(0, 5);
 
@@ -285,20 +311,119 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
         </div>
       )}
 
-      {/* Container-Query Driven MediaGrid */}
-      <MediaGrid>
-        {gridSongs.map((song, index) => (
-          <MusicCard
-            key={`${song.id || song.videoId}-${index}`}
-            id={song.id || song.videoId}
-            name={song.name || song.title}
-            artist={song.artist || song.channelTitle}
-            image={song.thumbnail || song.thumbNail}
-            variant="default"
-            onClick={() => handlePlayTrack(song)}
-          />
-        ))}
-      </MediaGrid>
+      {/* Container-Query Driven MediaGrid replaced with Horizontal Carousel */}
+      <div className="relative">
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="grid grid-flow-col auto-cols-[minmax(190px,1fr)] sm:auto-cols-[minmax(210px,1fr)] gap-6 overflow-x-auto scrollbar-hide scroll-smooth py-3 px-1 relative z-10"
+          style={{ scrollSnapType: "x mandatory" }}
+        >
+          {gridSongs.map((song, index) => {
+            const songId = song.id || song.videoId;
+            const validImage = getHighResThumbnailUrl(song.thumbnail || song.coverUrl, songId) || getValidThumbnailUrl(song.thumbnail) || placeholder;
+            const cleanTitle = decodeHtmlEntities(song.name || song.title || "Untitled Track");
+            return (
+              <div
+                key={`${songId}-${index}`}
+                style={{ scrollSnapAlign: "start" }}
+                onClick={() => handlePlayTrack(song)}
+                className="group relative cursor-pointer flex flex-col items-center select-none"
+              >
+                {/* Vinyl Record + Sleeve Container */}
+                <div className="relative w-full aspect-square rounded-2xl bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] hover:border-[var(--color-primary)]/50 shadow-md hover:shadow-xl transition-all duration-500 p-2 overflow-visible">
+                  
+                  {/* Dark Vinyl Disc Peeking Out on Hover */}
+                  <div className="absolute top-2 right-2 w-[85%] h-[85%] rounded-full bg-neutral-900 border-4 border-neutral-800 shadow-xl flex items-center justify-center transition-all duration-500 group-hover:translate-x-5 group-hover:rotate-45 pointer-events-none z-0">
+                    {/* Vinyl Grooves Pattern */}
+                    <div className="w-[70%] h-[70%] rounded-full border border-neutral-700/50 flex items-center justify-center">
+                      <div className="w-[45%] h-[45%] rounded-full border border-neutral-700/50 flex items-center justify-center">
+                        {/* Center Vinyl Label */}
+                        <div className="w-[30%] h-[30%] rounded-full bg-[var(--color-primary)] border border-[var(--color-primary)]/50 flex items-center justify-center">
+                          <div className="w-1.5 h-1.5 rounded-full bg-black" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Album Cover Artwork Sleeve */}
+                  <div className="relative z-10 w-full h-full rounded-xl overflow-hidden shadow-md group-hover:-translate-x-2 transition-transform duration-500 bg-[var(--color-surface-base)]">
+                    <img
+                      src={validImage}
+                      alt={cleanTitle}
+                      onLoad={handleThumbnailLoad}
+                      onError={(e) => handleThumbnailError(e, songId)}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
+
+                    {/* Rank Badge */}
+                    <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-xs text-white text-[10px] font-extrabold tracking-wider border border-white/20">
+                      #{index + 1}
+                    </div>
+
+                    {/* Add to Playlist Button */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openModal({
+                          id: songId,
+                          name: cleanTitle,
+                          artist: song.artist || song.channelTitle,
+                          thumbnail: validImage,
+                        });
+                      }}
+                      className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 hover:bg-[var(--color-primary)] text-white transition-all shadow-md cursor-pointer"
+                      title="Add to playlist"
+                    >
+                      <ListPlus size={14} />
+                    </button>
+
+                    {/* Hover Play Button Overlay */}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
+                      <div className="w-11 h-11 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
+                        <Play size={20} fill="currentColor" className="ml-0.5" />
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Song Title & Artist */}
+                <div className="w-full mt-3 text-left px-1">
+                  <h4 className="font-bold text-sm text-[var(--color-on-surface)] truncate group-hover:text-[var(--color-primary)] transition-colors" title={cleanTitle}>
+                    {cleanTitle}
+                  </h4>
+                  <p className="text-xs text-[var(--color-on-surface-variant)] truncate mt-0.5" title={song.artist || song.channelTitle}>
+                    {song.artist || song.channelTitle || "Unknown Artist"}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Left Scroll Navigation Button */}
+        {showScrollLeft && (
+          <button
+            onClick={handleScrollLeft}
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-[var(--color-primary)] text-[var(--color-text-on-primary)] hover:opacity-90 shadow-xl rounded-full z-20 cursor-pointer transition-opacity"
+            aria-label="Scroll left"
+          >
+            <ChevronLeft size={20} />
+          </button>
+        )}
+
+        {/* Right Scroll Navigation Button */}
+        {showScrollRight && (
+          <button
+            onClick={handleScrollRight}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 flex items-center justify-center bg-[var(--color-primary)] text-[var(--color-text-on-primary)] hover:opacity-90 shadow-xl rounded-full z-20 cursor-pointer transition-opacity"
+            aria-label="Scroll right"
+          >
+            <ChevronRight size={20} />
+          </button>
+        )}
+      </div>
     </section>
   );
 };
