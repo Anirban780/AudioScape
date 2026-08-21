@@ -21,6 +21,7 @@ const usePlayerStore = create((set, get) => ({
     track: null,
     isPlaying: false,
     isFullScreen: false,
+    miniPlayerMode: 'float',
     progress: 0,
     duration: 0,
     volume: 80,
@@ -47,6 +48,7 @@ const usePlayerStore = create((set, get) => ({
     setIsPlaying: (isPlaying) => set({ isPlaying }),
     setProgress: (progress) => set({ progress }),
     setDuration: (duration) => set({ duration }),
+    setMiniPlayerMode: (miniPlayerMode) => set({ miniPlayerMode }),
 
     /**
      * Master Volume Setter synchronized directly with YouTube iFrame API.
