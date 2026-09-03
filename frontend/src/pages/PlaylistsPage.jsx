@@ -1,144 +1,454 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import AppLayout from "@/components/Layout/AppLayout";
 import useAuthStore from "@/store/useAuthStore";
 import usePlaylistStore from "@/store/usePlaylistStore";
 import usePlayerStore from "@/store/usePlayerStore";
-import toast from "react-hot-toast";
-import MusicCard from "@/components/Cards/MusicCard";
 import Loader from "@/components/Home/Loader";
-import { Trash2, FolderHeart } from "lucide-react";
-import { getPlaylists, deletePlaylist } from "@/utils/playlists";
-import MediaGrid from "@/components/Layout/MediaGrid";
+import toast from "react-hot-toast";
+import { ListMusic, Disc3, Trash2, X, Loader2 } from "lucide-react";
+import { getPlaylists, deletePlaylist, createPlaylist, updatePlaylist } from "@/utils/playlists";
+import PlaylistHeroHeader from "@/components/Playlist/PlaylistHeroHeader";
+import PlaylistFilterBar from "@/components/Playlist/PlaylistFilterBar";
+import PlaylistCard from "@/components/Playlist/PlaylistCard";
+import PlaylistCreateModal from "@/components/Playlist/PlaylistCreateModal";
 
 /**
  * ============================================================================
- * PLAYLISTS MANAGEMENT PAGE (PlaylistsPage.jsx)
+ * PLAYLISTS PAGE (PlaylistsPage.jsx)
  * ============================================================================
- * 
+ *
  * WHAT THIS FILE DOES:
- * Displays user's created playlists and custom track collections.
- * Supports playlist selection, playing all songs in a playlist, and deletion.
+ * Full redesign of the Playlists list view (/playlists).
+ * Renders the authenticated user's entire playlist library with:
+ * - Glassmorphic hero header with stats and "Create Playlist" CTA
+ * - Search, sort, and grid/list view controls
+ * - Spotify-style 2x2 mosaic PlaylistCard grid
+ * - Delete confirmation modal
+ * - Inline rename modal
+ * - Empty state for no playlists
+ *
+ * WHY IT WAS DESIGNED THIS WAY:
+ * 1. Two-level navigation: This page is the INDEX view; clicking a card goes
+ *    to /playlists/:id (the DETAIL view built in Phase 4).
+ * 2. Consistent with Favorites: Shares FilterBar, sticky position, and view
+ *    mode toggle patterns from FavoritesPage.jsx for coherent UX.
+ * 3. Brand purple accent: Uses var(--color-primary) throughout instead of
+ *    the pink used by Favorites — differentiates the two sections.
+ * 4. Client-side filtering/sorting: Fast, no-network search and sort on the
+ *    already-fetched playlist array.
  */
-
 const PlaylistsPage = () => {
-  const user = useAuthStore((s) => s.user);
-  const { playlists, setPlaylists } = usePlaylistStore();
-  const { setTrack, setQueue } = usePlayerStore();
-  const [loading, setLoading] = useState(true);
-  const [deleteModal, setDeleteModal] = useState({ open: false, playlist: null });
+    const user = useAuthStore((s) => s.user);
+    const { playlists, setPlaylists, openCreateModal, closeCreateModal, isCreateModalOpen } = usePlaylistStore();
+    const { setTrack, setQueue } = usePlayerStore();
 
-  useEffect(() => {
-    if (!user) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    getPlaylists(user.id)
-      .then(setPlaylists)
-      .catch(() => toast.error("Failed to load playlists"))
-      .finally(() => setLoading(false));
-  }, [user, setPlaylists]);
+    const [loading, setLoading] = useState(true);
 
-  const confirmDeletePlaylist = (playlist) => {
-    setDeleteModal({ open: true, playlist });
-  };
+    // Search / sort / view mode state — persisted to localStorage
+    const [searchQuery, setSearchQuery] = useState("");
+    const [sortBy, setSortBy] = useState("updated");
+    const [sortDirection, setSortDirection] = useState(() =>
+        localStorage.getItem("audioscape-playlists-sort-dir") || "desc"
+    );
+    const [viewMode, setViewMode] = useState(() =>
+        localStorage.getItem("audioscape-playlists-view") || "grid"
+    );
 
-  const handleDeletePlaylist = async () => {
-    if (!user || !deleteModal.playlist) return toast.error("User not logged in");
+    // Delete confirmation modal state
+    const [deleteModal, setDeleteModal] = useState({ open: false, playlist: null, loading: false });
 
-    try {
-      await deletePlaylist(user.id, deleteModal.playlist.id);
-      const updated = await getPlaylists(user.id);
-      setPlaylists(updated);
-      toast.success("Playlist deleted");
-    } catch (error) {
-      console.error("Delete failed:", error);
-      toast.error("Failed to delete playlist");
-    } finally {
-      setDeleteModal({ open: false, playlist: null });
-    }
-  };
+    // Rename/edit modal state
+    const [editModal, setEditModal] = useState({ open: false, playlist: null, newName: "", loading: false });
 
-  return (
-    <AppLayout>
-      <div className="w-full animate-in fade-in duration-300">
-        <h2 className="text-2xl sm:text-3xl font-extrabold text-[var(--color-on-surface)] tracking-tight mb-6 flex items-center gap-2.5">
-          <FolderHeart className="text-[var(--color-primary)]" size={28} />
-          <span>Your Playlists</span>
-        </h2>
+    // Persist view mode and sort direction changes
+    useEffect(() => {
+        localStorage.setItem("audioscape-playlists-view", viewMode);
+    }, [viewMode]);
 
-        {loading ? (
-          <Loader message="Loading your playlists..." />
-        ) : !playlists || playlists.length === 0 ? (
-          <div className="text-center text-sm text-[var(--color-on-surface-variant)] py-12 px-6 rounded-3xl border border-[var(--color-border-default)] bg-[var(--color-surface-raised)] max-w-md mx-auto my-8">
-            <p className="font-bold text-base text-[var(--color-on-surface)] mb-1">No playlists created yet</p>
-            <p className="text-xs text-[var(--color-on-surface-variant)]">Save tracks to a new playlist from any song card!</p>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {playlists.map((pl) => (
-              <div
-                key={pl.id}
-                className="p-6 rounded-3xl bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] shadow-sm"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-xl font-bold text-[var(--color-on-surface)]">{pl.name}</h3>
-                  <button
-                    onClick={() => confirmDeletePlaylist(pl)}
-                    className="p-2 rounded-xl text-[var(--color-on-surface-variant)] hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
-                    title="Delete Playlist"
-                  >
-                    <Trash2 size={18} />
-                  </button>
-                </div>
-                <MediaGrid>
-                  {pl.songs?.map((song, i) => (
-                    <MusicCard
-                      key={`${song.id}-${i}`}
-                      id={song.id}
-                      name={song.name}
-                      artist={song.artist}
-                      image={song.thumbnail}
-                      onClick={() => {
-                        usePlayerStore.getState().setTrack(song);
-                        usePlayerStore.getState().setIsPlaying(true);
-                      }}
-                    />
-                  ))}
-                </MediaGrid>
-              </div>
-            ))}
-          </div>
-        )}
+    useEffect(() => {
+        localStorage.setItem("audioscape-playlists-sort-dir", sortDirection);
+    }, [sortDirection]);
 
-        {/* Delete Confirmation Modal */}
-        {deleteModal.open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-            <div className="bg-[var(--color-surface-raised)] border border-[var(--color-border-strong)] p-6 rounded-3xl max-w-sm w-full shadow-2xl">
-              <h4 className="text-lg font-bold text-[var(--color-on-surface)] mb-2">Delete Playlist?</h4>
-              <p className="text-xs text-[var(--color-on-surface-variant)] mb-6">
-                Are you sure you want to delete <span className="font-bold">{deleteModal.playlist?.name}</span>? This action cannot be undone.
-              </p>
-              <div className="flex items-center justify-end gap-3">
-                <button
-                  onClick={() => setDeleteModal({ open: false, playlist: null })}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-[var(--color-on-surface-variant)] hover:bg-[var(--color-state-hover)] transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleDeletePlaylist}
-                  className="px-4 py-2 rounded-xl text-xs font-bold bg-red-600 hover:bg-red-700 text-white transition-colors"
-                >
-                  Delete
-                </button>
-              </div>
+    /**
+     * Loads user playlists from the backend on mount or user change.
+     */
+    const loadPlaylists = async (showLoader = true) => {
+        if (!user) {
+            setLoading(false);
+            return;
+        }
+        if (showLoader) setLoading(true);
+        try {
+            const data = await getPlaylists(user.id);
+            setPlaylists(data);
+        } catch (err) {
+            toast.error("Failed to load playlists");
+        } finally {
+            if (showLoader) setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadPlaylists(true);
+    }, [user]);
+
+    // ── Aggregated Stats ──────────────────────────────────────────────────────
+    const totalTrackCount = useMemo(() => {
+        return playlists.reduce((acc, pl) => acc + (pl.trackCount || pl.songs?.length || 0), 0);
+    }, [playlists]);
+
+    // ── Client-side filtering & sorting ──────────────────────────────────────
+    const processedPlaylists = useMemo(() => {
+        let result = [...playlists];
+
+        // 1. Search filter by playlist name
+        if (searchQuery.trim()) {
+            const q = searchQuery.toLowerCase();
+            result = result.filter((pl) => pl.name.toLowerCase().includes(q));
+        }
+
+        // 2. Sort
+        switch (sortBy) {
+            case "updated":
+                result.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+                break;
+            case "created":
+                result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                break;
+            case "name":
+                result.sort((a, b) => a.name.localeCompare(b.name));
+                break;
+            case "tracks":
+                result.sort((a, b) => (b.trackCount || 0) - (a.trackCount || 0));
+                break;
+            default:
+                break;
+        }
+
+        // 3. Direction
+        if (sortDirection === "asc") result.reverse();
+
+        return result;
+    }, [playlists, searchQuery, sortBy, sortDirection]);
+
+    // ── Create Playlist ───────────────────────────────────────────────────────
+    /**
+     * Called by PlaylistCreateModal on submit.
+     * Creates the playlist in the backend then refreshes the list.
+     */
+    const handleCreatePlaylist = async (name, description) => {
+        try {
+            await createPlaylist(user.id, name, description);
+            toast.success(`Playlist "${name}" created!`);
+            await loadPlaylists(false);
+        } catch (err) {
+            toast.error(err.message || "Failed to create playlist");
+            throw err; // Let the modal handle re-enabling the form
+        }
+    };
+
+    // ── Delete Playlist ───────────────────────────────────────────────────────
+    const confirmDelete = (playlist) => {
+        setDeleteModal({ open: true, playlist, loading: false });
+    };
+
+    const handleDelete = async () => {
+        if (!deleteModal.playlist) return;
+        setDeleteModal((prev) => ({ ...prev, loading: true }));
+        try {
+            await deletePlaylist(user.id, deleteModal.playlist.id);
+            toast.success(`"${deleteModal.playlist.name}" deleted`);
+            await loadPlaylists(false);
+        } catch (err) {
+            toast.error("Failed to delete playlist");
+        } finally {
+            setDeleteModal({ open: false, playlist: null, loading: false });
+        }
+    };
+
+    // ── Rename/Edit Playlist ──────────────────────────────────────────────────
+    const openEditModal = (playlist) => {
+        setEditModal({ open: true, playlist, newName: playlist.name, loading: false });
+    };
+
+    const handleRename = async () => {
+        const trimmedName = editModal.newName.trim();
+        if (!trimmedName) return toast.error("Playlist name cannot be empty");
+        if (trimmedName === editModal.playlist.name) {
+            setEditModal({ open: false, playlist: null, newName: "", loading: false });
+            return;
+        }
+        setEditModal((prev) => ({ ...prev, loading: true }));
+        try {
+            await updatePlaylist(user.id, editModal.playlist.id, { name: trimmedName });
+            toast.success("Playlist renamed");
+            await loadPlaylists(false);
+        } catch (err) {
+            toast.error(err.message || "Failed to rename playlist");
+        } finally {
+            setEditModal({ open: false, playlist: null, newName: "", loading: false });
+        }
+    };
+
+    // ── Render ────────────────────────────────────────────────────────────────
+    return (
+        <AppLayout>
+            <div className="w-full animate-in fade-in duration-300 pb-24">
+
+                {loading ? (
+                    <Loader message="Loading your playlists..." />
+                ) : (
+                    <>
+                        {/* 1. Hero Header — stats + create CTA */}
+                        <PlaylistHeroHeader
+                            playlistCount={playlists.length}
+                            trackCount={totalTrackCount}
+                            onCreatePlaylist={openCreateModal}
+                        />
+
+                        {/* Only show filter bar and content when there are playlists */}
+                        {playlists.length === 0 ? (
+                            /* ── Empty State ── */
+                            <div className="flex flex-col items-center justify-center min-h-[40vh] gap-5 mt-4">
+                                <div className="w-24 h-24 rounded-3xl bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20 flex items-center justify-center">
+                                    <Disc3 size={48} className="text-[var(--color-primary)]/50 animate-spin" style={{ animationDuration: "10s" }} />
+                                </div>
+                                <div className="text-center max-w-sm">
+                                    <h2 className="text-xl font-bold text-[var(--color-on-surface)] mb-2">
+                                        No playlists yet
+                                    </h2>
+                                    <p className="text-sm text-[var(--color-on-surface-variant)] leading-relaxed">
+                                        Create your first playlist to organise your music. Click{" "}
+                                        <span className="text-[var(--color-primary)] font-semibold">Create Playlist</span>{" "}
+                                        above to get started!
+                                    </p>
+                                </div>
+                            </div>
+                        ) : (
+                            <>
+                                {/* 2. Filter Bar — search, sort, view toggle */}
+                                <PlaylistFilterBar
+                                    searchQuery={searchQuery}
+                                    onSearchChange={setSearchQuery}
+                                    sortBy={sortBy}
+                                    onSortChange={setSortBy}
+                                    sortDirection={sortDirection}
+                                    onDirectionToggle={() =>
+                                        setSortDirection((prev) => (prev === "desc" ? "asc" : "desc"))
+                                    }
+                                    viewMode={viewMode}
+                                    onViewChange={setViewMode}
+                                    totalCount={playlists.length}
+                                    filteredCount={processedPlaylists.length}
+                                />
+
+                                {/* 3a. No search results */}
+                                {processedPlaylists.length === 0 ? (
+                                    <div className="text-center py-16">
+                                        <ListMusic size={40} className="text-[var(--color-on-surface-variant)]/30 mx-auto mb-3" />
+                                        <p className="text-[var(--color-on-surface)] font-medium mb-2">
+                                            No playlists match "{searchQuery}"
+                                        </p>
+                                        <button
+                                            onClick={() => setSearchQuery("")}
+                                            className="text-[var(--color-primary)] hover:underline text-sm font-bold cursor-pointer"
+                                        >
+                                            Clear search
+                                        </button>
+                                    </div>
+                                ) : viewMode === "grid" ? (
+                                    /* 3b. Grid View — 2/3/4 responsive columns */
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
+                                        {processedPlaylists.map((pl) => (
+                                            <PlaylistCard
+                                                key={pl.id}
+                                                playlist={pl}
+                                                onDelete={confirmDelete}
+                                                onEdit={openEditModal}
+                                            />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    /* 3c. List View — compact table rows */
+                                    <div className="flex flex-col gap-2">
+                                        {processedPlaylists.map((pl, index) => {
+                                            const thumb = pl.previewThumbnail || pl.previewThumbnails?.[0] || null;
+                                            return (
+                                                <div
+                                                    key={pl.id}
+                                                    className="flex items-center gap-4 bg-[var(--color-surface-raised)] px-4 py-3 rounded-xl border border-[var(--color-border-default)] hover:border-[var(--color-primary)]/30 hover:bg-[var(--color-surface-overlay)] transition-all group cursor-pointer"
+                                                    onClick={() => window.location.href = `/playlists/${pl.id}`}
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    aria-label={`Open ${pl.name}`}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === "Enter") window.location.href = `/playlists/${pl.id}`;
+                                                    }}
+                                                >
+                                                    {/* Index number */}
+                                                    <span className="w-6 text-center text-xs font-bold text-[var(--color-on-surface-variant)] group-hover:text-[var(--color-primary)] transition-colors shrink-0">
+                                                        {index + 1}
+                                                    </span>
+
+                                                    {/* Cover thumbnail */}
+                                                    <div className="w-11 h-11 rounded-lg overflow-hidden bg-[var(--color-surface-overlay)] shrink-0">
+                                                        {thumb ? (
+                                                            <img src={thumb} alt={pl.name} className="w-full h-full object-cover" />
+                                                        ) : (
+                                                            <div className="w-full h-full bg-gradient-to-br from-[var(--color-primary)]/30 to-violet-800/20 flex items-center justify-center">
+                                                                <ListMusic size={16} className="text-[var(--color-primary)]/60" />
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Name & track count */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className="text-sm font-semibold text-[var(--color-on-surface)] truncate group-hover:text-[var(--color-primary)] transition-colors">
+                                                            {pl.name}
+                                                        </p>
+                                                        <p className="text-xs text-[var(--color-on-surface-variant)] mt-0.5">
+                                                            {pl.trackCount || 0} {pl.trackCount === 1 ? "track" : "tracks"}
+                                                        </p>
+                                                    </div>
+
+                                                    {/* Quick actions */}
+                                                    <div
+                                                        className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); openEditModal(pl); }}
+                                                            className="p-1.5 rounded-full text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-colors cursor-pointer"
+                                                            title="Rename"
+                                                        >
+                                                            <ListMusic size={15} />
+                                                        </button>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); confirmDelete(pl); }}
+                                                            className="p-1.5 rounded-full text-[var(--color-on-surface-variant)] hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                                                            title="Delete"
+                                                        >
+                                                            <Trash2 size={15} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </>
+                )}
+
+                {/* ── Create Playlist Modal ── */}
+                <PlaylistCreateModal
+                    isOpen={isCreateModalOpen}
+                    onClose={closeCreateModal}
+                    onCreate={handleCreatePlaylist}
+                />
+
+                {/* ── Delete Confirmation Modal ── */}
+                {deleteModal.open && (
+                    <div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+                        onClick={(e) => { if (e.target === e.currentTarget && !deleteModal.loading) setDeleteModal({ open: false, playlist: null, loading: false }); }}
+                    >
+                        <div className="bg-[var(--color-surface-overlay)] border border-[var(--color-border-strong)] p-6 rounded-3xl max-w-sm w-full shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200">
+                            <div className="flex items-center gap-3 mb-4">
+                                <div className="w-10 h-10 rounded-xl bg-red-500/15 flex items-center justify-center shrink-0">
+                                    <Trash2 size={18} className="text-red-500" />
+                                </div>
+                                <h4 className="text-base font-bold text-[var(--color-on-surface)]">Delete Playlist?</h4>
+                            </div>
+                            <p className="text-sm text-[var(--color-on-surface-variant)] mb-6 leading-relaxed">
+                                Are you sure you want to delete{" "}
+                                <span className="font-bold text-[var(--color-on-surface)]">
+                                    "{deleteModal.playlist?.name}"
+                                </span>
+                                ? This cannot be undone.
+                            </p>
+                            <div className="flex items-center justify-end gap-3">
+                                <button
+                                    onClick={() => setDeleteModal({ open: false, playlist: null, loading: false })}
+                                    disabled={deleteModal.loading}
+                                    className="px-4 py-2 rounded-xl text-sm font-bold text-[var(--color-on-surface-variant)] hover:bg-[var(--color-state-hover)] transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleDelete}
+                                    disabled={deleteModal.loading}
+                                    className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold bg-red-600 hover:bg-red-700 text-white transition-colors cursor-pointer disabled:opacity-60 shadow-lg"
+                                >
+                                    {deleteModal.loading ? (
+                                        <><Loader2 size={14} className="animate-spin" /><span>Deleting...</span></>
+                                    ) : (
+                                        <><Trash2 size={14} /><span>Delete</span></>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* ── Rename Playlist Modal ── */}
+                {editModal.open && (
+                    <div
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+                        onClick={(e) => { if (e.target === e.currentTarget && !editModal.loading) setEditModal({ open: false, playlist: null, newName: "", loading: false }); }}
+                    >
+                        <div className="bg-[var(--color-surface-overlay)] border border-[var(--color-border-strong)] p-6 rounded-3xl max-w-sm w-full shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200">
+                            {/* Header */}
+                            <div className="flex items-center justify-between mb-5">
+                                <h4 className="text-base font-bold text-[var(--color-on-surface)]">Rename Playlist</h4>
+                                <button
+                                    onClick={() => setEditModal({ open: false, playlist: null, newName: "", loading: false })}
+                                    className="p-1.5 rounded-full hover:bg-[var(--color-state-hover)] text-[var(--color-on-surface-variant)] transition-colors cursor-pointer"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
+
+                            {/* Input */}
+                            <input
+                                type="text"
+                                value={editModal.newName}
+                                onChange={(e) => setEditModal((prev) => ({ ...prev, newName: e.target.value }))}
+                                onKeyDown={(e) => { if (e.key === "Enter") handleRename(); }}
+                                maxLength={100}
+                                autoFocus
+                                placeholder="New playlist name"
+                                className="w-full px-4 py-3 rounded-xl text-sm bg-[var(--color-surface-base)] text-[var(--color-on-surface)] border border-[var(--color-border-default)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/40 focus:border-[var(--color-primary)] transition-all mb-5 placeholder:text-[var(--color-on-surface-variant)]/50"
+                            />
+
+                            {/* Actions */}
+                            <div className="flex items-center justify-end gap-3">
+                                <button
+                                    onClick={() => setEditModal({ open: false, playlist: null, newName: "", loading: false })}
+                                    disabled={editModal.loading}
+                                    className="px-4 py-2 rounded-xl text-sm font-bold text-[var(--color-on-surface-variant)] hover:bg-[var(--color-state-hover)] transition-colors cursor-pointer disabled:opacity-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    onClick={handleRename}
+                                    disabled={editModal.loading || !editModal.newName.trim()}
+                                    className="flex items-center gap-2 px-5 py-2 rounded-xl text-sm font-bold bg-[var(--color-primary)] text-white hover:opacity-90 transition-all cursor-pointer disabled:opacity-50 shadow-lg"
+                                >
+                                    {editModal.loading ? (
+                                        <><Loader2 size={14} className="animate-spin" /><span>Saving...</span></>
+                                    ) : (
+                                        <span>Save</span>
+                                    )}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
-          </div>
-        )}
-      </div>
-    </AppLayout>
-  );
+        </AppLayout>
+    );
 };
 
 export default PlaylistsPage;

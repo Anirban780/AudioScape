@@ -80,7 +80,7 @@ const ExplorePlaylistsCarousel = ({ userId }) => {
             return (
               <div
                 key={playlist.id || index}
-                onClick={() => navigate("/playlists")}
+                onClick={() => navigate(playlist.id ? `/playlists/${playlist.id}` : "/playlists")}
                 className="group relative h-[150px] rounded-[24px] p-6 bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] hover:border-[var(--color-primary)] shadow-lg transition-all duration-300 hover:scale-[1.02] cursor-pointer flex flex-col justify-between overflow-hidden"
               >
                 {/* Ambient Top Glow Line */}
