@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Play, Shuffle, Pencil, Disc3, Clock } from "lucide-react";
+import { handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
 
 /**
  * ============================================================================
@@ -27,8 +28,11 @@ const PlaylistDetailHero = ({
 
     const validThumbnails = previewThumbnails.filter((_, i) => !imgErrors[i]);
 
-    const handleImgError = (index) => {
-        setImgErrors((prev) => ({ ...prev, [index]: true }));
+    const handleImgError = (e, index) => {
+        handleThumbnailError(e);
+        if (e.target.dataset.fallbackDone || e.target.src.includes("placeholder")) {
+            setImgErrors((prev) => ({ ...prev, [index]: true }));
+        }
     };
 
     /**
@@ -38,13 +42,13 @@ const PlaylistDetailHero = ({
         if (isBackground) {
             const bgImg = coverUrl || validThumbnails[0];
             if (bgImg) {
-                return <img src={bgImg} alt="" className="w-full h-full object-cover" />;
+                return <img src={bgImg} alt="" onLoad={handleThumbnailLoad} onError={handleThumbnailError} className="w-full h-full object-cover" />;
             }
             return <div className="w-full h-full bg-[var(--color-primary)]" />;
         }
 
         if (coverUrl) {
-            return <img src={coverUrl} alt={name} className="w-full h-full object-cover" />;
+            return <img src={coverUrl} alt={name} onLoad={handleThumbnailLoad} onError={handleThumbnailError} className="w-full h-full object-cover" />;
         }
 
         if (validThumbnails.length >= 4) {
@@ -55,7 +59,8 @@ const PlaylistDetailHero = ({
                             key={i}
                             src={thumb}
                             alt={`Artwork ${i + 1}`}
-                            onError={() => handleImgError(i)}
+                            onLoad={handleThumbnailLoad}
+                            onError={(e) => handleImgError(e, i)}
                             className="w-full h-full object-cover"
                         />
                     ))}
@@ -68,7 +73,8 @@ const PlaylistDetailHero = ({
                 <img
                     src={validThumbnails[0]}
                     alt={name}
-                    onError={() => handleImgError(0)}
+                    onLoad={handleThumbnailLoad}
+                    onError={(e) => handleImgError(e, 0)}
                     className="w-full h-full object-cover"
                 />
             );

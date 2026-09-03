@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Play, Trash2, Pencil, Music, ListMusic } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
 
 /**
  * ============================================================================
@@ -22,7 +23,7 @@ const PlaylistCard = ({ playlist, onDelete, onEdit }) => {
 
     const { id, name, previewThumbnails = [], trackCount = 0, updatedAt } = playlist;
 
-    // Filter out thumbnails that failed to load
+    // Filter out thumbnails that failed all resolution tiers
     const validThumbnails = previewThumbnails.filter((_, i) => !imgErrors[i]);
 
     /**
@@ -39,8 +40,11 @@ const PlaylistCard = ({ playlist, onDelete, onEdit }) => {
         return `Updated ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
     };
 
-    const handleImgError = (index) => {
-        setImgErrors((prev) => ({ ...prev, [index]: true }));
+    const handleImgError = (e, index) => {
+        handleThumbnailError(e);
+        if (e.target.dataset.fallbackDone || e.target.src.includes("placeholder")) {
+            setImgErrors((prev) => ({ ...prev, [index]: true }));
+        }
     };
 
     /**
@@ -55,7 +59,8 @@ const PlaylistCard = ({ playlist, onDelete, onEdit }) => {
                             key={i}
                             src={thumb}
                             alt={`Playlist artwork ${i + 1}`}
-                            onError={() => handleImgError(i)}
+                            onLoad={handleThumbnailLoad}
+                            onError={(e) => handleImgError(e, i)}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                     ))}
@@ -68,7 +73,8 @@ const PlaylistCard = ({ playlist, onDelete, onEdit }) => {
                 <img
                     src={validThumbnails[0]}
                     alt={name}
-                    onError={() => handleImgError(0)}
+                    onLoad={handleThumbnailLoad}
+                    onError={(e) => handleImgError(e, 0)}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
             );
