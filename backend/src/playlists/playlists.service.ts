@@ -101,11 +101,11 @@ export class PlaylistsService {
    * Creates a new custom playlist for an authenticated user.
    *
    * @param userId - Internal PostgreSQL user UUID
-   * @param dto - CreatePlaylistDto containing playlist name
+   * @param dto - CreatePlaylistDto containing playlist name, optional description, and coverUrl
    * @returns Newly created Playlist record
    */
   async createPlaylist(userId: string, dto: CreatePlaylistDto) {
-    const { name } = dto;
+    const { name, description, coverUrl } = dto;
 
     // Check for duplicate playlist name for this user
     const existing = await this.prisma.playlist.findUnique({
@@ -126,10 +126,12 @@ export class PlaylistsService {
         data: {
           userId,
           name: name.trim(),
+          description: description?.trim() || null,
+          coverUrl: coverUrl || null,
         },
         include: {
           tracks: {
-            take: 1,
+            take: 4,
             include: { track: true },
           },
         },
@@ -138,7 +140,12 @@ export class PlaylistsService {
       this.logger.log(` Created playlist: id=${playlist.id}, name="${playlist.name}", user=${userId}`);
       return {
         message: 'Playlist created successfully',
-        playlist,
+        playlist: {
+          ...playlist,
+          previewThumbnails: playlist.tracks
+            .map((pt) => getValidThumbnailUrl(pt.track?.thumbnailUrl))
+            .filter((url): url is string => Boolean(url)),
+        },
       };
     } catch (error: any) {
       this.logger.error(`Failed to create playlist for user ${userId}: ${error.message}`);
@@ -147,7 +154,8 @@ export class PlaylistsService {
   }
 
   /**
-   * Retrieves all playlists owned by an authenticated user with track counts and preview thumbnails.
+   * Retrieves all playlists owned by an authenticated user with track counts,
+   * up to 4 preview thumbnails for 2x2 mosaic rendering, description, and cover image.
    *
    * @param userId - Internal PostgreSQL user UUID
    * @returns Array of user playlists
@@ -160,7 +168,7 @@ export class PlaylistsService {
         include: {
           tracks: {
             orderBy: { position: 'asc' },
-            take: 1, // First track preview thumbnail
+            take: 4, // Fetch first 4 tracks to render 2x2 Spotify-style mosaic card
             include: { track: true },
           },
           _count: {
@@ -169,14 +177,23 @@ export class PlaylistsService {
         },
       });
 
-      const formatted = playlists.map((p) => ({
-        id: p.id,
-        name: p.name,
-        trackCount: p._count.tracks,
-        previewThumbnail: getValidThumbnailUrl(p.tracks[0]?.track?.thumbnailUrl) || null,
-        createdAt: p.createdAt,
-        updatedAt: p.updatedAt,
-      }));
+      const formatted = playlists.map((p) => {
+        const previewThumbnails = p.tracks
+          .map((pt) => getValidThumbnailUrl(pt.track?.thumbnailUrl))
+          .filter((url): url is string => Boolean(url));
+
+        return {
+          id: p.id,
+          name: p.name,
+          description: p.description || null,
+          coverUrl: p.coverUrl || null,
+          trackCount: p._count.tracks,
+          previewThumbnail: previewThumbnails[0] || null, // Legacy single thumbnail fallback
+          previewThumbnails, // Up to 4 valid thumbnails for 2x2 mosaic layout
+          createdAt: p.createdAt,
+          updatedAt: p.updatedAt,
+        };
+      });
 
       return {
         count: formatted.length,
@@ -189,11 +206,12 @@ export class PlaylistsService {
   }
 
   /**
-   * Retrieves a single playlist by ID along with its full list of tracks ordered by position.
+   * Retrieves a single playlist by ID along with its full list of tracks ordered by position,
+   * track count, and total computed playback duration.
    *
    * @param userId - Internal PostgreSQL user UUID
    * @param playlistId - Target Playlist UUID
-   * @returns Playlist object with ordered tracks
+   * @returns Playlist object with ordered tracks & duration aggregates
    */
   async getPlaylistById(userId: string, playlistId: string) {
     await this.verifyPlaylistOwnership(userId, playlistId);
@@ -212,53 +230,87 @@ export class PlaylistsService {
 
     if (!playlist) return playlist;
 
+    const formattedTracks = playlist.tracks.map((pt) => ({
+      ...pt,
+      track: pt.track
+        ? {
+            ...pt.track,
+            thumbnailUrl: getValidThumbnailUrl(pt.track.thumbnailUrl) || null,
+          }
+        : pt.track,
+    }));
+
+    // Aggregate total duration in seconds across all tracks in playlist
+    const totalDurationSeconds = formattedTracks.reduce(
+      (acc, pt) => acc + (pt.track?.durationSeconds || 0),
+      0,
+    );
+
     return {
-      ...playlist,
-      tracks: playlist.tracks.map((pt) => ({
-        ...pt,
-        track: pt.track
-          ? {
-              ...pt.track,
-              thumbnailUrl: getValidThumbnailUrl(pt.track.thumbnailUrl) || null,
-            }
-          : pt.track,
-      })),
+      id: playlist.id,
+      name: playlist.name,
+      description: playlist.description || null,
+      coverUrl: playlist.coverUrl || null,
+      userId: playlist.userId,
+      trackCount: formattedTracks.length,
+      totalDurationSeconds,
+      createdAt: playlist.createdAt,
+      updatedAt: playlist.updatedAt,
+      tracks: formattedTracks,
     };
   }
 
   /**
-   * Updates / renames an existing playlist.
+   * Updates / renames an existing playlist, and optionally updates description and coverUrl.
    *
    * @param userId - Internal PostgreSQL user UUID
    * @param playlistId - Target Playlist UUID
-   * @param dto - UpdatePlaylistDto containing new name
+   * @param dto - UpdatePlaylistDto containing updated name, description, coverUrl
    * @returns Updated Playlist record
    */
   async updatePlaylist(userId: string, playlistId: string, dto: UpdatePlaylistDto) {
     await this.verifyPlaylistOwnership(userId, playlistId);
-    const newName = dto.name.trim();
 
-    // Check if new name collides with another existing playlist owned by user
-    const existing = await this.prisma.playlist.findFirst({
-      where: {
-        userId,
-        name: newName,
-        NOT: { id: playlistId },
-      },
-    });
+    const updateData: any = {};
 
-    if (existing) {
-      throw new ConflictException(`You already have another playlist named '${newName}'`);
+    if (dto.name !== undefined) {
+      const newName = dto.name.trim();
+      if (!newName) {
+        throw new HttpException('Playlist name cannot be empty', HttpStatus.BAD_REQUEST);
+      }
+
+      // Check if new name collides with another existing playlist owned by user
+      const existing = await this.prisma.playlist.findFirst({
+        where: {
+          userId,
+          name: newName,
+          NOT: { id: playlistId },
+        },
+      });
+
+      if (existing) {
+        throw new ConflictException(`You already have another playlist named '${newName}'`);
+      }
+
+      updateData.name = newName;
+    }
+
+    if (dto.description !== undefined) {
+      updateData.description = dto.description.trim() || null;
+    }
+
+    if (dto.coverUrl !== undefined) {
+      updateData.coverUrl = dto.coverUrl || null;
     }
 
     const updated = await this.prisma.playlist.update({
       where: { id: playlistId },
-      data: { name: newName },
+      data: updateData,
     });
 
-    this.logger.log(` Renamed playlist ${playlistId} to "${newName}"`);
+    this.logger.log(` Updated playlist ${playlistId}: ${JSON.stringify(updateData)}`);
     return {
-      message: 'Playlist renamed successfully',
+      message: 'Playlist updated successfully',
       playlist: updated,
     };
   }
