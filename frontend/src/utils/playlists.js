@@ -1,6 +1,6 @@
 import useAuthStore from "../store/useAuthStore";
 import { getBackendURL } from "./api";
-import { getValidThumbnailUrl } from "./youtubeUtils";
+import { getValidThumbnailUrl, getHighResThumbnailUrl } from "./youtubeUtils";
 
 /**
  * Helper to retrieve Google OAuth ID Token from useAuthStore for NestJS Authorization header.
@@ -76,15 +76,17 @@ export const getPlaylists = async (userId) => {
         return playlists.map((pl) => {
             const rawThumbs = pl.previewThumbnails || (pl.previewThumbnail ? [pl.previewThumbnail] : []);
             const validThumbs = rawThumbs
-                .map((t) => getValidThumbnailUrl(t))
+                .map((t) => getHighResThumbnailUrl(t) || getValidThumbnailUrl(t))
                 .filter(Boolean);
 
             const songs = (pl.tracks || pl.songs || []).map((pt) => {
                 const track = pt.track || pt;
-                const thumb = getValidThumbnailUrl(track.thumbnailUrl || track.thumbNail || "") || "";
+                const videoId = track.youtubeVideoId || track.videoId || track.id;
+                const rawThumb = track.thumbnailUrl || track.thumbNail || "";
+                const thumb = getHighResThumbnailUrl(rawThumb, videoId) || getValidThumbnailUrl(rawThumb) || "";
                 return {
-                    id: track.youtubeVideoId || track.videoId || track.id,
-                    videoId: track.youtubeVideoId || track.videoId || track.id,
+                    id: videoId,
+                    videoId: videoId,
                     title: track.title || "Unknown Title",
                     name: track.title || "Unknown Title",
                     artist: track.artist || track.channelTitle || "Unknown Artist",
@@ -141,10 +143,12 @@ export const getPlaylistById = async (userId, playlistId) => {
 
         const formattedSongs = rawTracks.map((pt) => {
             const track = pt.track || pt;
-            const thumb = getValidThumbnailUrl(track.thumbnailUrl || track.thumbNail || "") || "";
+            const videoId = track.youtubeVideoId || track.videoId || track.id;
+            const rawThumb = track.thumbnailUrl || track.thumbNail || "";
+            const thumb = getHighResThumbnailUrl(rawThumb, videoId) || getValidThumbnailUrl(rawThumb) || "";
             return {
-                id: track.youtubeVideoId || track.videoId || track.id,
-                videoId: track.youtubeVideoId || track.videoId || track.id,
+                id: videoId,
+                videoId: videoId,
                 title: track.title || "Unknown Title",
                 name: track.title || "Unknown Title",
                 artist: track.artist || track.channelTitle || "Unknown Artist",
@@ -327,3 +331,31 @@ export const removeSongFromPlaylist = async (userId, playlistId, songId) => {
         throw new Error(errData.message || "Failed to remove song from playlist");
     }
 };
+
+/**
+ * Fetches array of playlist IDs containing a given track for the user.
+ *
+ * @param {string} userId - User ID string
+ * @param {string} videoId - YouTube Video ID of target track
+ * @returns {Promise<Array<string>>} Array of playlist UUID strings
+ */
+export const getTrackMembership = async (userId, videoId) => {
+    if (!videoId) return [];
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
+
+        const response = await fetch(`${API_URL}/api/playlists/membership/${videoId}`, {
+            method: "GET",
+            headers: { ...headers },
+        });
+
+        if (!response.ok) return [];
+        const data = await response.json();
+        return Array.isArray(data) ? data : (data.playlistIds || []);
+    } catch (error) {
+        console.error("Error fetching track membership:", error);
+        return [];
+    }
+};
+

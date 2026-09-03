@@ -44,3 +44,19 @@ export function getValidThumbnailUrl(originalUrl?: string | null): string | null
 
   return originalUrl;
 }
+
+/**
+ * Transforms any YouTube thumbnail URL into its HIGHEST available Ultra HD resolution tier (maxresdefault.jpg).
+ */
+export function getHighResThumbnailUrl(originalUrl?: string | null): string | null | undefined {
+  if (!originalUrl || typeof originalUrl !== 'string') {
+    return originalUrl;
+  }
+
+  let target = originalUrl;
+  if (target.includes('ytimg.com') || target.includes('youtube.com')) {
+    target = target.replace(/\/default\.jpg|\/mqdefault\.jpg|\/hqdefault\.jpg|\/sddefault\.jpg/, '/maxresdefault.jpg');
+  }
+
+  return getValidThumbnailUrl(target);
+}

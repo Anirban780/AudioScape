@@ -4,6 +4,7 @@ import {
     removeSongFromPlaylist,
     getPlaylists,
     createPlaylist,
+    getTrackMembership,
 } from "@/utils/playlists";
 import { X, Plus, Check, ListMusic, Music, Loader2, AlertCircle } from "lucide-react";
 import usePlaylistStore from "@/store/usePlaylistStore";
@@ -55,14 +56,23 @@ const PlaylistModal = ({ userId }) => {
 
     useEffect(() => {
         if (!isModalOpen || !targetTrack) return;
+        const videoId = targetTrack.id || targetTrack.videoId;
+
         setLoading(true);
-        getPlaylists(userId)
-            .then((data) => {
-                setPlaylists(data);
+        Promise.all([
+            getPlaylists(userId),
+            videoId ? getTrackMembership(userId, videoId) : Promise.resolve([]),
+        ])
+            .then(([data, memberPlaylistIds]) => {
+                const memberSet = new Set(memberPlaylistIds);
+                // Filter out playlists where the song is already added
+                const availablePlaylists = data.filter((pl) => !memberSet.has(pl.id));
+                
+                setPlaylists(availablePlaylists);
                 
                 const initialMap = {};
-                data.forEach((pl) => {
-                    initialMap[pl.id] = isInPlaylist(pl, targetTrack);
+                availablePlaylists.forEach((pl) => {
+                    initialMap[pl.id] = false;
                 });
 
                 setInitialSelectedMap(initialMap);
@@ -162,11 +172,6 @@ const PlaylistModal = ({ userId }) => {
         (pl) => Boolean(initialSelectedMap[pl.id]) !== Boolean(selectedMap[pl.id])
     );
 
-    // Get names of selected playlists where song already exists initially
-    const existingInPlaylists = playlists.filter(
-        (pl) => Boolean(selectedMap[pl.id]) && Boolean(initialSelectedMap[pl.id])
-    );
-
     return (
         <div
             className="fixed inset-0 z-50 flex items-center justify-center bg-black/65 backdrop-blur-md p-4 animate-in fade-in duration-200"
@@ -237,13 +242,12 @@ const PlaylistModal = ({ userId }) => {
                     ) : playlists.length === 0 ? (
                         <div className="text-center py-8 px-4 bg-[var(--color-surface-base)]/50 rounded-2xl border border-[var(--color-border-default)]">
                             <p className="text-xs text-[var(--color-on-surface-variant)]">
-                                You don't have any playlists yet. Create one below!
+                                No available playlists. Song may already be added to all playlists, or create a new one below!
                             </p>
                         </div>
                     ) : (
                         <div className="max-h-[200px] overflow-y-auto space-y-2 pr-1 scrollbar-custom">
                             {playlists.map((pl) => {
-                                const isInitiallyAdded = Boolean(initialSelectedMap[pl.id]);
                                 const isSelected = Boolean(selectedMap[pl.id]);
                                 const plThumb = pl.coverUrl || pl.previewThumbnails?.[0] || null;
 
@@ -271,18 +275,9 @@ const PlaylistModal = ({ userId }) => {
 
                                             {/* Info */}
                                             <div className="min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <h5 className="text-sm font-bold text-[var(--color-on-surface)] truncate">
-                                                        {pl.name}
-                                                    </h5>
-
-                                                    {/* Pre-scan tag badge */}
-                                                    {isInitiallyAdded && (
-                                                        <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-[var(--color-primary)] bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/30 px-2 py-0.5 rounded-full shrink-0">
-                                                            Already added
-                                                        </span>
-                                                    )}
-                                                </div>
+                                                <h5 className="text-sm font-bold text-[var(--color-on-surface)] truncate">
+                                                    {pl.name}
+                                                </h5>
 
                                                 <p className="text-xs text-[var(--color-on-surface-variant)]">
                                                     {pl.trackCount || pl.songs?.length || 0} tracks
@@ -351,16 +346,8 @@ const PlaylistModal = ({ userId }) => {
                             </>
                         ) : (
                             <>
-                                {existingInPlaylists.length > 0 ? (
-                                    <AlertCircle size={18} strokeWidth={2.5} />
-                                ) : (
-                                    <Check size={18} strokeWidth={3} />
-                                )}
-                                <span>
-                                    {existingInPlaylists.length > 0
-                                        ? "Done (Song already in playlist)"
-                                        : "Done (Save Changes)"}
-                                </span>
+                                <Check size={18} strokeWidth={3} />
+                                <span>Done</span>
                             </>
                         )}
                     </button>

@@ -13,7 +13,7 @@ import { CreatePlaylistDto } from './dto/create-playlist.dto';
 import { UpdatePlaylistDto } from './dto/update-playlist.dto';
 import { AddPlaylistTrackDto } from './dto/add-playlist-track.dto';
 import { ReorderTracksDto } from './dto/reorder-tracks.dto';
-import { getValidThumbnailUrl } from '../utils/youtubeUtils';
+import { getValidThumbnailUrl, getHighResThumbnailUrl } from '../utils/youtubeUtils';
 
 /**
  * ============================================================================
@@ -179,7 +179,7 @@ export class PlaylistsService {
 
       const formatted = playlists.map((p) => {
         const previewThumbnails = p.tracks
-          .map((pt) => getValidThumbnailUrl(pt.track?.thumbnailUrl))
+          .map((pt) => getHighResThumbnailUrl(pt.track?.thumbnailUrl) || getValidThumbnailUrl(pt.track?.thumbnailUrl))
           .filter((url): url is string => Boolean(url));
 
         return {
@@ -235,7 +235,7 @@ export class PlaylistsService {
       track: pt.track
         ? {
             ...pt.track,
-            thumbnailUrl: getValidThumbnailUrl(pt.track.thumbnailUrl) || null,
+            thumbnailUrl: getHighResThumbnailUrl(pt.track.thumbnailUrl) || getValidThumbnailUrl(pt.track.thumbnailUrl) || null,
           }
         : pt.track,
     }));
@@ -495,5 +495,23 @@ export class PlaylistsService {
     return {
       message: 'Playlist tracks reordered successfully',
     };
+  }
+
+  /**
+   * Retrieves array of playlist IDs containing a given track for the authenticated user.
+   *
+   * @param userId - Internal PostgreSQL user UUID
+   * @param videoId - YouTube Video ID of track
+   * @returns Array of playlist UUID strings
+   */
+  async getTrackMembership(userId: string, videoId: string) {
+    const rows = await this.prisma.playlistTrack.findMany({
+      where: {
+        trackId: videoId,
+        playlist: { userId },
+      },
+      select: { playlistId: true },
+    });
+    return rows.map((r) => r.playlistId);
   }
 }

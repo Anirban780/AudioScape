@@ -2,6 +2,7 @@ import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Play, Trash2, Plus, Music, Volume2 } from "lucide-react";
+import { handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
 
 /**
  * ============================================================================
@@ -143,6 +144,8 @@ const PlaylistTrackRow = ({
                     <img
                         src={thumb}
                         alt={title}
+                        onLoad={handleThumbnailLoad}
+                        onError={(e) => handleThumbnailError(e, track.videoId || track.id)}
                         className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
                     />
                 ) : (
