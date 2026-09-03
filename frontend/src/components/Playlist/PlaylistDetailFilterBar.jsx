@@ -3,19 +3,15 @@ import { Search, ChevronDown, ArrowDownWideNarrow, ArrowUpNarrowWide } from "luc
 
 /**
  * ============================================================================
- * PLAYLIST DETAIL FILTER BAR (PlaylistDetailFilterBar.jsx)
+ * PLAYLIST DETAIL FILTER BAR (PlaylistDetailFilterBar.jsx) - Revamped
  * ============================================================================
  *
  * WHAT THIS FILE DOES:
  * Provides a sticky control bar for the Playlist Detail view (/playlists/:id).
  * Includes:
  * - In-playlist track search
- * - Sorting dropdown (Custom/Drag-and-Drop, Date Added, Title, Artist)
+ * - Sorting dropdown (Custom Order / Drag-and-Drop, Date Added, Title, Artist)
  * - Sort direction toggle
- *
- * WHY IT WAS DESIGNED THIS WAY:
- * Matches the aesthetic of PlaylistFilterBar but tailored for tracks inside a playlist.
- * "Custom Order" is the default to reflect the user's manual drag-and-drop arrangement.
  */
 const PlaylistDetailFilterBar = ({
     searchQuery,
@@ -71,7 +67,6 @@ const PlaylistDetailFilterBar = ({
                         <option value="added">Date Added</option>
                         <option value="title">Title (A-Z)</option>
                         <option value="artist">Artist (A-Z)</option>
-                        <option value="duration">Duration</option>
                     </select>
                     <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none text-[var(--color-on-surface-variant)]">
                         <ChevronDown size={16} />

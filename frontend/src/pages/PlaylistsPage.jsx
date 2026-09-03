@@ -5,7 +5,7 @@ import usePlaylistStore from "@/store/usePlaylistStore";
 import usePlayerStore from "@/store/usePlayerStore";
 import Loader from "@/components/Home/Loader";
 import toast from "react-hot-toast";
-import { ListMusic, Disc3, Trash2, X, Loader2 } from "lucide-react";
+import { ListMusic, Disc3, Trash2, X, Loader2, Pencil } from "lucide-react";
 import { getPlaylists, deletePlaylist, createPlaylist, updatePlaylist } from "@/utils/playlists";
 import PlaylistHeroHeader from "@/components/Playlist/PlaylistHeroHeader";
 import PlaylistFilterBar from "@/components/Playlist/PlaylistFilterBar";
@@ -199,8 +199,26 @@ const PlaylistsPage = () => {
                     <Loader message="Loading your playlists..." />
                 ) : (
                     <>
-                        {/* 1. Hero Header — stats + create CTA */}
+                        {/* Page Title Header */}
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-11 h-11 rounded-2xl bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/30 flex items-center justify-center shadow-md shadow-[var(--color-primary)]/10 backdrop-blur-md shrink-0">
+                                    <ListMusic className="text-[var(--color-primary)]" size={22} />
+                                </div>
+                                <div>
+                                    <h1 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--color-on-surface)] flex items-center gap-2">
+                                        My <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-primary)] to-purple-400">Playlists</span>
+                                    </h1>
+                                    <p className="text-xs font-semibold text-[var(--color-on-surface-variant)] tracking-wide mt-0.5">
+                                        Organise, manage, and listen to your custom playlists
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* 1. Hero Header — stats + create CTA + dynamic cover collage */}
                         <PlaylistHeroHeader
+                            playlists={playlists}
                             playlistCount={playlists.length}
                             trackCount={totalTrackCount}
                             onCreatePlaylist={openCreateModal}
@@ -257,8 +275,8 @@ const PlaylistsPage = () => {
                                         </button>
                                     </div>
                                 ) : viewMode === "grid" ? (
-                                    /* 3b. Grid View — 2/3/4 responsive columns */
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 sm:gap-5">
+                                    /* 3b. Grid View — Balanced 2/3/4/5 responsive columns */
+                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
                                         {processedPlaylists.map((pl) => (
                                             <PlaylistCard
                                                 key={pl.id}
@@ -269,14 +287,27 @@ const PlaylistsPage = () => {
                                         ))}
                                     </div>
                                 ) : (
-                                    /* 3c. List View — compact table rows */
-                                    <div className="flex flex-col gap-2">
+                                    /* 3c. List View — spacious and highly visible table rows */
+                                    <div className="flex flex-col gap-3">
                                         {processedPlaylists.map((pl, index) => {
                                             const thumb = pl.previewThumbnail || pl.previewThumbnails?.[0] || null;
+                                            
+                                            // Format relative date for list view
+                                            const formatDate = (dateStr) => {
+                                                if (!dateStr) return "";
+                                                const date = new Date(dateStr);
+                                                const now = new Date();
+                                                const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+                                                if (diffDays === 0) return "Updated today";
+                                                if (diffDays === 1) return "Updated yesterday";
+                                                if (diffDays < 7) return `Updated ${diffDays}d ago`;
+                                                return `Updated ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
+                                            };
+
                                             return (
                                                 <div
                                                     key={pl.id}
-                                                    className="flex items-center gap-4 bg-[var(--color-surface-raised)] px-4 py-3 rounded-xl border border-[var(--color-border-default)] hover:border-[var(--color-primary)]/30 hover:bg-[var(--color-surface-overlay)] transition-all group cursor-pointer"
+                                                    className="flex items-center gap-5 bg-[var(--color-surface-raised)] px-6 py-4 rounded-2xl border border-white/5 hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-surface-overlay)] hover:shadow-[0_12px_24px_rgba(167,139,250,0.1)] hover:-translate-y-0.5 transition-all duration-300 group cursor-pointer"
                                                     onClick={() => window.location.href = `/playlists/${pl.id}`}
                                                     role="button"
                                                     tabIndex={0}
@@ -286,49 +317,55 @@ const PlaylistsPage = () => {
                                                     }}
                                                 >
                                                     {/* Index number */}
-                                                    <span className="w-6 text-center text-xs font-bold text-[var(--color-on-surface-variant)] group-hover:text-[var(--color-primary)] transition-colors shrink-0">
+                                                    <span className="w-8 text-center text-sm font-bold text-[var(--color-on-surface-variant)]/60 group-hover:text-[var(--color-primary)] transition-colors shrink-0">
                                                         {index + 1}
                                                     </span>
 
-                                                    {/* Cover thumbnail */}
-                                                    <div className="w-11 h-11 rounded-lg overflow-hidden bg-[var(--color-surface-overlay)] shrink-0">
+                                                    {/* Cover thumbnail - significantly enlarged */}
+                                                    <div className="w-16 h-16 rounded-xl overflow-hidden bg-[var(--color-surface-overlay)] shrink-0 shadow-md group-hover:shadow-[0_8px_16px_rgba(0,0,0,0.3)] transition-shadow">
                                                         {thumb ? (
-                                                            <img src={thumb} alt={pl.name} className="w-full h-full object-cover" />
+                                                            <img src={thumb} alt={pl.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                                         ) : (
-                                                            <div className="w-full h-full bg-gradient-to-br from-[var(--color-primary)]/30 to-violet-800/20 flex items-center justify-center">
-                                                                <ListMusic size={16} className="text-[var(--color-primary)]/60" />
+                                                            <div className="w-full h-full bg-gradient-to-br from-[var(--color-primary)]/20 to-violet-900/10 flex items-center justify-center border border-[var(--color-primary)]/10">
+                                                                <ListMusic size={24} className="text-[var(--color-primary)]/50" />
                                                             </div>
                                                         )}
                                                     </div>
 
-                                                    {/* Name & track count */}
-                                                    <div className="flex-1 min-w-0">
-                                                        <p className="text-sm font-semibold text-[var(--color-on-surface)] truncate group-hover:text-[var(--color-primary)] transition-colors">
+                                                    {/* Name & metadata */}
+                                                    <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                        <p className="text-base sm:text-lg font-bold text-[var(--color-on-surface)] truncate group-hover:text-[var(--color-primary)] transition-colors duration-200">
                                                             {pl.name}
                                                         </p>
-                                                        <p className="text-xs text-[var(--color-on-surface-variant)] mt-0.5">
-                                                            {pl.trackCount || 0} {pl.trackCount === 1 ? "track" : "tracks"}
-                                                        </p>
+                                                        <div className="flex items-center gap-3 mt-1.5">
+                                                            <div className="flex items-center gap-1.5 bg-[var(--color-primary)]/10 group-hover:bg-[var(--color-primary)]/20 border border-[var(--color-primary)]/20 px-2 py-0.5 rounded-md text-[var(--color-primary)] font-bold text-[11px] transition-colors">
+                                                                <ListMusic size={11} />
+                                                                <span>{pl.trackCount || 0} {pl.trackCount === 1 ? "track" : "tracks"}</span>
+                                                            </div>
+                                                            <span className="text-xs font-medium text-[var(--color-on-surface-variant)]/70 hidden sm:block">
+                                                                {formatDate(pl.updatedAt)}
+                                                            </span>
+                                                        </div>
                                                     </div>
 
-                                                    {/* Quick actions */}
+                                                    {/* Quick actions - larger buttons */}
                                                     <div
-                                                        className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                                                        className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 shrink-0 mr-2"
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); openEditModal(pl); }}
-                                                            className="p-1.5 rounded-full text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-colors cursor-pointer"
+                                                            className="p-2.5 rounded-full bg-white/5 text-[var(--color-on-surface-variant)] hover:text-white hover:bg-[var(--color-primary)] hover:shadow-lg transition-all cursor-pointer"
                                                             title="Rename"
                                                         >
-                                                            <ListMusic size={15} />
+                                                            <Pencil size={16} />
                                                         </button>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); confirmDelete(pl); }}
-                                                            className="p-1.5 rounded-full text-[var(--color-on-surface-variant)] hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                                                            className="p-2.5 rounded-full bg-white/5 text-[var(--color-on-surface-variant)] hover:text-white hover:bg-red-500 hover:shadow-lg transition-all cursor-pointer"
                                                             title="Delete"
                                                         >
-                                                            <Trash2 size={15} />
+                                                            <Trash2 size={16} />
                                                         </button>
                                                     </div>
                                                 </div>

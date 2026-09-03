@@ -33,22 +33,22 @@ import Loader from "@/components/Home/Loader";
 
 /**
  * ============================================================================
- * PLAYLIST DETAIL PAGE (PlaylistDetailPage.jsx)
+ * PLAYLIST DETAIL PAGE (PlaylistDetailPage.jsx) - Revamped Aesthetics
  * ============================================================================
  *
  * WHAT THIS FILE DOES:
- * Renders the full detail view for a specific playlist (/playlists/:id).
- * - Fetches playlist data and track list
- * - DndContext & SortableContext for drag-and-drop track reordering
- * - Inline rename/edit modal for playlist metadata
- * - Playback integration with usePlayerStore
+ * Renders the detail page for a specific playlist (/playlists/:id) with:
+ * - Glassmorphic Hero & Filter bar
+ * - Glassmorphic track container panel with header bar
+ * - dnd-kit sortable track rows with playing state indicators
+ * - Inline metadata edit modal
  */
 const PlaylistDetailPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const user = useAuthStore((s) => s.user);
     const { activePlaylist, setActivePlaylist, openModal: openAddToPlaylistModal } = usePlaylistStore();
-    const { setTrack, setQueue, playTrack } = usePlayerStore();
+    const { track: currentPlayingTrack, setTrack, setQueue, playTrack } = usePlayerStore();
 
     const [loading, setLoading] = useState(true);
     const [localTracks, setLocalTracks] = useState([]);
@@ -60,6 +60,9 @@ const PlaylistDetailPage = () => {
 
     // Edit Modal State
     const [editModal, setEditModal] = useState({ open: false, name: "", description: "", loading: false });
+
+    // Active track ID for active playing highlight
+    const currentPlayingId = currentPlayingTrack?.id || currentPlayingTrack?.videoId || null;
 
     // ── Data Fetching ─────────────────────────────────────────────────────────
     const loadPlaylist = useCallback(async (showLoader = true) => {
@@ -85,7 +88,7 @@ const PlaylistDetailPage = () => {
 
     useEffect(() => {
         loadPlaylist(true);
-        return () => setActivePlaylist(null); // cleanup on unmount
+        return () => setActivePlaylist(null);
     }, [loadPlaylist, setActivePlaylist]);
 
     // ── Edit Playlist ─────────────────────────────────────────────────────────
@@ -143,15 +146,14 @@ const PlaylistDetailPage = () => {
 
     const handleRemoveTrack = async (track) => {
         const previousTracks = [...localTracks];
-        // Optimistic UI update
         setLocalTracks(prev => prev.filter(t => t.id !== track.id));
-        
+
         try {
             await removeSongFromPlaylist(user.id, activePlaylist.id, track.id);
             toast.success("Track removed");
-            loadPlaylist(false); // Refresh stats in background
+            loadPlaylist(false);
         } catch (error) {
-            setLocalTracks(previousTracks); // Revert
+            setLocalTracks(previousTracks);
             toast.error("Failed to remove track");
         }
     };
@@ -162,8 +164,8 @@ const PlaylistDetailPage = () => {
 
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase();
-            result = result.filter(t => 
-                (t.name?.toLowerCase().includes(q)) || 
+            result = result.filter(t =>
+                (t.name?.toLowerCase().includes(q)) ||
                 (t.artist?.toLowerCase().includes(q))
             );
         }
@@ -178,9 +180,6 @@ const PlaylistDetailPage = () => {
                     break;
                 case "artist":
                     result.sort((a, b) => (a.artist || "").localeCompare(b.artist || ""));
-                    break;
-                case "duration":
-                    result.sort((a, b) => (b.durationSeconds || 0) - (a.durationSeconds || 0));
                     break;
                 default:
                     break;
@@ -197,7 +196,6 @@ const PlaylistDetailPage = () => {
     const isDraggable = sortBy === "custom" && !searchQuery.trim();
 
     // ── Drag & Drop Configuration (dnd-kit) ──────────────────────────────────
-    // Require a slight movement (8px) before drag starts to allow clicks to pass through
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } })
     );
@@ -216,22 +214,19 @@ const PlaylistDetailPage = () => {
             const oldIndex = localTracks.findIndex((t) => t.id === active.id);
             const newIndex = localTracks.findIndex((t) => t.id === over.id);
 
-            // Optimistic UI update
             const newTracks = arrayMove(localTracks, oldIndex, newIndex);
             setLocalTracks(newTracks);
 
             try {
-                // Sync to backend (debounced / awaited)
                 await reorderPlaylistTracks(user.id, activePlaylist.id, newTracks);
             } catch (error) {
-                // Revert on failure
                 toast.error("Failed to save track order");
-                setLocalTracks(localTracks); 
+                setLocalTracks(localTracks);
             }
         }
     };
 
-    const activeTrack = useMemo(() => 
+    const activeTrack = useMemo(() =>
         activeId ? localTracks.find(t => t.id === activeId) : null,
     [activeId, localTracks]);
 
@@ -255,9 +250,9 @@ const PlaylistDetailPage = () => {
     return (
         <AppLayout>
             <div className="w-full animate-in fade-in duration-300 pb-24">
-                
+
                 {/* Back button */}
-                <button 
+                <button
                     onClick={() => navigate("/playlists")}
                     className="flex items-center gap-1 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] transition-colors text-sm font-medium mb-6 mt-2 cursor-pointer w-fit"
                 >
@@ -266,7 +261,7 @@ const PlaylistDetailPage = () => {
                 </button>
 
                 {/* Hero Header */}
-                <PlaylistDetailHero 
+                <PlaylistDetailHero
                     playlist={activePlaylist}
                     onPlayAll={handlePlayAll}
                     onShuffle={handleShuffle}
@@ -274,7 +269,7 @@ const PlaylistDetailPage = () => {
                 />
 
                 {/* Filter Bar */}
-                <PlaylistDetailFilterBar 
+                <PlaylistDetailFilterBar
                     searchQuery={searchQuery}
                     onSearchChange={setSearchQuery}
                     sortBy={sortBy}
@@ -285,81 +280,99 @@ const PlaylistDetailPage = () => {
                     filteredCount={processedTracks.length}
                 />
 
-                {/* Track List area */}
+                {/* Glassmorphic Track List Panel */}
                 {localTracks.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-20 text-center">
-                        <div className="w-20 h-20 rounded-full bg-[var(--color-surface-raised)] border border-[var(--color-border-subtle)] flex items-center justify-center mb-4">
-                            <Disc3 size={32} className="text-[var(--color-on-surface-variant)]/40" />
+                    <div className="flex flex-col items-center justify-center py-20 text-center rounded-3xl bg-[var(--color-surface-raised)]/60 border border-[var(--color-border-default)] shadow-lg">
+                        <div className="w-20 h-20 rounded-2xl bg-[var(--color-primary)]/10 border border-[var(--color-primary)]/20 flex items-center justify-center mb-4">
+                            <Disc3 size={36} className="text-[var(--color-primary)]/60 animate-spin" style={{ animationDuration: '12s' }} />
                         </div>
                         <h3 className="text-xl font-bold text-[var(--color-on-surface)] mb-2">Playlist is empty</h3>
                         <p className="text-sm text-[var(--color-on-surface-variant)] max-w-sm">
-                            Go to Explore or your Favorites to find songs and add them to this playlist.
+                            Explore tracks or visit your Favorites to add songs to this playlist.
                         </p>
                     </div>
                 ) : processedTracks.length === 0 ? (
-                    <div className="text-center py-16">
-                        <p className="text-[var(--color-on-surface-variant)]">No tracks match your search.</p>
+                    <div className="text-center py-16 rounded-3xl bg-[var(--color-surface-raised)]/60 border border-[var(--color-border-default)]">
+                        <p className="text-[var(--color-on-surface-variant)]">No tracks match "{searchQuery}"</p>
                     </div>
                 ) : (
-                    <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragStart={handleDragStart}
-                        onDragEnd={handleDragEnd}
-                    >
-                        <SortableContext
-                            items={processedTracks.map(t => t.id)}
-                            strategy={verticalListSortingStrategy}
-                        >
-                            <div className="flex flex-col gap-1 md:gap-2">
-                                {processedTracks.map((track, idx) => (
-                                    <PlaylistTrackRow
-                                        key={track.id}
-                                        track={track}
-                                        index={idx}
-                                        isDraggable={isDraggable}
-                                        onPlay={handlePlayTrack}
-                                        onRemove={handleRemoveTrack}
-                                        onAdd={(t) => openAddToPlaylistModal(t)}
-                                    />
-                                ))}
-                            </div>
-                        </SortableContext>
+                    <div className="rounded-3xl bg-[var(--color-surface)]/40 backdrop-blur-md border border-[var(--color-border-default)] p-3 sm:p-5 shadow-xl">
                         
-                        {/* Drag Overlay for smooth preview while dragging */}
-                        <DragOverlay dropAnimation={dropAnimation}>
-                            {activeTrack ? (
-                                <PlaylistTrackRow
-                                    track={activeTrack}
-                                    index={0}
-                                    isDraggable={true}
-                                    onPlay={() => {}}
-                                    onRemove={() => {}}
-                                    onAdd={() => {}}
-                                />
-                            ) : null}
-                        </DragOverlay>
-                    </DndContext>
+                        {/* Table Header Bar */}
+                        <div className="flex items-center gap-4 px-3 py-2 text-[10px] font-extrabold uppercase tracking-widest text-[var(--color-on-surface-variant)]/60 border-b border-[var(--color-border-subtle)] mb-3">
+                            <span className="w-8 text-center">#</span>
+                            <span className="flex-1">Title & Artist</span>
+                            <span className="w-16 text-right hidden sm:block">Actions</span>
+                        </div>
+
+                        {/* Sortable List Context */}
+                        <DndContext
+                            sensors={sensors}
+                            collisionDetection={closestCenter}
+                            onDragStart={handleDragStart}
+                            onDragEnd={handleDragEnd}
+                        >
+                            <SortableContext
+                                items={processedTracks.map(t => t.id)}
+                                strategy={verticalListSortingStrategy}
+                            >
+                                <div className="flex flex-col gap-2">
+                                    {processedTracks.map((track, idx) => {
+                                        const trackId = track.id || track.videoId;
+                                        const isPlaying = Boolean(currentPlayingId && currentPlayingId === trackId);
+
+                                        return (
+                                            <PlaylistTrackRow
+                                                key={track.id}
+                                                track={track}
+                                                index={idx}
+                                                isDraggable={isDraggable}
+                                                isPlayingTrack={isPlaying}
+                                                onPlay={handlePlayTrack}
+                                                onRemove={handleRemoveTrack}
+                                                onAdd={(t) => openAddToPlaylistModal(t)}
+                                            />
+                                        );
+                                    })}
+                                </div>
+                            </SortableContext>
+
+                            {/* Drag Overlay */}
+                            <DragOverlay dropAnimation={dropAnimation}>
+                                {activeTrack ? (
+                                    <PlaylistTrackRow
+                                        track={activeTrack}
+                                        index={0}
+                                        isDraggable={true}
+                                        isPlayingTrack={false}
+                                        onPlay={() => {}}
+                                        onRemove={() => {}}
+                                        onAdd={() => {}}
+                                    />
+                                ) : null}
+                            </DragOverlay>
+                        </DndContext>
+                    </div>
                 )}
             </div>
 
             {/* Rename/Edit Modal */}
             {editModal.open && (
-                <div 
+                <div
                     className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
                     onClick={(e) => { if (e.target === e.currentTarget && !editModal.loading) setEditModal({ open: false, name: "", description: "", loading: false }); }}
                 >
                     <div className="bg-[var(--color-surface-overlay)] border border-[var(--color-border-strong)] p-6 rounded-3xl max-w-sm w-full shadow-2xl animate-in fade-in slide-in-from-bottom-4 duration-200">
                         <div className="flex items-center justify-between mb-5">
                             <h4 className="text-base font-bold text-[var(--color-on-surface)]">Edit Details</h4>
-                            <button 
+                            <button
                                 onClick={() => setEditModal({ open: false, name: "", description: "", loading: false })}
                                 className="p-1.5 rounded-full hover:bg-[var(--color-state-hover)] text-[var(--color-on-surface-variant)] transition-colors cursor-pointer"
                             >
                                 <X size={16} />
                             </button>
                         </div>
-                        
+
                         <div className="flex flex-col gap-3 mb-6">
                             <div>
                                 <label className="text-xs font-semibold text-[var(--color-on-surface-variant)] uppercase tracking-wider mb-1 block">Name</label>
@@ -406,8 +419,8 @@ const PlaylistDetailPage = () => {
                     </div>
                 </div>
             )}
-            
-            {/* Global Playlist Modal for "Add to another playlist" functionality */}
+
+            {/* Global Playlist Modal */}
             <PlaylistModal />
         </AppLayout>
     );

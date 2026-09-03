@@ -296,9 +296,9 @@ export const addSongToPlaylist = async (userId, playlistId, song) => {
         },
         body: JSON.stringify({
             videoId,
-            title: song.name || song.title,
-            artist: song.artist,
-            thumbnailUrl: song.thumbnail || song.thumbNail,
+            title: song.name || song.title || "Unknown Title",
+            artist: song.artist || song.channelTitle || "Unknown Artist",
+            thumbnailUrl: song.thumbnail || song.thumbNail || song.thumbnailUrl || "",
         }),
     });
 

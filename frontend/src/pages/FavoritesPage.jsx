@@ -189,6 +189,23 @@ const FavoritesPage = () => {
                     </div>
                 ) : (
                     <>
+                        {/* Page Title Header */}
+                        <div className="flex items-center justify-between mb-6">
+                            <div className="flex items-center gap-3">
+                                <div className="w-11 h-11 rounded-2xl bg-pink-500/15 border border-pink-500/30 flex items-center justify-center shadow-md shadow-pink-500/10 backdrop-blur-md shrink-0">
+                                    <Heart className="text-pink-500 fill-pink-500/30" size={22} />
+                                </div>
+                                <div>
+                                    <h1 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--color-on-surface)] flex items-center gap-2">
+                                        Your <span className="text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-rose-400">Favorites</span>
+                                    </h1>
+                                    <p className="text-xs font-semibold text-[var(--color-on-surface-variant)] tracking-wide mt-0.5">
+                                        Your personal collection of cherished melodies
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
                         {/* 1. Hero Banner */}
                         <FavoritesHeroBanner 
                             tracks={likedSongs.slice(0, 5)} 

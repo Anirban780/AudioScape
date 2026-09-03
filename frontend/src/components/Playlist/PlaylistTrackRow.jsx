@@ -1,39 +1,44 @@
 import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Play, Trash2, Plus, Music } from "lucide-react";
+import { GripVertical, Play, Trash2, Plus, Music, Volume2 } from "lucide-react";
 
 /**
  * ============================================================================
- * PLAYLIST TRACK ROW (PlaylistTrackRow.jsx)
+ * PLAYLIST TRACK ROW (PlaylistTrackRow.jsx) - Revamped Aesthetics
  * ============================================================================
  *
  * WHAT THIS FILE DOES:
- * A single track row in the playlist detail view.
- * Features:
- * - dnd-kit hooks for drag-and-drop sortability (if enabled).
- * - Grip handle icon for dragging.
- * - Artwork, title, artist, duration, date added.
- * - Action buttons: Play, Remove (or Add to another playlist).
+ * Renders an individual track row inside a playlist detail view (/playlists/:id).
+ * Supports:
+ * - dnd-kit sortable drag-and-drop handles
+ * - Glassmorphic surface cards with subtle border & shadow depth
+ * - Tactile hover lift micro-animations (-translate-y-0.5)
+ * - Playing track indicator (glowing border & Volume2 icon)
+ * - Secondary line metadata combining Artist and Date Added
+ * - Action buttons (Play, Add to another playlist, Remove)
  *
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Accessible dragging: The drag handle is distinct to prevent accidental
- *    clicks vs drags.
- * 2. Visual feedback: Uses `isDragging` to lower opacity and scale slightly
- *    when being dragged.
+ * 1. Visual Depth: Each row is a distinct glassmorphic card instead of flat text,
+ *    aligning with the FavoritesVinylCard and Home page aesthetic.
+ * 2. Clean Metadata: Duration column is omitted (unreliable from YouTube API)
+ *    and Date Added is merged cleanly under the artist to eliminate clutter.
+ * 3. Tactile Feel: Hover lift + glowing primary purple border on hover/play.
  *
  * PROPS:
- * - track: The song object.
- * - index: 0-based index.
- * - isDraggable: Boolean to enable/disable drag handles (e.g. disabled when sorting by Date/Name).
- * - onPlay: Callback to play this track.
- * - onRemove: Callback to remove this track from the playlist.
- * - onAdd: Callback to add this track to another playlist.
+ * - track: Song object { id, name, title, artist, thumbnail, addedAt, position }
+ * - index: 0-based row index
+ * - isDraggable: Boolean enabling dnd-kit drag handle
+ * - isPlayingTrack: Boolean indicating if this track is currently active in the player
+ * - onPlay: Callback(track) to trigger playback
+ * - onRemove: Callback(track) to remove track from playlist
+ * - onAdd: Callback(track) to open "Add to playlist" modal
  */
 const PlaylistTrackRow = ({
     track,
     index,
     isDraggable,
+    isPlayingTrack = false,
     onPlay,
     onRemove,
     onAdd,
@@ -54,9 +59,8 @@ const PlaylistTrackRow = ({
     const style = {
         transform: CSS.Transform.toString(transform),
         transition,
-        // Visual feedback while dragging
         opacity: isDragging ? 0.4 : 1,
-        zIndex: isDragging ? 10 : 1,
+        zIndex: isDragging ? 20 : 1,
         position: isDragging ? "relative" : "static",
     };
 
@@ -64,112 +68,141 @@ const PlaylistTrackRow = ({
     const artist = track.artist || track.channelTitle || "Unknown Artist";
     const thumb = track.thumbnail || track.thumbNail;
 
-    // Format duration
-    const formatDuration = (seconds) => {
-        if (!seconds) return "--:--";
-        const m = Math.floor(seconds / 60);
-        const s = Math.floor(seconds % 60);
-        return `${m}:${s.toString().padStart(2, "0")}`;
-    };
-
-    // Format Date Added
+    /**
+     * Formats ISO date string to concise string (e.g. "Mar 5, 2026").
+     */
     const formatDate = (dateStr) => {
         if (!dateStr) return "";
         return new Date(dateStr).toLocaleDateString("en-US", {
             month: "short",
             day: "numeric",
-            year: "numeric"
+            year: "numeric",
         });
     };
+
+    const addedDateStr = formatDate(track.addedAt);
 
     return (
         <div
             ref={setNodeRef}
             style={style}
-            className={`flex items-center gap-3 md:gap-4 p-2 md:p-3 rounded-xl border border-transparent hover:bg-[var(--color-surface-raised)] hover:border-[var(--color-border-subtle)] group transition-colors ${
-                isDragging ? "bg-[var(--color-surface-raised)] shadow-2xl scale-[1.02]" : ""
+            className={`group relative flex items-center gap-3 md:gap-4 p-2.5 md:p-3.5 rounded-2xl border transition-all duration-200 ${
+                isDragging
+                    ? "bg-[var(--color-surface-overlay)] border-[var(--color-primary)] shadow-2xl scale-[1.02]"
+                    : isPlayingTrack
+                    ? "bg-[var(--color-primary)]/10 border-[var(--color-primary)]/50 shadow-md"
+                    : index % 2 === 0
+                    ? "bg-[var(--color-surface-raised)]/90 border-[var(--color-border-subtle)] hover:bg-[var(--color-surface-overlay)] hover:border-[var(--color-primary)]/30 hover:-translate-y-0.5 hover:shadow-lg"
+                    : "bg-[var(--color-surface-raised)]/50 border-[var(--color-border-subtle)] hover:bg-[var(--color-surface-overlay)] hover:border-[var(--color-primary)]/30 hover:-translate-y-0.5 hover:shadow-lg"
             }`}
         >
-            {/* Drag Handle & Index */}
+            {/* ── Left: Drag Handle / Index / Play Icon ── */}
             <div className="flex items-center w-8 shrink-0 justify-center">
-                {isDraggable ? (
+                {isPlayingTrack ? (
+                    /* Active playing indicator */
+                    <div className="text-[var(--color-primary)] animate-pulse p-1" title="Currently playing">
+                        <Volume2 size={16} />
+                    </div>
+                ) : isDraggable ? (
+                    /* Drag handle */
                     <div
                         {...attributes}
                         {...listeners}
-                        className="text-[var(--color-on-surface-variant)]/50 hover:text-[var(--color-primary)] cursor-grab active:cursor-grabbing p-1 transition-colors"
+                        className="text-[var(--color-on-surface-variant)]/40 hover:text-[var(--color-primary)] cursor-grab active:cursor-grabbing p-1 transition-colors"
                         title="Drag to reorder"
+                        aria-label="Drag to reorder track"
                     >
                         <GripVertical size={16} />
                     </div>
                 ) : (
-                    <span className="text-xs font-bold text-[var(--color-on-surface-variant)] group-hover:hidden">
+                    /* Track number */
+                    <span className="text-xs font-bold text-[var(--color-on-surface-variant)]/60 group-hover:hidden">
                         {index + 1}
                     </span>
                 )}
 
-                {/* Hover Play button (replaces index/handle on hover if not draggable) */}
-                {!isDraggable && (
+                {/* Hover Play button (replaces index number if not draggable & not active) */}
+                {!isDraggable && !isPlayingTrack && (
                     <button
                         onClick={() => onPlay(track)}
                         className="hidden group-hover:flex text-[var(--color-primary)] hover:scale-110 transition-transform cursor-pointer p-1"
+                        title="Play track"
+                        aria-label={`Play ${title}`}
                     >
                         <Play size={16} fill="currentColor" />
                     </button>
                 )}
             </div>
 
-            {/* Thumbnail */}
+            {/* ── Thumbnail Artwork ── */}
             <div
-                className="relative w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-md overflow-hidden bg-[var(--color-surface-overlay)] cursor-pointer"
+                className="relative w-12 h-12 md:w-14 md:h-14 shrink-0 rounded-xl overflow-hidden bg-[var(--color-surface-overlay)] border border-[var(--color-border-subtle)] shadow-xs cursor-pointer group/thumb"
                 onClick={() => onPlay(track)}
             >
                 {thumb ? (
-                    <img src={thumb} alt={title} className="w-full h-full object-cover" />
+                    <img
+                        src={thumb}
+                        alt={title}
+                        className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
+                    />
                 ) : (
-                    <div className="w-full h-full flex items-center justify-center bg-violet-900/20">
-                        <Music size={16} className="text-[var(--color-primary)]/50" />
+                    <div className="w-full h-full flex items-center justify-center bg-[var(--color-primary)]/15">
+                        <Music size={18} className="text-[var(--color-primary)]/60" />
                     </div>
                 )}
-                
-                {/* Hover overlay play button */}
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <Play size={16} fill="white" className="text-white ml-0.5" />
+
+                {/* Hover Play Overlay */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center">
+                    <Play size={18} fill="white" className="text-white ml-0.5" />
                 </div>
             </div>
 
-            {/* Title & Artist */}
+            {/* ── Title & Secondary Metadata (Artist + Date Added) ── */}
             <div className="flex-1 min-w-0 pr-2">
-                <p 
-                    className="text-sm font-semibold text-[var(--color-on-surface)] truncate group-hover:text-[var(--color-primary)] transition-colors cursor-pointer"
+                <p
+                    className={`text-sm font-bold truncate cursor-pointer transition-colors ${
+                        isPlayingTrack
+                            ? "text-[var(--color-primary)]"
+                            : "text-[var(--color-on-surface)] group-hover:text-[var(--color-primary)]"
+                    }`}
                     onClick={() => onPlay(track)}
+                    title={title}
                 >
                     {title}
                 </p>
-                <p className="text-xs text-[var(--color-on-surface-variant)] truncate mt-0.5">
-                    {artist}
+
+                {/* Sub-line: Artist · Added Date */}
+                <p className="text-xs text-[var(--color-on-surface-variant)] truncate mt-0.5 font-medium flex items-center gap-1.5">
+                    <span className="truncate">{artist}</span>
+                    {addedDateStr && (
+                        <>
+                            <span className="text-[var(--color-on-surface-variant)]/40">•</span>
+                            <span className="text-[var(--color-on-surface-variant)]/60 text-[11px] shrink-0">
+                                Added {addedDateStr}
+                            </span>
+                        </>
+                    )}
                 </p>
             </div>
 
-            {/* Desktop: Date Added & Duration */}
-            <div className="hidden md:flex items-center gap-6 text-xs text-[var(--color-on-surface-variant)] w-48 shrink-0 justify-end">
-                <span className="truncate w-24 text-right">{formatDate(track.addedAt)}</span>
-                <span className="w-10 text-right">{formatDuration(track.durationSeconds)}</span>
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            {/* ── Action Buttons ── */}
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                {/* Add to another playlist */}
                 <button
                     onClick={() => onAdd(track)}
-                    className="p-1.5 rounded-full text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-colors cursor-pointer"
+                    className="p-2 rounded-full text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-colors cursor-pointer"
                     title="Add to another playlist"
+                    aria-label="Add to another playlist"
                 >
                     <Plus size={16} />
                 </button>
-                
+
+                {/* Remove from this playlist */}
                 <button
                     onClick={() => onRemove(track)}
-                    className="p-1.5 rounded-full text-[var(--color-on-surface-variant)] hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                    className="p-2 rounded-full text-[var(--color-on-surface-variant)] hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
                     title="Remove from playlist"
+                    aria-label="Remove from playlist"
                 >
                     <Trash2 size={16} />
                 </button>
