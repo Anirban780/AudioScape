@@ -76,7 +76,7 @@ function AppContent() {
       {user && track && <PlayerContainer uid={user.id} />}
 
       {/* Persistent Playlist Selection Modal */}
-      {user && <PlaylistModal userId={user.id} />}
+      <PlaylistModal userId={user?.id} />
 
       {/* Route Definitions */}
       <Routes>

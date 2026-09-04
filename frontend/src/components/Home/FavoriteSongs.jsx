@@ -202,9 +202,11 @@ const FavoriteSongs = ({ userId }) => {
                       #{index + 1}
                     </div>
 
-                    {/* Add to Playlist Button */}
+                    {/* Add to Playlist Button - Elevated to z-30 so it is never eclipsed */}
                     <button
+                      type="button"
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         openModal({
                           id: songId,
@@ -213,15 +215,22 @@ const FavoriteSongs = ({ userId }) => {
                           thumbnail: validImage,
                         });
                       }}
-                      className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 hover:bg-pink-600 text-white transition-all shadow-md cursor-pointer"
+                      className="absolute top-2 right-2 z-30 p-1.5 rounded-full bg-black/70 hover:bg-pink-600 text-white transition-all shadow-md cursor-pointer border border-white/10"
                       title="Add to playlist"
+                      aria-label="Add to playlist"
                     >
                       <ListPlus size={14} />
                     </button>
 
-                    {/* Hover Play Button Overlay */}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                      <div className="w-11 h-11 rounded-full bg-pink-600 text-white flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
+                    {/* Hover Play Button Overlay - pointer-events-none to prevent blocking corner buttons */}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
+                      <div 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePlayTrack(song);
+                        }}
+                        className="w-11 h-11 rounded-full bg-pink-600 text-white flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform pointer-events-auto cursor-pointer"
+                      >
                         <Play size={20} fill="currentColor" className="ml-0.5" />
                       </div>
                     </div>

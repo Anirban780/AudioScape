@@ -42,6 +42,7 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
   };
 
   const handlePlaylistClick = (e) => {
+    e.preventDefault();
     e.stopPropagation();
     openModal(songData);
   };
@@ -184,8 +185,9 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
     >
       {/* Add to Playlist Action Button */}
       <button
+        type="button"
         onClick={handlePlaylistClick}
-        className="absolute top-2 right-2 z-20 p-1.5 rounded-full bg-black/60 hover:bg-[var(--color-primary)] text-white transition-all shadow-md cursor-pointer opacity-0 group-hover:opacity-100"
+        className="absolute top-2 right-2 z-30 p-1.5 rounded-full bg-black/70 hover:bg-[var(--color-primary)] text-white transition-all shadow-md cursor-pointer opacity-0 group-hover:opacity-100 border border-white/10"
         title="Add to playlist"
         aria-label="Add song to playlist"
       >

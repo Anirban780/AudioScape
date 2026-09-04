@@ -8,6 +8,7 @@ import {
 } from "@/utils/playlists";
 import { X, Plus, Check, ListMusic, Music, Loader2, AlertCircle } from "lucide-react";
 import usePlaylistStore from "@/store/usePlaylistStore";
+import useAuthStore from "@/store/useAuthStore";
 import toast from "react-hot-toast";
 import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
@@ -43,6 +44,9 @@ const isInPlaylist = (pl, track) => {
  * - Staged selection workflow before sending batch network updates on "Done".
  */
 const PlaylistModal = ({ userId }) => {
+    const authUser = useAuthStore((s) => s.user);
+    const effectiveUserId = userId || authUser?.id || authUser?.uid || "";
+
     const { selectedSong, selectedTracks, isModalOpen, closeModal } = usePlaylistStore();
     const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
 
@@ -62,26 +66,28 @@ const PlaylistModal = ({ userId }) => {
 
         setLoading(true);
         Promise.all([
-            getPlaylists(userId),
-            videoId ? getTrackMembership(userId, videoId) : Promise.resolve([]),
+            getPlaylists(effectiveUserId),
+            videoId ? getTrackMembership(effectiveUserId, videoId) : Promise.resolve([]),
         ])
             .then(([data, memberPlaylistIds]) => {
-                const memberSet = new Set(memberPlaylistIds);
-                // Filter out playlists where the song is already added
-                const availablePlaylists = data.filter((pl) => !memberSet.has(pl.id));
+                const memberSet = new Set(memberPlaylistIds || []);
+                const allPlaylists = Array.isArray(data) ? data : (data?.playlists || []);
                 
-                setPlaylists(availablePlaylists);
+                setPlaylists(allPlaylists);
                 
                 const initialMap = {};
-                availablePlaylists.forEach((pl) => {
-                    initialMap[pl.id] = false;
+                allPlaylists.forEach((pl) => {
+                    initialMap[pl.id] = memberSet.has(pl.id);
                 });
 
                 setInitialSelectedMap(initialMap);
                 setSelectedMap(initialMap);
             })
+            .catch((err) => {
+                console.error("Failed to load playlist memberships:", err);
+            })
             .finally(() => setLoading(false));
-    }, [isModalOpen, userId, targetTrack]);
+    }, [isModalOpen, targetTrack, effectiveUserId]);
 
     /**
      * Toggles local selection state.
@@ -103,12 +109,17 @@ const PlaylistModal = ({ userId }) => {
             return;
         }
 
+        if (!effectiveUserId) {
+            toast.error("User authentication required");
+            return;
+        }
+
         setCreating(true);
         try {
-            const docRef = await createPlaylist(userId, name);
+            const docRef = await createPlaylist(effectiveUserId, name);
             const newPlId = docRef.id;
 
-            const refreshed = await getPlaylists(userId);
+            const refreshed = await getPlaylists(effectiveUserId);
             setPlaylists(refreshed);
 
             setSelectedMap((prev) => ({
@@ -129,7 +140,7 @@ const PlaylistModal = ({ userId }) => {
      * Finalizes all pending add/remove changes when the user clicks "Done".
      */
     const handleFinalConfirm = async () => {
-        if (!targetTrack) return;
+        if (!targetTrack || !effectiveUserId) return;
         setSaving(true);
 
         const trackId = getTrackId(targetTrack);
@@ -142,10 +153,10 @@ const PlaylistModal = ({ userId }) => {
                 const isNowSelected = Boolean(selectedMap[pl.id]);
 
                 if (!wasSelected && isNowSelected) {
-                    await addSongToPlaylist(userId, pl.id, targetTrack);
+                    await addSongToPlaylist(effectiveUserId, pl.id, targetTrack);
                     addedCount++;
                 } else if (wasSelected && !isNowSelected) {
-                    await removeSongFromPlaylist(userId, pl.id, trackId);
+                    await removeSongFromPlaylist(effectiveUserId, pl.id, trackId);
                     removedCount++;
                 }
             }
@@ -250,7 +261,7 @@ const PlaylistModal = ({ userId }) => {
                     ) : playlists.length === 0 ? (
                         <div className="text-center py-8 px-4 bg-[var(--color-surface-base)]/50 rounded-2xl border border-[var(--color-border-default)]">
                             <p className="text-xs text-[var(--color-on-surface-variant)]">
-                                No available playlists. Song may already be added to all playlists, or create a new one below!
+                                No playlists found. Create your first playlist below!
                             </p>
                         </div>
                     ) : (

@@ -28,7 +28,6 @@ import {
 import PlaylistDetailHero from "@/components/Playlist/PlaylistDetailHero";
 import PlaylistDetailFilterBar from "@/components/Playlist/PlaylistDetailFilterBar";
 import PlaylistTrackRow from "@/components/Playlist/PlaylistTrackRow";
-import PlaylistModal from "@/components/Playlist/PlaylistModal";
 import Loader from "@/components/Home/Loader";
 
 /**
@@ -419,9 +418,6 @@ const PlaylistDetailPage = () => {
                     </div>
                 </div>
             )}
-
-            {/* Global Playlist Modal */}
-            <PlaylistModal />
         </AppLayout>
     );
 };

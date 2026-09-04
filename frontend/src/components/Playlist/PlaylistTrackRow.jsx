@@ -1,7 +1,7 @@
 import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { GripVertical, Play, Trash2, Plus, Music, Volume2 } from "lucide-react";
+import { GripVertical, Play, Trash2, ListPlus, Music, Volume2 } from "lucide-react";
 import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
@@ -199,7 +199,7 @@ const PlaylistTrackRow = ({
                     title="Add to another playlist"
                     aria-label="Add to another playlist"
                 >
-                    <Plus size={16} />
+                    <ListPlus size={16} />
                 </button>
 
                 {/* Remove from this playlist */}

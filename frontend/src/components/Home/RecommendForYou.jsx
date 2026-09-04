@@ -264,6 +264,20 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
                   <span>PLAY DAILY MIX</span>
                 </button>
                 <button
+                  onClick={() => {
+                    openModal({
+                      id: trackId,
+                      name: trackName,
+                      artist: artistName,
+                      thumbnail: artwork,
+                    });
+                  }}
+                  className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:text-[var(--color-primary)] hover:border-[var(--color-primary)]/50 transition-colors shadow-md cursor-pointer"
+                  title="Add to Playlist"
+                >
+                  <ListPlus size={18} />
+                </button>
+                <button
                   onClick={() => toast.success("Added to your favorites!")}
                   className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:text-pink-400 hover:border-pink-400/50 transition-colors shadow-md cursor-pointer"
                   title="Add to Favorites"
@@ -361,9 +375,11 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
                       #{index + 1}
                     </div>
 
-                    {/* Add to Playlist Button */}
+                    {/* Add to Playlist Button - Elevated to z-30 so it is never eclipsed */}
                     <button
+                      type="button"
                       onClick={(e) => {
+                        e.preventDefault();
                         e.stopPropagation();
                         openModal({
                           id: songId,
@@ -372,15 +388,22 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
                           thumbnail: validImage,
                         });
                       }}
-                      className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 hover:bg-[var(--color-primary)] text-white transition-all shadow-md cursor-pointer"
+                      className="absolute top-2 right-2 z-30 p-1.5 rounded-full bg-black/70 hover:bg-[var(--color-primary)] text-white transition-all shadow-md cursor-pointer border border-white/10"
                       title="Add to playlist"
+                      aria-label="Add to playlist"
                     >
                       <ListPlus size={14} />
                     </button>
 
-                    {/* Hover Play Button Overlay */}
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                      <div className="w-11 h-11 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
+                    {/* Hover Play Button Overlay - pointer-events-none to prevent blocking corner buttons */}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center pointer-events-none">
+                      <div 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePlayTrack(song);
+                        }}
+                        className="w-11 h-11 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform pointer-events-auto cursor-pointer"
+                      >
                         <Play size={20} fill="currentColor" className="ml-0.5" />
                       </div>
                     </div>

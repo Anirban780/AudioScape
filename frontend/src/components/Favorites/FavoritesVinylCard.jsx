@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Play, Plus, Heart } from 'lucide-react';
+import { Play, ListPlus, Heart } from 'lucide-react';
 import { getHighResThumbnailUrl, getNextFallbackThumbnailUrl } from '@/utils/youtubeUtils';
 import placeholder from '@/assets/placeholder.jpg';
 
@@ -112,39 +112,50 @@ const FavoritesVinylCard = ({
           </div>
         </div>
 
-        {/* Action Buttons (Top Right) */}
-        <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-20 flex flex-col gap-2">
+        {/* Action Buttons (Top Right) - Elevated to z-30 to prevent click interception */}
+        <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-30 flex flex-col gap-2">
           {/* Add to Playlist */}
           <button
+            type="button"
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               onAddToPlaylist(song);
             }}
-            className="p-1.5 sm:p-2 bg-black/50 backdrop-blur-md rounded-full text-white/80 hover:text-white hover:bg-black/70 hover:scale-110 transition-all border border-white/10 opacity-0 group-hover:opacity-100 -translate-y-2 group-hover:translate-y-0"
+            className="p-1.5 sm:p-2 bg-black/60 backdrop-blur-md rounded-full text-white/90 hover:text-white hover:bg-[var(--color-primary)] hover:scale-110 transition-all border border-white/20 opacity-0 group-hover:opacity-100 -translate-y-2 group-hover:translate-y-0 cursor-pointer shadow-lg"
             title="Add to playlist"
+            aria-label="Add to playlist"
           >
-            <Plus size={14} className="sm:w-4 sm:h-4" />
+            <ListPlus size={14} className="sm:w-4 sm:h-4" />
           </button>
           
           {/* Remove from Favorites (Heart) */}
           <button
+            type="button"
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               onRemove(song);
             }}
-            className="p-1.5 sm:p-2 bg-black/50 backdrop-blur-md rounded-full text-pink-500 hover:bg-black/70 hover:scale-110 transition-all border border-white/10 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0"
+            className="p-1.5 sm:p-2 bg-black/60 backdrop-blur-md rounded-full text-pink-500 hover:bg-black/80 hover:scale-110 transition-all border border-white/20 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 cursor-pointer shadow-lg"
             title="Remove from favorites"
+            aria-label="Remove from favorites"
           >
             <Heart size={14} className="sm:w-4 sm:h-4 fill-pink-500" />
           </button>
         </div>
 
-        {/* Play Button Overlay */}
+        {/* Play Button Overlay - Container is pointer-events-none so top-right action buttons are never blocked */}
         <div 
-          className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300"
-          onClick={() => onPlay(song)}
+          className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none"
         >
-          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-pink-600/90 backdrop-blur-sm flex items-center justify-center shadow-2xl hover:scale-110 hover:bg-pink-500 transition-transform cursor-pointer group/play">
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlay(song);
+            }}
+            className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-pink-600/90 backdrop-blur-sm flex items-center justify-center shadow-2xl hover:scale-110 hover:bg-pink-500 transition-transform cursor-pointer group/play pointer-events-auto"
+          >
             <Play size={20} className="sm:w-7 sm:h-7 text-white ml-1 group-hover/play:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" fill="currentColor" />
           </div>
         </div>
