@@ -1,6 +1,6 @@
-import React, { useState } from "react";
+import React from "react";
 import { Play, Shuffle, Pencil, Disc3, Clock } from "lucide-react";
-import { handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
+import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
  * ============================================================================
@@ -14,6 +14,7 @@ import { handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils"
  * - 2x2 mosaic or custom cover art square with hover edit overlay
  * - Playlist title, description, track count, and duration (when available)
  * - Play All and Shuffle CTA buttons
+ * - Robust Failsafe: Dead/broken thumbnails automatically degrade to remaining art or disc stub.
  */
 const PlaylistDetailHero = ({
     playlist,
@@ -24,31 +25,41 @@ const PlaylistDetailHero = ({
     if (!playlist) return null;
 
     const { name, description, coverUrl, trackCount, totalDurationSeconds, previewThumbnails = [] } = playlist;
-    const [imgErrors, setImgErrors] = useState({});
+    const { isImageDead, filterValidThumbnails, handleImgLoad, handleImgError } = useThumbnailFailsafe();
 
-    const validThumbnails = previewThumbnails.filter((_, i) => !imgErrors[i]);
-
-    const handleImgError = (e, index) => {
-        handleThumbnailError(e);
-        if (e.target.dataset.fallbackDone || e.target.src.includes("placeholder")) {
-            setImgErrors((prev) => ({ ...prev, [index]: true }));
-        }
-    };
+    const validThumbnails = filterValidThumbnails(previewThumbnails);
 
     /**
      * Renders cover art artwork or background blur.
+     * Failed thumbnails are automatically removed, cleanly falling back to disc stub or single art.
      */
     const renderCoverArt = (isBackground = false) => {
         if (isBackground) {
             const bgImg = coverUrl || validThumbnails[0];
-            if (bgImg) {
-                return <img src={bgImg} alt="" onLoad={handleThumbnailLoad} onError={handleThumbnailError} className="w-full h-full object-cover" />;
+            if (bgImg && !isImageDead(bgImg)) {
+                return (
+                    <img
+                        src={bgImg}
+                        alt=""
+                        onLoad={(e) => handleImgLoad(e, bgImg)}
+                        onError={(e) => handleImgError(e, bgImg)}
+                        className="w-full h-full object-cover"
+                    />
+                );
             }
             return <div className="w-full h-full bg-[var(--color-primary)]" />;
         }
 
-        if (coverUrl) {
-            return <img src={coverUrl} alt={name} onLoad={handleThumbnailLoad} onError={handleThumbnailError} className="w-full h-full object-cover" />;
+        if (coverUrl && !isImageDead("coverUrl")) {
+            return (
+                <img
+                    src={coverUrl}
+                    alt={name}
+                    onLoad={(e) => handleImgLoad(e, "coverUrl")}
+                    onError={(e) => handleImgError(e, "coverUrl")}
+                    className="w-full h-full object-cover"
+                />
+            );
         }
 
         if (validThumbnails.length >= 4) {
@@ -56,11 +67,11 @@ const PlaylistDetailHero = ({
                 <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
                     {validThumbnails.slice(0, 4).map((thumb, i) => (
                         <img
-                            key={i}
+                            key={thumb || i}
                             src={thumb}
                             alt={`Artwork ${i + 1}`}
-                            onLoad={handleThumbnailLoad}
-                            onError={(e) => handleImgError(e, i)}
+                            onLoad={(e) => handleImgLoad(e, thumb || i)}
+                            onError={(e) => handleImgError(e, thumb || i)}
                             className="w-full h-full object-cover"
                         />
                     ))}
@@ -71,10 +82,11 @@ const PlaylistDetailHero = ({
         if (validThumbnails.length > 0) {
             return (
                 <img
+                    key={validThumbnails[0]}
                     src={validThumbnails[0]}
                     alt={name}
-                    onLoad={handleThumbnailLoad}
-                    onError={(e) => handleImgError(e, 0)}
+                    onLoad={(e) => handleImgLoad(e, validThumbnails[0])}
+                    onError={(e) => handleImgError(e, validThumbnails[0])}
                     className="w-full h-full object-cover"
                 />
             );

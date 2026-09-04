@@ -2,7 +2,7 @@ import React from "react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { GripVertical, Play, Trash2, Plus, Music, Volume2 } from "lucide-react";
-import { handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
+import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
  * ============================================================================
@@ -44,6 +44,8 @@ const PlaylistTrackRow = ({
     onRemove,
     onAdd,
 }) => {
+    const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
+
     // dnd-kit sortable hook
     const {
         attributes,
@@ -140,12 +142,12 @@ const PlaylistTrackRow = ({
                 className="relative w-12 h-12 md:w-14 md:h-14 shrink-0 rounded-xl overflow-hidden bg-[var(--color-surface-overlay)] border border-[var(--color-border-subtle)] shadow-xs cursor-pointer group/thumb"
                 onClick={() => onPlay(track)}
             >
-                {thumb ? (
+                {thumb && !isImageDead("rowArtwork") ? (
                     <img
                         src={thumb}
                         alt={title}
-                        onLoad={handleThumbnailLoad}
-                        onError={(e) => handleThumbnailError(e, track.videoId || track.id)}
+                        onLoad={(e) => handleImgLoad(e, "rowArtwork", track.videoId || track.id)}
+                        onError={(e) => handleImgError(e, "rowArtwork", track.videoId || track.id)}
                         className="w-full h-full object-cover group-hover/thumb:scale-105 transition-transform duration-300"
                     />
                 ) : (

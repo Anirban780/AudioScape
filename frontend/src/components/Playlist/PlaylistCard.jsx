@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React from "react";
 import { Play, Trash2, Pencil, Music, ListMusic } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
+import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
  * ============================================================================
@@ -13,18 +13,19 @@ import { handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils"
  * Features:
  * - Balanced card proportions with dark, borderless glassmorphism.
  * - Spotify-style 2x2 mosaic cover art grid from track thumbnails.
+ * - Robust failsafe: removes failed/broken YouTube thumbnails dynamically.
  * - Dynamic hover micro-animations (card lift -translate-y-1, primary border glow, image zoom, play overlay).
  * - Track count pill and update metadata elegantly positioned at the bottom.
  * - Quick action overlay (Rename, Delete) on hover.
  */
 const PlaylistCard = ({ playlist, onDelete, onEdit }) => {
     const navigate = useNavigate();
-    const [imgErrors, setImgErrors] = useState({});
+    const { filterValidThumbnails, handleImgLoad, handleImgError } = useThumbnailFailsafe();
 
     const { id, name, previewThumbnails = [], trackCount = 0, updatedAt } = playlist;
 
-    // Filter out thumbnails that failed all resolution tiers
-    const validThumbnails = previewThumbnails.filter((_, i) => !imgErrors[i]);
+    // Filter out thumbnails that failed or point to placeholder assets
+    const validThumbnails = filterValidThumbnails(previewThumbnails);
 
     /**
      * Formats an ISO date string into a relative label.
@@ -40,15 +41,9 @@ const PlaylistCard = ({ playlist, onDelete, onEdit }) => {
         return `Updated ${date.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`;
     };
 
-    const handleImgError = (e, index) => {
-        handleThumbnailError(e);
-        if (e.target.dataset.fallbackDone || e.target.src.includes("placeholder")) {
-            setImgErrors((prev) => ({ ...prev, [index]: true }));
-        }
-    };
-
     /**
      * Renders cover art: 2x2 mosaic grid, single image, or gradient fallback stub.
+     * Failed thumbnails are completely removed, stepping down to remaining art or empty stub.
      */
     const renderCoverArt = () => {
         if (validThumbnails.length >= 4) {
@@ -56,11 +51,11 @@ const PlaylistCard = ({ playlist, onDelete, onEdit }) => {
                 <div className="grid grid-cols-2 grid-rows-2 w-full h-full">
                     {validThumbnails.slice(0, 4).map((thumb, i) => (
                         <img
-                            key={i}
+                            key={thumb || i}
                             src={thumb}
                             alt={`Playlist artwork ${i + 1}`}
-                            onLoad={handleThumbnailLoad}
-                            onError={(e) => handleImgError(e, i)}
+                            onLoad={(e) => handleImgLoad(e, thumb || i)}
+                            onError={(e) => handleImgError(e, thumb || i)}
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
                     ))}
@@ -71,10 +66,11 @@ const PlaylistCard = ({ playlist, onDelete, onEdit }) => {
         if (validThumbnails.length > 0) {
             return (
                 <img
+                    key={validThumbnails[0]}
                     src={validThumbnails[0]}
                     alt={name}
-                    onLoad={handleThumbnailLoad}
-                    onError={(e) => handleImgError(e, 0)}
+                    onLoad={(e) => handleImgLoad(e, validThumbnails[0])}
+                    onError={(e) => handleImgError(e, validThumbnails[0])}
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 />
             );

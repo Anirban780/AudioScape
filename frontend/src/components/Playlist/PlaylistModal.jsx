@@ -9,6 +9,7 @@ import {
 import { X, Plus, Check, ListMusic, Music, Loader2, AlertCircle } from "lucide-react";
 import usePlaylistStore from "@/store/usePlaylistStore";
 import toast from "react-hot-toast";
+import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
  * Robust helper to extract string ID from any track object shape.
@@ -43,6 +44,7 @@ const isInPlaylist = (pl, track) => {
  */
 const PlaylistModal = ({ userId }) => {
     const { selectedSong, selectedTracks, isModalOpen, closeModal } = usePlaylistStore();
+    const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
 
     const [playlists, setPlaylists] = useState([]);
     const [initialSelectedMap, setInitialSelectedMap] = useState({}); // { [playlistId]: boolean }
@@ -205,8 +207,14 @@ const PlaylistModal = ({ userId }) => {
                 {/* ── Track Preview Card ── */}
                 <div className="flex items-center gap-3 bg-[var(--color-surface-base)] p-3 rounded-2xl border border-[var(--color-border-default)] mb-4 shadow-inner">
                     <div className="w-12 h-12 rounded-xl overflow-hidden bg-black/20 shrink-0 border border-white/10">
-                        {trackThumb ? (
-                            <img src={trackThumb} alt={trackTitle} className="w-full h-full object-cover" />
+                        {trackThumb && !isImageDead("previewTrack") ? (
+                            <img
+                                src={trackThumb}
+                                alt={trackTitle}
+                                onLoad={(e) => handleImgLoad(e, "previewTrack", targetTrack.id || targetTrack.videoId)}
+                                onError={(e) => handleImgError(e, "previewTrack", targetTrack.id || targetTrack.videoId)}
+                                className="w-full h-full object-cover"
+                            />
                         ) : (
                             <div className="w-full h-full bg-[var(--color-primary)]/20 flex items-center justify-center">
                                 <Music size={20} className="text-[var(--color-primary)]" />
@@ -264,8 +272,14 @@ const PlaylistModal = ({ userId }) => {
                                         <div className="flex items-center gap-3 min-w-0">
                                             {/* Thumbnail */}
                                             <div className="w-10 h-10 rounded-xl overflow-hidden bg-black/20 shrink-0 border border-white/5">
-                                                {plThumb ? (
-                                                    <img src={plThumb} alt={pl.name} className="w-full h-full object-cover" />
+                                                {plThumb && !isImageDead(pl.id) ? (
+                                                    <img
+                                                        src={plThumb}
+                                                        alt={pl.name}
+                                                        onLoad={(e) => handleImgLoad(e, pl.id)}
+                                                        onError={(e) => handleImgError(e, pl.id)}
+                                                        className="w-full h-full object-cover"
+                                                    />
                                                 ) : (
                                                     <div className="w-full h-full bg-gradient-to-br from-[var(--color-primary)]/30 to-purple-900/20 flex items-center justify-center">
                                                         <ListMusic size={16} className="text-[var(--color-primary)]" />

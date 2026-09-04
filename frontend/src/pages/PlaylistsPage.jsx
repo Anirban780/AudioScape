@@ -11,6 +11,7 @@ import PlaylistHeroHeader from "@/components/Playlist/PlaylistHeroHeader";
 import PlaylistFilterBar from "@/components/Playlist/PlaylistFilterBar";
 import PlaylistCard from "@/components/Playlist/PlaylistCard";
 import PlaylistCreateModal from "@/components/Playlist/PlaylistCreateModal";
+import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
  * ============================================================================
@@ -26,6 +27,7 @@ import PlaylistCreateModal from "@/components/Playlist/PlaylistCreateModal";
  * - Delete confirmation modal
  * - Inline rename modal
  * - Empty state for no playlists
+ * - Robust Failsafe: Failed/broken list row thumbnails automatically degrade to gradient icon stubs.
  *
  * WHY IT WAS DESIGNED THIS WAY:
  * 1. Two-level navigation: This page is the INDEX view; clicking a card goes
@@ -36,11 +38,13 @@ import PlaylistCreateModal from "@/components/Playlist/PlaylistCreateModal";
  *    the pink used by Favorites — differentiates the two sections.
  * 4. Client-side filtering/sorting: Fast, no-network search and sort on the
  *    already-fetched playlist array.
+ * ============================================================================
  */
 const PlaylistsPage = () => {
     const user = useAuthStore((s) => s.user);
     const { playlists, setPlaylists, openCreateModal, closeCreateModal, isCreateModalOpen } = usePlaylistStore();
     const { setTrack, setQueue } = usePlayerStore();
+    const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
 
     const [loading, setLoading] = useState(true);
 
@@ -323,8 +327,14 @@ const PlaylistsPage = () => {
 
                                                     {/* Cover thumbnail - significantly enlarged */}
                                                     <div className="w-16 h-16 rounded-xl overflow-hidden bg-[var(--color-surface-overlay)] shrink-0 shadow-md group-hover:shadow-[0_8px_16px_rgba(0,0,0,0.3)] transition-shadow">
-                                                        {thumb ? (
-                                                            <img src={thumb} alt={pl.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                        {thumb && !isImageDead(pl.id) ? (
+                                                            <img
+                                                                src={thumb}
+                                                                alt={pl.name}
+                                                                onLoad={(e) => handleImgLoad(e, pl.id)}
+                                                                onError={(e) => handleImgError(e, pl.id)}
+                                                                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                                                            />
                                                         ) : (
                                                             <div className="w-full h-full bg-gradient-to-br from-[var(--color-primary)]/20 to-violet-900/10 flex items-center justify-center border border-[var(--color-primary)]/10">
                                                                 <ListMusic size={24} className="text-[var(--color-primary)]/50" />

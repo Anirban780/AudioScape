@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import { Plus, Music, Disc3, ListMusic } from "lucide-react";
+import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
  * ============================================================================
@@ -14,6 +15,7 @@ import { Plus, Music, Disc3, ListMusic } from "lucide-react";
  * - Ambient Artwork Layer: Blurred playlist thumbnail radiating organic color tones.
  * - Gradient Typography: Metallic purple sheen on "Your Playlists".
  * - Elevated Right-Side Card Stack with purple ambient drop shadows.
+ * - Robust Failsafe: Dead/broken thumbnails automatically degrade to themed gradient icon stubs.
  */
 const PlaylistHeroHeader = ({
     playlists = [],
@@ -21,16 +23,21 @@ const PlaylistHeroHeader = ({
     trackCount = 0,
     onCreatePlaylist,
 }) => {
+    const { isImageDead, filterValidThumbnails, handleImgLoad, handleImgError } = useThumbnailFailsafe();
+
     /**
      * Fast, constant-time $O(1)$ random sampler:
      * Pulls up to 4 unique cover images across user playlists without deep iteration.
+     * Automatically filters out broken or dead image URLs.
      */
     const collageImages = useMemo(() => {
         if (!playlists || playlists.length === 0) return [];
         
-        const availableImgs = playlists
+        const rawImgs = playlists
             .map((pl) => pl.coverUrl || pl.previewThumbnails?.[0])
             .filter(Boolean);
+
+        const availableImgs = filterValidThumbnails(rawImgs);
 
         if (availableImgs.length <= 4) return availableImgs;
 
@@ -42,7 +49,7 @@ const PlaylistHeroHeader = ({
             selected.push(picked);
         }
         return selected;
-    }, [playlists]);
+    }, [playlists, filterValidThumbnails]);
 
     // Primary ambient background artwork
     const heroBgThumb = collageImages[0] || null;
@@ -51,16 +58,18 @@ const PlaylistHeroHeader = ({
         <div className="relative w-full rounded-[32px] overflow-hidden border border-[var(--color-border-strong)] shadow-2xl mb-8 bg-gradient-to-r from-purple-100/90 via-violet-50/70 to-white dark:from-slate-950 dark:via-purple-950/70 dark:to-slate-950 transition-all duration-500 group">
             
             {/* ── 1. Ambient Blurred Artwork Backdrop ── */}
-            {heroBgThumb ? (
+            {heroBgThumb && !isImageDead("heroBg") ? (
                 <div className="absolute inset-0 overflow-hidden pointer-events-none">
                     <img
                         src={heroBgThumb}
                         alt=""
+                        onLoad={(e) => handleImgLoad(e, "heroBg")}
+                        onError={(e) => handleImgError(e, "heroBg")}
                         className="w-full h-full object-cover blur-[70px] scale-125 opacity-30 dark:opacity-40 mix-blend-multiply dark:mix-blend-screen transition-all duration-1000"
                     />
                 </div>
             ) : (
-                /* Fallback ambient color layer if no covers yet */
+                /* Fallback ambient color layer if no covers or image failed */
                 <div className="absolute inset-0 bg-gradient-to-tr from-[var(--color-primary)]/20 via-pink-500/10 to-transparent blur-[60px] pointer-events-none" />
             )}
 
@@ -120,8 +129,14 @@ const PlaylistHeroHeader = ({
                         
                         {/* Layer 3 (Back Card) */}
                         <div className="absolute w-40 h-40 rounded-2xl overflow-hidden border border-white/30 dark:border-white/15 shadow-[0_12px_30px_rgba(0,0,0,0.25)] transform -translate-x-12 -translate-y-6 rotate-12 transition-transform duration-500 group-hover:-translate-x-16 group-hover:-translate-y-9 group-hover:rotate-[18deg] bg-[var(--color-surface-overlay)]">
-                            {collageImages[2] ? (
-                                <img src={collageImages[2]} alt="" className="w-full h-full object-cover opacity-80" />
+                            {collageImages[2] && !isImageDead("card3") ? (
+                                <img
+                                    src={collageImages[2]}
+                                    alt=""
+                                    onLoad={(e) => handleImgLoad(e, "card3")}
+                                    onError={(e) => handleImgError(e, "card3")}
+                                    className="w-full h-full object-cover opacity-80"
+                                />
                             ) : (
                                 <div className="w-full h-full bg-gradient-to-br from-indigo-500/20 to-purple-600/30 flex items-center justify-center">
                                     <Music size={24} className="text-[var(--color-primary)]" />
@@ -131,8 +146,14 @@ const PlaylistHeroHeader = ({
 
                         {/* Layer 2 (Middle Card) */}
                         <div className="absolute w-44 h-44 rounded-2xl overflow-hidden border border-white/40 dark:border-white/20 shadow-[0_16px_36px_rgba(124,58,237,0.2)] transform -translate-x-3 translate-y-3 -rotate-6 transition-transform duration-500 group-hover:-translate-x-5 group-hover:translate-y-5 group-hover:-rotate-12 bg-[var(--color-surface-overlay)]">
-                            {collageImages[1] ? (
-                                <img src={collageImages[1]} alt="" className="w-full h-full object-cover opacity-90" />
+                            {collageImages[1] && !isImageDead("card2") ? (
+                                <img
+                                    src={collageImages[1]}
+                                    alt=""
+                                    onLoad={(e) => handleImgLoad(e, "card2")}
+                                    onError={(e) => handleImgError(e, "card2")}
+                                    className="w-full h-full object-cover opacity-90"
+                                />
                             ) : (
                                 <div className="w-full h-full bg-gradient-to-br from-pink-500/20 to-purple-600/30 flex items-center justify-center">
                                     <Disc3 size={28} className="text-[var(--color-primary)]" />
@@ -142,8 +163,14 @@ const PlaylistHeroHeader = ({
 
                         {/* Layer 1 (Front Spotlight Card) */}
                         <div className="absolute w-48 h-48 rounded-2xl overflow-hidden border-2 border-white/50 dark:border-white/30 shadow-[0_20px_45px_rgba(124,58,237,0.3)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.6)] transform translate-x-6 -translate-y-2 rotate-6 transition-transform duration-500 group-hover:translate-x-8 group-hover:-translate-y-4 group-hover:rotate-2 group-hover:scale-[1.03] bg-[var(--color-surface-overlay)] z-10">
-                            {collageImages[0] ? (
-                                <img src={collageImages[0]} alt="" className="w-full h-full object-cover" />
+                            {collageImages[0] && !isImageDead("card1") ? (
+                                <img
+                                    src={collageImages[0]}
+                                    alt=""
+                                    onLoad={(e) => handleImgLoad(e, "card1")}
+                                    onError={(e) => handleImgError(e, "card1")}
+                                    className="w-full h-full object-cover"
+                                />
                             ) : (
                                 <div className="w-full h-full bg-gradient-to-br from-[var(--color-primary)] via-purple-700 to-indigo-900 flex flex-col items-center justify-center gap-2 p-4 text-center text-white">
                                     <ListMusic size={34} className="text-white" />
