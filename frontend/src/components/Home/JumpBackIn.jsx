@@ -2,7 +2,8 @@ import React from "react";
 import { Play, RotateCcw, Compass, Music, Sparkles } from "lucide-react";
 import placeholder from "@/assets/placeholder.jpg";
 import usePlayerStore from "@/store/usePlayerStore";
-import { getValidThumbnailUrl } from "@/utils/youtubeUtils";
+import { getValidThumbnailUrl, getHighResThumbnailUrl } from "@/utils/youtubeUtils";
+import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 import { useNavigate } from "react-router-dom";
 
 /**
@@ -32,6 +33,7 @@ import { useNavigate } from "react-router-dom";
 const JumpBackIn = ({ lastPlayedTrack }) => {
   const { setTrack, setIsPlaying } = usePlayerStore();
   const navigate = useNavigate();
+  const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
 
   const handleResumePlayback = (e) => {
     e.stopPropagation();
@@ -44,9 +46,12 @@ const JumpBackIn = ({ lastPlayedTrack }) => {
     navigate("/explore");
   };
 
-  // Safe thumbnail URL extraction
+  const trackId = lastPlayedTrack?.id || lastPlayedTrack?.videoId;
+  const isDead = isImageDead(trackId);
   const thumbnailUrl = lastPlayedTrack
-    ? getValidThumbnailUrl(lastPlayedTrack.thumbnail || lastPlayedTrack.coverUrl) || placeholder
+    ? getHighResThumbnailUrl(lastPlayedTrack.thumbnail || lastPlayedTrack.coverUrl, trackId) ||
+      getValidThumbnailUrl(lastPlayedTrack.thumbnail || lastPlayedTrack.coverUrl) ||
+      placeholder
     : placeholder;
 
   return (
@@ -80,12 +85,20 @@ const JumpBackIn = ({ lastPlayedTrack }) => {
             className="relative z-10 flex items-center gap-4 p-3.5 rounded-2xl bg-[var(--color-surface-overlay)]/80 border border-[var(--color-border-default)] backdrop-blur-md cursor-pointer group/card hover:bg-[var(--color-state-hover)] transition-all duration-300 shadow-md"
           >
             {/* Album Thumbnail with Overlay Play Icon */}
-            <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-sm">
-              <img
-                src={thumbnailUrl}
-                alt={lastPlayedTrack.name || lastPlayedTrack.title || "Track Artwork"}
-                className="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-300"
-              />
+            <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-xl overflow-hidden flex-shrink-0 border border-white/10 shadow-sm bg-gradient-to-br from-purple-900/60 via-indigo-950/80 to-black flex items-center justify-center">
+              {!isDead ? (
+                <img
+                  src={thumbnailUrl}
+                  alt={lastPlayedTrack.name || lastPlayedTrack.title || "Track Artwork"}
+                  onLoad={(e) => handleImgLoad(e, trackId, trackId)}
+                  onError={(e) => handleImgError(e, trackId, trackId)}
+                  className="w-full h-full object-cover group-hover/card:scale-105 transition-transform duration-300"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <Music size={24} className="text-[var(--color-primary)] opacity-70" />
+                </div>
+              )}
               <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/card:opacity-100 flex items-center justify-center transition-opacity duration-200">
                 <div className="w-8 h-8 rounded-full bg-[var(--color-primary)] text-white flex items-center justify-center shadow-lg">
                   <Play size={16} className="fill-white ml-0.5" />

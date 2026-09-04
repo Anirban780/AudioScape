@@ -1,9 +1,10 @@
 import React, { useState } from "react";
-import { ListPlus, Play, Sparkles } from "lucide-react";
+import { ListPlus, Play, Sparkles, Music } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import usePlaylistStore from "@/store/usePlaylistStore";
 import placeholder from "@/assets/placeholder.jpg";
-import { getHighResThumbnailUrl, decodeHtmlEntities, handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
+import { getHighResThumbnailUrl, decodeHtmlEntities } from "@/utils/youtubeUtils";
+import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
  * ============================================================================
@@ -17,8 +18,8 @@ import { getHighResThumbnailUrl, decodeHtmlEntities, handleThumbnailLoad, handle
  * 3. `"compact"`: Horizontal list row layout (48x48 thumbnail, inline title/artist, play & playlist buttons).
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. HD Thumbnail Resolution: Converts low-res `/default.jpg` and `/mqdefault.jpg` URLs to HD
- *    `/hqdefault.jpg` / `/maxresdefault.jpg` using `getHighResThumbnailUrl()` with automatic step-down.
+ * 1. HD Thumbnail Resolution & Failsafe: Converts low-res URLs to HD with automatic
+ *    failsafe stepdown (maxres -> sd -> hq -> mq -> default) and grey dummy detection.
  * 2. Layout Diversity: Eliminates monotonous uniform grids across the Home Dashboard.
  * 3. Stitch Surface Tokens: Consumes semantic CSS variables (`var(--color-surface-raised)`,
  *    `var(--color-border-default)`, `var(--color-primary)`) enforcing zero-green brand palette.
@@ -30,6 +31,7 @@ import { getHighResThumbnailUrl, decodeHtmlEntities, handleThumbnailLoad, handle
 const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) => {
   const [isHovered, setIsHovered] = useState(false);
   const { openModal } = usePlaylistStore();
+  const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
 
   const cleanName = decodeHtmlEntities(name || "Unknown Title");
   const hdImage = getHighResThumbnailUrl(image, id) || placeholder;
@@ -59,14 +61,19 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
         {/* Left Side: Thumbnail Artwork & Play Overlay */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
           <div className="relative w-12 h-12 rounded-xl overflow-hidden shrink-0 border border-[var(--color-border-default)] bg-gradient-to-br from-purple-900/40 via-pink-900/20 to-blue-900/30 flex items-center justify-center">
-            <Sparkles size={16} className="text-white/30 absolute pointer-events-none" />
-            <img
-              src={hdImage}
-              alt={name}
-              onLoad={handleThumbnailLoad}
-              onError={(e) => handleThumbnailError(e, id)}
-              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-            />
+            {hdImage && !isImageDead(id) ? (
+              <img
+                src={hdImage}
+                alt={name}
+                onLoad={(e) => handleImgLoad(e, id, id)}
+                onError={(e) => handleImgError(e, id, id)}
+                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+              />
+            ) : (
+              <div className="w-full h-full bg-[var(--color-primary)]/20 flex items-center justify-center">
+                <Music size={18} className="text-[var(--color-primary)]" />
+              </div>
+            )}
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
               <Play size={16} fill="white" className="text-white ml-0.5" />
             </div>
@@ -127,13 +134,19 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
           </div>
 
           <div className="relative z-10 w-full h-full rounded-2xl overflow-hidden border border-[var(--color-border-strong)] shadow-lg group-hover:-translate-x-2 transition-transform duration-500 bg-[var(--color-surface-base)]">
-            <img
-              src={hdImage}
-              alt={cleanName}
-              onLoad={handleThumbnailLoad}
-              onError={(e) => handleThumbnailError(e, id)}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-            />
+            {hdImage && !isImageDead(id) ? (
+              <img
+                src={hdImage}
+                alt={cleanName}
+                onLoad={(e) => handleImgLoad(e, id, id)}
+                onError={(e) => handleImgError(e, id, id)}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+            ) : (
+              <div className="w-full h-full bg-[var(--color-primary)]/20 flex items-center justify-center">
+                <Music size={36} className="text-[var(--color-primary)]" />
+              </div>
+            )}
             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
               <div className="w-12 h-12 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] flex items-center justify-center shadow-lg transform scale-90 group-hover:scale-100 transition-transform">
                 <Play size={22} fill="currentColor" className="ml-0.5" />
@@ -216,15 +229,21 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
             onMouseEnter={() => setIsHovered(true)}
             onMouseLeave={() => setIsHovered(false)}
           >
-            <img
-              src={hdImage}
-              alt={cleanName}
-              onLoad={handleThumbnailLoad}
-              onError={(e) => handleThumbnailError(e, id)}
-              className={`w-full h-full object-cover transition-all duration-300 ${
-                isHovered ? "scale-105 opacity-80" : "scale-100 opacity-100"
-              }`}
-            />
+            {hdImage && !isImageDead(id) ? (
+              <img
+                src={hdImage}
+                alt={cleanName}
+                onLoad={(e) => handleImgLoad(e, id, id)}
+                onError={(e) => handleImgError(e, id, id)}
+                className={`w-full h-full object-cover transition-all duration-300 ${
+                  isHovered ? "scale-105 opacity-80" : "scale-100 opacity-100"
+                }`}
+              />
+            ) : (
+              <div className="w-full h-full bg-[var(--color-primary)]/20 flex items-center justify-center">
+                <Music size={32} className="text-[var(--color-primary)]" />
+              </div>
+            )}
 
             {/* Hover Play Button (Stitch Primary Token - Zero Green) */}
             {isHovered && (

@@ -2,7 +2,8 @@ import React, { useMemo } from "react";
 import { Play, Disc3, Sparkles } from "lucide-react";
 import placeholder from "@/assets/placeholder.jpg";
 import usePlayerStore from "@/store/usePlayerStore";
-import { getValidThumbnailUrl, getHighResThumbnailUrl, handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
+import { getValidThumbnailUrl, getHighResThumbnailUrl } from "@/utils/youtubeUtils";
+import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
  * ============================================================================
@@ -54,6 +55,7 @@ const capitalize = (str) => {
 
 const DailyMixCards = ({ recommendations = [] }) => {
   const { setQueue, setTrack, setIsPlaying, setCurrentIndex } = usePlayerStore();
+  const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
 
   // Group flat recommendations array into 2–3 Daily Mix buckets based on sourceKeyword
   const groupedMixes = useMemo(() => {
@@ -171,19 +173,31 @@ const DailyMixCards = ({ recommendations = [] }) => {
             {/* Left Info Section */}
             <div className="flex items-center gap-3.5 min-w-0 flex-1 relative z-10 pr-2">
               {/* Stacked Album Art Thumbnail */}
-              <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden flex-shrink-0 border border-white/15 shadow-md bg-gradient-to-br from-purple-900/60 via-pink-900/40 to-blue-900/50 flex items-center justify-center">
-                <Disc3 size={24} className={`${theme.accentIconColor} opacity-50 absolute pointer-events-none`} />
-                <img
-                  src={mix.coverUrl || placeholder}
-                  alt={mix.title}
-                  onLoad={handleThumbnailLoad}
-                  onError={(e) => handleThumbnailError(e, mix.tracks[0]?.id || mix.tracks[0]?.videoId)}
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 relative z-10"
-                />
-                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-20">
-                  <Play size={18} className="fill-white text-white" />
-                </div>
-              </div>
+              {(() => {
+                const trackId = mix.tracks[0]?.id || mix.tracks[0]?.videoId || mix.id;
+                const isDead = isImageDead(trackId);
+                return (
+                  <div className="relative w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden flex-shrink-0 border border-white/15 shadow-md bg-gradient-to-br from-purple-900/60 via-pink-900/40 to-blue-900/50 flex items-center justify-center">
+                    <Disc3 size={24} className={`${theme.accentIconColor} opacity-50 absolute pointer-events-none`} />
+                    {!isDead ? (
+                      <img
+                        src={mix.coverUrl || placeholder}
+                        alt={mix.title}
+                        onLoad={(e) => handleImgLoad(e, trackId, trackId)}
+                        onError={(e) => handleImgError(e, trackId, trackId)}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300 relative z-10"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-purple-900/80 via-pink-950/60 to-black flex items-center justify-center relative z-10">
+                        <Disc3 size={22} className={`${theme.accentIconColor} opacity-80`} />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity z-20">
+                      <Play size={18} className="fill-white text-white" />
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Text Info */}
               <div className="min-w-0 flex-1">

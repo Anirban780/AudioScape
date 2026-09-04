@@ -8,8 +8,9 @@ import usePlaylistStore from "@/store/usePlaylistStore";
 import { useRefreshOn } from "@/store/useDataRefreshStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import SectionHeader from "@/components/Home/SectionHeader";
-import { getValidThumbnailUrl, getHighResThumbnailUrl, decodeHtmlEntities, handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
+import { getValidThumbnailUrl, getHighResThumbnailUrl, decodeHtmlEntities } from "@/utils/youtubeUtils";
 import toast from "react-hot-toast";
+import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
  * ============================================================================
@@ -21,8 +22,9 @@ import toast from "react-hot-toast";
  * 1. Branded Section Header (`SectionHeader.jsx`): Rose accent bar, tagline subtitle, track count.
  * 2. Tactile Vinyl Record Hover Effect: On card hover, album artwork shifts left while a dark
  *    grooved vinyl disc peeks out from behind the right edge with a spinning animation.
- * 3. Rank Badges: Shows `#1`, `#2`, `#3` badges based on recent like order.
- * 4. Router Navigation: "SEE ALL" pill button navigates directly to `/favourites`.
+ * 3. Full Thumbnail Failsafe Stepdown: Automatically steps down resolution tiers.
+ * 4. Rank Badges: Shows `#1`, `#2`, `#3` badges based on recent like order.
+ * 5. Router Navigation: "SEE ALL" pill button navigates directly to `/favourites`.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
  * 1. Premium Tactile Feel: The vinyl disc animation makes personal favorites feel treasured.
@@ -41,6 +43,7 @@ const FavoriteSongs = ({ userId }) => {
   const [showScrollLeft, setShowScrollLeft] = useState(false);
   const scrollRef = useRef(null);
   const { openModal } = usePlaylistStore();
+  const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
 
   const loadFavorites = (showLoader = true) => {
     if (userId) {
@@ -188,14 +191,20 @@ const FavoriteSongs = ({ userId }) => {
                   </div>
 
                   {/* Album Cover Artwork Sleeve */}
-                  <div className="relative z-10 w-full h-full rounded-xl overflow-hidden shadow-md group-hover:-translate-x-2 transition-transform duration-500 bg-[var(--color-surface-base)]">
-                    <img
-                      src={validImage}
-                      alt={cleanTitle}
-                      onLoad={handleThumbnailLoad}
-                      onError={(e) => handleThumbnailError(e, songId)}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
+                  <div className="relative z-10 w-full h-full rounded-xl overflow-hidden shadow-md group-hover:-translate-x-2 transition-transform duration-500 bg-[var(--color-surface-base)] flex items-center justify-center">
+                    {validImage && !isImageDead(songId) ? (
+                      <img
+                        src={validImage}
+                        alt={cleanTitle}
+                        onLoad={(e) => handleImgLoad(e, songId, songId)}
+                        onError={(e) => handleImgError(e, songId, songId)}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-pink-900/40 via-rose-900/20 to-[var(--color-surface-raised)] flex items-center justify-center">
+                        <Music size={36} className="text-pink-500/70" />
+                      </div>
+                    )}
 
                     {/* Rank Badge */}
                     <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-xs text-white text-[10px] font-extrabold tracking-wider border border-white/20">

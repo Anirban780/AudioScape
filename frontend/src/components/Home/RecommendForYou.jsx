@@ -11,6 +11,7 @@ import { getHighResThumbnailUrl, handleThumbnailLoad, handleThumbnailError, deco
 import MediaGrid from "@/components/Layout/MediaGrid";
 import SectionHeader from "@/components/Home/SectionHeader";
 import toast from "react-hot-toast";
+import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
  * ============================================================================
@@ -54,6 +55,7 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
   const [showScrollLeft, setShowScrollLeft] = useState(false);
   const scrollRef = React.useRef(null);
   const { openModal } = usePlaylistStore();
+  const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
 
   const loadRecommendations = async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -216,16 +218,22 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
         <div className="relative w-full h-[300px] sm:h-[350px] rounded-[32px] overflow-hidden border border-[var(--color-border-strong)] shadow-2xl mb-8 group bg-[var(--color-surface-raised)] flex items-center transition-all duration-500">
           
           {/* Background Artwork Image */}
-          <img
-            key={`rec-banner-integrated-${trackId}-${bannerIndex}`}
-            src={artwork}
-            alt={trackName}
-            onLoad={handleThumbnailLoad}
-            onError={(e) => handleThumbnailError(e, trackId)}
-            className={`absolute inset-0 w-full h-full object-cover pointer-events-none blur-[1px] ${
-              enablePanAnimation ? "animate-pan-vertical" : ""
-            }`}
-          />
+          {artwork && !isImageDead(trackId) ? (
+            <img
+              key={`rec-banner-integrated-${trackId}-${bannerIndex}`}
+              src={artwork}
+              alt={trackName}
+              onLoad={(e) => handleImgLoad(e, trackId, trackId)}
+              onError={(e) => handleImgError(e, trackId, trackId)}
+              className={`absolute inset-0 w-full h-full object-cover pointer-events-none blur-[1px] ${
+                enablePanAnimation ? "animate-pan-vertical" : ""
+              }`}
+            />
+          ) : (
+            <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-purple-900/60 via-pink-900/40 to-neutral-950 flex items-center justify-center">
+              <Music size={64} className="text-white/20" />
+            </div>
+          )}
 
           {/* Ambient Gradient Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 via-50% to-transparent pointer-events-none" />
@@ -361,14 +369,20 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
                   </div>
 
                   {/* Album Cover Artwork Sleeve */}
-                  <div className="relative z-10 w-full h-full rounded-xl overflow-hidden shadow-md group-hover:-translate-x-2 transition-transform duration-500 bg-[var(--color-surface-base)]">
-                    <img
-                      src={validImage}
-                      alt={cleanTitle}
-                      onLoad={handleThumbnailLoad}
-                      onError={(e) => handleThumbnailError(e, songId)}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
+                  <div className="relative z-10 w-full h-full rounded-xl overflow-hidden shadow-md group-hover:-translate-x-2 transition-transform duration-500 bg-[var(--color-surface-base)] flex items-center justify-center">
+                    {validImage && !isImageDead(songId) ? (
+                      <img
+                        src={validImage}
+                        alt={cleanTitle}
+                        onLoad={(e) => handleImgLoad(e, songId, songId)}
+                        onError={(e) => handleImgError(e, songId, songId)}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-[var(--color-primary)]/30 via-purple-900/20 to-[var(--color-surface-raised)] flex items-center justify-center">
+                        <Music size={36} className="text-[var(--color-primary)]/70" />
+                      </div>
+                    )}
 
                     {/* Rank Badge */}
                     <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-xs text-white text-[10px] font-extrabold tracking-wider border border-white/20">

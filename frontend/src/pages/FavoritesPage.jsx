@@ -7,13 +7,14 @@ import usePlaylistStore from '@/store/usePlaylistStore';
 import { useRefreshOn } from "@/store/useDataRefreshStore";
 import Loader from '@/components/Home/Loader';
 import toast from 'react-hot-toast';
-import { Heart, HeartOff, ListPlus, Loader2, X } from 'lucide-react';
+import { Heart, HeartOff, ListPlus, Loader2, X, Music } from 'lucide-react';
 import MediaGrid from '@/components/Layout/MediaGrid';
 import FavoritesHeroBanner from '@/components/Favorites/FavoritesHeroBanner';
 import FavoritesFilterBar from '@/components/Favorites/FavoritesFilterBar';
 import FavoritesVinylCard from '@/components/Favorites/FavoritesVinylCard';
 import placeholder from '@/assets/placeholder.jpg';
 import { getHighResThumbnailUrl } from '@/utils/youtubeUtils';
+import useThumbnailFailsafe from '@/hooks/useThumbnailFailsafe';
 
 /**
  * ============================================================================
@@ -30,6 +31,7 @@ const FavoritesPage = () => {
     const [likedSongs, setLikedSongs] = useState([]);
     const { setTrack, setQueue, playTrack } = usePlayerStore();
     const { openModal } = usePlaylistStore();
+    const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
     const [loading, setLoading] = useState(true);
 
     // Modal state for confirming track removal from favorites (prevents accidental unliking)
@@ -312,8 +314,18 @@ const FavoritesPage = () => {
                                             <div className="w-7 text-center text-xs font-bold text-[var(--color-on-surface-variant)] group-hover:text-pink-500 transition-colors">
                                                 {index + 1}
                                             </div>
-                                            <div className="relative w-12 h-12 shrink-0">
-                                                <img src={thumb} alt={title} className="w-full h-full object-cover rounded-lg shadow-sm" />
+                                            <div className="relative w-12 h-12 shrink-0 rounded-lg overflow-hidden bg-[var(--color-surface-overlay)] flex items-center justify-center">
+                                                {thumb && !isImageDead(track.id || track.videoId) ? (
+                                                    <img 
+                                                        src={getHighResThumbnailUrl(thumb, track.id || track.videoId) || thumb} 
+                                                        alt={title} 
+                                                        className="w-full h-full object-cover rounded-lg shadow-sm"
+                                                        onLoad={(e) => handleImgLoad(e, track.id || track.videoId, track.id || track.videoId)}
+                                                        onError={(e) => handleImgError(e, track.id || track.videoId, track.id || track.videoId)}
+                                                    />
+                                                ) : (
+                                                    <Music size={18} className="text-pink-500/70" />
+                                                )}
                                             </div>
                                             <div className="flex-1 min-w-0">
                                                 <p className="text-sm font-semibold text-[var(--color-on-surface)] truncate group-hover:text-pink-500 transition-colors">{title}</p>
@@ -393,17 +405,24 @@ const FavoritesPage = () => {
 
                         {/* Track Info Preview Box */}
                         <div className="w-full bg-[var(--color-surface)] border border-[var(--color-border-subtle)] rounded-2xl p-3 flex items-center gap-3 mb-6 text-left">
-                            <img 
-                                src={
-                                    getHighResThumbnailUrl(
-                                        confirmRemoveModal.song.thumbnail || confirmRemoveModal.song.thumbNail,
-                                        confirmRemoveModal.song.id || confirmRemoveModal.song.videoId
-                                    ) || placeholder
-                                } 
-                                alt={confirmRemoveModal.song.name || confirmRemoveModal.song.title}
-                                className="w-12 h-12 rounded-xl object-cover shrink-0 border border-white/10"
-                                onError={(e) => { e.target.src = placeholder; }}
-                            />
+                            <div className="w-12 h-12 rounded-xl overflow-hidden bg-black/20 shrink-0 border border-white/10 flex items-center justify-center">
+                                {confirmRemoveModal.song && !isImageDead(confirmRemoveModal.song.id || confirmRemoveModal.song.videoId) ? (
+                                    <img 
+                                        src={
+                                            getHighResThumbnailUrl(
+                                                confirmRemoveModal.song.thumbnail || confirmRemoveModal.song.thumbNail,
+                                                confirmRemoveModal.song.id || confirmRemoveModal.song.videoId
+                                            ) || placeholder
+                                        } 
+                                        alt={confirmRemoveModal.song.name || confirmRemoveModal.song.title}
+                                        className="w-full h-full object-cover"
+                                        onLoad={(e) => handleImgLoad(e, confirmRemoveModal.song.id || confirmRemoveModal.song.videoId, confirmRemoveModal.song.id || confirmRemoveModal.song.videoId)}
+                                        onError={(e) => handleImgError(e, confirmRemoveModal.song.id || confirmRemoveModal.song.videoId, confirmRemoveModal.song.id || confirmRemoveModal.song.videoId)}
+                                    />
+                                ) : (
+                                    <Music size={20} className="text-pink-500" />
+                                )}
+                            </div>
                             <div className="min-w-0 flex-1">
                                 <p className="text-sm font-bold text-[var(--color-on-surface)] truncate">
                                     {confirmRemoveModal.song.name || confirmRemoveModal.song.title || "Untitled Track"}

@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Play, ListPlus, Heart } from 'lucide-react';
-import { getHighResThumbnailUrl, getNextFallbackThumbnailUrl } from '@/utils/youtubeUtils';
+import React from 'react';
+import { Play, ListPlus, Heart, Music } from 'lucide-react';
+import { getHighResThumbnailUrl } from '@/utils/youtubeUtils';
 import placeholder from '@/assets/placeholder.jpg';
+import useThumbnailFailsafe from '@/hooks/useThumbnailFailsafe';
 
 /**
  * ============================================================================
@@ -15,6 +16,8 @@ import placeholder from '@/assets/placeholder.jpg';
  * 
  * FEATURES:
  * - Album sleeve + spinning vinyl disc animation on hover
+ * - Full thumbnail failsafe step-down (maxres -> sd -> hq -> mq -> default)
+ * - Zero broken grey image fallback (themed pink gradient stub when all tiers fail)
  * - Rank badge (#1, #2, etc.)
  * - Play overlay button
  * - Add to playlist button
@@ -34,7 +37,7 @@ const FavoritesVinylCard = ({
   onAddToPlaylist, 
   onRemove 
 }) => {
-  const [imageError, setImageError] = useState(false);
+  const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
   const trackId = song.id || song.videoId;
   
   // Clean up title (remove parentheticals, etc)
@@ -46,18 +49,9 @@ const FavoritesVinylCard = ({
   const title = formatTitle(song.name || song.title);
   const artist = song.artist || song.channelTitle || "Unknown Artist";
   
-  // Image handling with fallback chain
+  // Image handling with failsafe pipeline
   const rawThumbnail = song.thumbnail || song.thumbNail;
-  let imgUrl = placeholder;
-  if (!imageError && rawThumbnail) {
-    imgUrl = getHighResThumbnailUrl(rawThumbnail, trackId) || rawThumbnail;
-  }
-
-  const handleImageError = (e) => {
-    if (imageError) return; // Prevent infinite loops
-    setImageError(true);
-    e.target.src = getNextFallbackThumbnailUrl(e.target.src, trackId, placeholder);
-  };
+  const imgUrl = getHighResThumbnailUrl(rawThumbnail, trackId) || rawThumbnail || placeholder;
 
   return (
     <div className="relative group cursor-pointer w-full flex justify-center mb-10 pb-4">
@@ -76,12 +70,19 @@ const FavoritesVinylCard = ({
         
         {/* Center label (matches album art) */}
         <div className="w-1/3 aspect-square rounded-full overflow-hidden animate-vinylSpin">
-          <img 
-            src={imgUrl} 
-            alt="vinyl label" 
-            className="w-full h-full object-cover"
-            onError={handleImageError}
-          />
+          {imgUrl && !isImageDead(trackId) ? (
+            <img 
+              src={imgUrl} 
+              alt="vinyl label" 
+              className="w-full h-full object-cover"
+              onLoad={(e) => handleImgLoad(e, trackId, trackId)}
+              onError={(e) => handleImgError(e, trackId, trackId)}
+            />
+          ) : (
+            <div className="w-full h-full bg-pink-600/30 flex items-center justify-center">
+              <Music size={12} className="text-pink-400" />
+            </div>
+          )}
         </div>
         
         {/* Center spindle hole */}
@@ -93,15 +94,22 @@ const FavoritesVinylCard = ({
 
       {/* Main Album Sleeve Card */}
       <div className="relative w-full aspect-square rounded-xl sm:rounded-2xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.4)] z-10 border-2 border-[var(--color-border-subtle)] group-hover:border-pink-500 bg-[var(--color-surface-raised)] transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_15px_40px_rgba(236,72,153,0.4)]">
-        <img
-          src={imgUrl}
-          alt={title}
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-          onError={handleImageError}
-        />
+        {imgUrl && !isImageDead(trackId) ? (
+          <img
+            src={imgUrl}
+            alt={title}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            onLoad={(e) => handleImgLoad(e, trackId, trackId)}
+            onError={(e) => handleImgError(e, trackId, trackId)}
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-pink-900/40 via-rose-900/20 to-[var(--color-surface-raised)] flex items-center justify-center">
+            <Music size={40} className="text-pink-500/80" />
+          </div>
+        )}
         
         {/* Gradients for text legibility */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10 opacity-70 group-hover:opacity-80 transition-opacity"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10 opacity-70 group-hover:opacity-80 transition-opacity pointer-events-none"></div>
         
         {/* Rank Badge */}
         <div className="absolute top-2 left-2 sm:top-3 sm:left-3 z-20">

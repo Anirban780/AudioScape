@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import placeholder from "@/assets/placeholder.jpg";
-import { Play, Sparkles, ChevronLeft, ChevronRight, Shuffle } from "lucide-react";
-import { getHighResThumbnailUrl, getNextFallbackThumbnailUrl } from "@/utils/youtubeUtils";
+import { Play, Sparkles, ChevronLeft, ChevronRight, Shuffle, Music } from "lucide-react";
+import { getHighResThumbnailUrl } from "@/utils/youtubeUtils";
+import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
  * ============================================================================
@@ -18,7 +19,8 @@ import { getHighResThumbnailUrl, getNextFallbackThumbnailUrl } from "@/utils/you
  * 1. Automatic Vertical Slow-Pan Animation (`animate-pan-vertical`):
  *    When a banner slide displays, the background image automatically pans smoothly
  *    from top to bottom (`center 5%` -> `center 95%`) over 12 seconds.
- * 2. Premium Tactile Feel: Creates an immersive, cinematic experience for the user's favorites.
+ * 2. Full Thumbnail Failsafe Step-Down: Seamless fallback across all resolution tiers.
+ * 3. Premium Tactile Feel: Creates an immersive, cinematic experience for the user's favorites.
  * 
  * PROPS:
  * - tracks: Array of favorite tracks to display in the carousel (usually top 5)
@@ -33,6 +35,7 @@ const FavoritesHeroBanner = ({
   trackCount = 0,
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
 
   // Auto-rotate slides every 6 seconds
   useEffect(() => {
@@ -69,16 +72,20 @@ const FavoritesHeroBanner = ({
     <div className="relative w-full h-[300px] sm:h-[350px] rounded-[32px] overflow-hidden border border-[var(--color-border-strong)] shadow-2xl mb-8 group bg-[var(--color-surface-raised)] flex items-center transition-all duration-500">
       
       {/* 1. Full-Width HD Background Artwork Image with Automatic Vertical Slow-Pan */}
-      <img
-        key={`${trackId}-${currentIndex}`}
-        src={artwork}
-        alt={trackName}
-        onError={(e) => {
-          e.target.onerror = null;
-          e.target.src = getNextFallbackThumbnailUrl(e.target.src, trackId, placeholder);
-        }}
-        className="absolute inset-0 w-full h-full object-cover blur-[1px] transition-all duration-700 pointer-events-none animate-pan-vertical"
-      />
+      {artwork && !isImageDead(trackId) ? (
+        <img
+          key={`${trackId}-${currentIndex}`}
+          src={artwork}
+          alt={trackName}
+          onLoad={(e) => handleImgLoad(e, trackId, trackId)}
+          onError={(e) => handleImgError(e, trackId, trackId)}
+          className="absolute inset-0 w-full h-full object-cover blur-[1px] transition-all duration-700 pointer-events-none animate-pan-vertical"
+        />
+      ) : (
+        <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-pink-900/60 via-purple-900/40 to-neutral-950 flex items-center justify-center">
+          <Music size={64} className="text-pink-500/30" />
+        </div>
+      )}
 
       {/* 2. Gradient Overlays for Optimal Legibility & Atmosphere */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/35 via-50% to-transparent pointer-events-none" />
