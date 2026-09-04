@@ -6,7 +6,7 @@ import usePlayerStore from "@/store/usePlayerStore";
 import Loader from "@/components/Home/Loader";
 import toast from "react-hot-toast";
 import { ListMusic, Disc3, Trash2, X, Loader2, Pencil } from "lucide-react";
-import { getPlaylists, deletePlaylist, createPlaylist, updatePlaylist } from "@/utils/playlists";
+import { getPlaylists, getPlaylistById, deletePlaylist, createPlaylist, updatePlaylist } from "@/utils/playlists";
 import PlaylistHeroHeader from "@/components/Playlist/PlaylistHeroHeader";
 import PlaylistFilterBar from "@/components/Playlist/PlaylistFilterBar";
 import PlaylistCard from "@/components/Playlist/PlaylistCard";
@@ -22,6 +22,7 @@ import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
  * Full redesign of the Playlists list view (/playlists).
  * Renders the authenticated user's entire playlist library with:
  * - Glassmorphic hero header with stats and "Create Playlist" CTA
+ * - Interactive 3-item Spotlight Quick-Switch Dock with 1-click playback
  * - Search, sort, and grid/list view controls
  * - Spotify-style 2x2 mosaic PlaylistCard grid
  * - Delete confirmation modal
@@ -43,10 +44,35 @@ import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 const PlaylistsPage = () => {
     const user = useAuthStore((s) => s.user);
     const { playlists, setPlaylists, openCreateModal, closeCreateModal, isCreateModalOpen } = usePlaylistStore();
-    const { setTrack, setQueue } = usePlayerStore();
+    const { setTrack, setQueue, setIsPlaying } = usePlayerStore();
     const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
 
     const [loading, setLoading] = useState(true);
+
+    /**
+     * 1-Click Playback: plays an entire playlist from the hero spotlight.
+     */
+    const handlePlayPlaylist = async (playlist) => {
+        if (!playlist) return;
+        try {
+            let tracks = playlist.songs || playlist.tracks || [];
+            if (!tracks.length && playlist.id) {
+                const fullPl = await getPlaylistById(user?.id, playlist.id);
+                tracks = fullPl?.songs || fullPl?.tracks || [];
+            }
+            if (!tracks.length) {
+                toast("This playlist is empty. Add songs to start playing!", { icon: "🎵" });
+                return;
+            }
+            setQueue(tracks);
+            await setTrack(tracks[0]);
+            setIsPlaying(true);
+            toast.success(`Playing "${playlist.name}"`);
+        } catch (err) {
+            console.error("Failed to play playlist:", err);
+            toast.error("Failed to play playlist");
+        }
+    };
 
     // Search / sort / view mode state — persisted to localStorage
     const [searchQuery, setSearchQuery] = useState("");
@@ -220,12 +246,13 @@ const PlaylistsPage = () => {
                             </div>
                         </div>
 
-                        {/* 1. Hero Header — stats + create CTA + dynamic cover collage */}
+                        {/* 1. Hero Header — stats + create CTA + dynamic spotlight dock */}
                         <PlaylistHeroHeader
                             playlists={playlists}
                             playlistCount={playlists.length}
                             trackCount={totalTrackCount}
                             onCreatePlaylist={openCreateModal}
+                            onPlayPlaylist={handlePlayPlaylist}
                         />
 
                         {/* Only show filter bar and content when there are playlists */}

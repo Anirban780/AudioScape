@@ -122,7 +122,9 @@ export const getPlaylists = async (userId) => {
  * @param {string} playlistId - Target Playlist UUID
  * @returns {Promise<Object|null>} Playlist detail object or null
  */
-export const getPlaylistById = async (userId, playlistId) => {
+export const getPlaylistById = async (arg1, arg2) => {
+    // Flexible signature: supports both getPlaylistById(playlistId) and getPlaylistById(userId, playlistId)
+    const playlistId = arg2 || arg1;
     if (!playlistId) return null;
 
     try {
