@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { Play, Plus, Heart } from 'lucide-react';
-import { getHighResThumbnailUrl, getNextFallbackThumbnailUrl } from '@/utils/youtubeUtils';
+import React from 'react';
+import { Play, ListPlus, Heart, Music } from 'lucide-react';
+import { getHighResThumbnailUrl } from '@/utils/youtubeUtils';
 import placeholder from '@/assets/placeholder.jpg';
+import useThumbnailFailsafe from '@/hooks/useThumbnailFailsafe';
 
 /**
  * ============================================================================
@@ -15,6 +16,8 @@ import placeholder from '@/assets/placeholder.jpg';
  * 
  * FEATURES:
  * - Album sleeve + spinning vinyl disc animation on hover
+ * - Full thumbnail failsafe step-down (maxres -> sd -> hq -> mq -> default)
+ * - Zero broken grey image fallback (themed pink gradient stub when all tiers fail)
  * - Rank badge (#1, #2, etc.)
  * - Play overlay button
  * - Add to playlist button
@@ -34,7 +37,7 @@ const FavoritesVinylCard = ({
   onAddToPlaylist, 
   onRemove 
 }) => {
-  const [imageError, setImageError] = useState(false);
+  const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
   const trackId = song.id || song.videoId;
   
   // Clean up title (remove parentheticals, etc)
@@ -46,18 +49,9 @@ const FavoritesVinylCard = ({
   const title = formatTitle(song.name || song.title);
   const artist = song.artist || song.channelTitle || "Unknown Artist";
   
-  // Image handling with fallback chain
+  // Image handling with failsafe pipeline
   const rawThumbnail = song.thumbnail || song.thumbNail;
-  let imgUrl = placeholder;
-  if (!imageError && rawThumbnail) {
-    imgUrl = getHighResThumbnailUrl(rawThumbnail, trackId) || rawThumbnail;
-  }
-
-  const handleImageError = (e) => {
-    if (imageError) return; // Prevent infinite loops
-    setImageError(true);
-    e.target.src = getNextFallbackThumbnailUrl(e.target.src, trackId, placeholder);
-  };
+  const imgUrl = getHighResThumbnailUrl(rawThumbnail, trackId) || rawThumbnail || placeholder;
 
   return (
     <div className="relative group cursor-pointer w-full flex justify-center mb-10 pb-4">
@@ -76,12 +70,19 @@ const FavoritesVinylCard = ({
         
         {/* Center label (matches album art) */}
         <div className="w-1/3 aspect-square rounded-full overflow-hidden animate-vinylSpin">
-          <img 
-            src={imgUrl} 
-            alt="vinyl label" 
-            className="w-full h-full object-cover"
-            onError={handleImageError}
-          />
+          {imgUrl && !isImageDead(trackId) ? (
+            <img 
+              src={imgUrl} 
+              alt="vinyl label" 
+              className="w-full h-full object-cover"
+              onLoad={(e) => handleImgLoad(e, trackId, trackId)}
+              onError={(e) => handleImgError(e, trackId, trackId)}
+            />
+          ) : (
+            <div className="w-full h-full bg-pink-600/30 flex items-center justify-center">
+              <Music size={12} className="text-pink-400" />
+            </div>
+          )}
         </div>
         
         {/* Center spindle hole */}
@@ -93,15 +94,22 @@ const FavoritesVinylCard = ({
 
       {/* Main Album Sleeve Card */}
       <div className="relative w-full aspect-square rounded-xl sm:rounded-2xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.4)] z-10 border-2 border-[var(--color-border-subtle)] group-hover:border-pink-500 bg-[var(--color-surface-raised)] transition-all duration-300 group-hover:-translate-y-1 group-hover:shadow-[0_15px_40px_rgba(236,72,153,0.4)]">
-        <img
-          src={imgUrl}
-          alt={title}
-          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-          onError={handleImageError}
-        />
+        {imgUrl && !isImageDead(trackId) ? (
+          <img
+            src={imgUrl}
+            alt={title}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+            onLoad={(e) => handleImgLoad(e, trackId, trackId)}
+            onError={(e) => handleImgError(e, trackId, trackId)}
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-pink-900/40 via-rose-900/20 to-[var(--color-surface-raised)] flex items-center justify-center">
+            <Music size={40} className="text-pink-500/80" />
+          </div>
+        )}
         
         {/* Gradients for text legibility */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10 opacity-70 group-hover:opacity-80 transition-opacity"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/10 opacity-70 group-hover:opacity-80 transition-opacity pointer-events-none"></div>
         
         {/* Rank Badge */}
         <div className="absolute top-2 left-2 sm:top-3 sm:left-3 z-20">
@@ -112,39 +120,50 @@ const FavoritesVinylCard = ({
           </div>
         </div>
 
-        {/* Action Buttons (Top Right) */}
-        <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-20 flex flex-col gap-2">
+        {/* Action Buttons (Top Right) - Elevated to z-30 to prevent click interception */}
+        <div className="absolute top-2 right-2 sm:top-3 sm:right-3 z-30 flex flex-col gap-2">
           {/* Add to Playlist */}
           <button
+            type="button"
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               onAddToPlaylist(song);
             }}
-            className="p-1.5 sm:p-2 bg-black/50 backdrop-blur-md rounded-full text-white/80 hover:text-white hover:bg-black/70 hover:scale-110 transition-all border border-white/10 opacity-0 group-hover:opacity-100 -translate-y-2 group-hover:translate-y-0"
+            className="p-1.5 sm:p-2 bg-black/60 backdrop-blur-md rounded-full text-white/90 hover:text-white hover:bg-[var(--color-primary)] hover:scale-110 transition-all border border-white/20 opacity-0 group-hover:opacity-100 -translate-y-2 group-hover:translate-y-0 cursor-pointer shadow-lg"
             title="Add to playlist"
+            aria-label="Add to playlist"
           >
-            <Plus size={14} className="sm:w-4 sm:h-4" />
+            <ListPlus size={14} className="sm:w-4 sm:h-4" />
           </button>
           
           {/* Remove from Favorites (Heart) */}
           <button
+            type="button"
             onClick={(e) => {
+              e.preventDefault();
               e.stopPropagation();
               onRemove(song);
             }}
-            className="p-1.5 sm:p-2 bg-black/50 backdrop-blur-md rounded-full text-pink-500 hover:bg-black/70 hover:scale-110 transition-all border border-white/10 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0"
+            className="p-1.5 sm:p-2 bg-black/60 backdrop-blur-md rounded-full text-pink-500 hover:bg-black/80 hover:scale-110 transition-all border border-white/20 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 cursor-pointer shadow-lg"
             title="Remove from favorites"
+            aria-label="Remove from favorites"
           >
             <Heart size={14} className="sm:w-4 sm:h-4 fill-pink-500" />
           </button>
         </div>
 
-        {/* Play Button Overlay */}
+        {/* Play Button Overlay - Container is pointer-events-none so top-right action buttons are never blocked */}
         <div 
-          className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300"
-          onClick={() => onPlay(song)}
+          className="absolute inset-0 z-20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none"
         >
-          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-pink-600/90 backdrop-blur-sm flex items-center justify-center shadow-2xl hover:scale-110 hover:bg-pink-500 transition-transform cursor-pointer group/play">
+          <div 
+            onClick={(e) => {
+              e.stopPropagation();
+              onPlay(song);
+            }}
+            className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-pink-600/90 backdrop-blur-sm flex items-center justify-center shadow-2xl hover:scale-110 hover:bg-pink-500 transition-transform cursor-pointer group/play pointer-events-auto"
+          >
             <Play size={20} className="sm:w-7 sm:h-7 text-white ml-1 group-hover/play:drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]" fill="currentColor" />
           </div>
         </div>

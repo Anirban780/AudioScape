@@ -61,6 +61,22 @@ const usePlaylistStore = create((set) => ({
     isModalOpen: false,
 
     /**
+     * WHAT: Active single playlist detail state for PlaylistDetailPage (/playlists/:id).
+     * WHY: Cached detail payload containing full track list, total duration, and metadata.
+     */
+    activePlaylist: null,
+    setActivePlaylist: (activePlaylist) => set({ activePlaylist }),
+    clearActivePlaylist: () => set({ activePlaylist: null }),
+
+    /**
+     * WHAT: Controls visibility of the dedicated PlaylistCreateModal.
+     * WHY: Separates creating new standalone playlists from saving tracks to playlists.
+     */
+    isCreateModalOpen: false,
+    openCreateModal: () => set({ isCreateModalOpen: true }),
+    closeCreateModal: () => set({ isCreateModalOpen: false }),
+
+    /**
      * WHAT: Action to open PlaylistModal with single or bulk tracks.
      * WHY: Standardizes modal triggering across all UI components.
      * HOW:

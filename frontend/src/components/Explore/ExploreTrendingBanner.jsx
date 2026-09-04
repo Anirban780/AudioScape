@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from "react";
 import placeholder from "@/assets/placeholder.jpg";
-import { Play, Flame, Sparkles, ChevronLeft, ChevronRight } from "lucide-react";
+import { Play, Flame, Sparkles, ChevronLeft, ChevronRight, Music } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import toast from "react-hot-toast";
-import { getHighResThumbnailUrl, getNextFallbackThumbnailUrl } from "@/utils/youtubeUtils";
+import { getHighResThumbnailUrl } from "@/utils/youtubeUtils";
+import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
  * ============================================================================
@@ -19,10 +20,10 @@ import { getHighResThumbnailUrl, getNextFallbackThumbnailUrl } from "@/utils/you
  * 1. Automatic Vertical Slow-Pan Animation (`animate-pan-vertical`):
  *    When a banner slide displays, the background image automatically pans smoothly
  *    from top to bottom (`center 5%` -> `center 95%`) over 12 seconds.
- * 2. Remounting Animation Key: `key={`${trackId}-${currentIndex}`}` restarts the slow-pan
+ * 2. Full Thumbnail Failsafe Stepdown: Automatically steps down resolution tiers
+ *    and detects YouTube 120x90 grey placeholders gracefully.
+ * 3. Remounting Animation Key: `key={`${trackId}-${currentIndex}`}` restarts the slow-pan
  *    animation seamlessly every time the banner transitions to the next track.
- * 3. Declarative Fallback Pipeline: Uses `getNextFallbackThumbnailUrl` helper instead
- *    of nested if/else statements in rendering for clean functional architecture.
  * 
  * HOW IT WORKS:
  * - `enablePanAnimation`: Enables automatic top-to-bottom slow pan animation (default `true`).
@@ -38,6 +39,7 @@ const ExploreTrendingBanner = ({
   imageObjectPosition = "center center",
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
+  const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
 
   // Declarative track list normalization
   const trackList = Array.isArray(trendingTracks) && trendingTracks.length > 0
@@ -107,23 +109,27 @@ const ExploreTrendingBanner = ({
     <div className="relative w-full h-[300px] sm:h-[350px] rounded-[32px] overflow-hidden border border-[var(--color-border-strong)] shadow-2xl mb-8 group bg-[var(--color-surface-raised)] flex items-center transition-all duration-500">
       
       {/* 1. Full-Width HD Background Artwork Image with Automatic Vertical Slow-Pan */}
-      <img
-        key={`${trackId}-${currentIndex}`}
-        src={artwork}
-        alt={trackName}
-        style={{ objectPosition: enablePanAnimation ? undefined : imageObjectPosition }}
-        onError={(e) => {
-          e.target.onerror = null;
-          e.target.src = getNextFallbackThumbnailUrl(e.target.src, trackId, placeholder);
-        }}
-        className={`absolute inset-0 w-full h-full object-cover opacity-65 dark:opacity-60 transition-all duration-700 pointer-events-none ${
-          enablePanAnimation ? "animate-pan-vertical" : ""
-        }`}
-      />
+      {artwork && !isImageDead(trackId) ? (
+        <img
+          key={`${trackId}-${currentIndex}`}
+          src={artwork}
+          alt={trackName}
+          style={{ objectPosition: enablePanAnimation ? undefined : imageObjectPosition }}
+          onLoad={(e) => handleImgLoad(e, trackId, trackId)}
+          onError={(e) => handleImgError(e, trackId, trackId)}
+          className={`absolute inset-0 w-full h-full object-cover opacity-95 dark:opacity-90 transition-all duration-700 pointer-events-none ${
+            enablePanAnimation ? "animate-pan-vertical" : ""
+          }`}
+        />
+      ) : (
+        <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-[var(--color-primary)]/40 via-purple-900/30 to-[var(--color-surface-raised)] flex items-center justify-center">
+          <Music size={64} className="text-[var(--color-primary)]/40" />
+        </div>
+      )}
 
-      {/* 2. Gradient Overlays for Optimal Legibility & Atmosphere */}
-      <div className="absolute inset-0 bg-gradient-to-r from-[var(--color-surface-raised)] via-[var(--color-surface-raised)]/90 via-45% sm:via-40% to-transparent pointer-events-none" />
-      <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-surface-raised)]/90 via-transparent to-[var(--color-surface-raised)]/30 pointer-events-none" />
+      {/* 2. Left-Side Gradient Mask for Text Legibility (Keeps Artwork Crisp & Saturated) */}
+      <div className="absolute inset-y-0 left-0 w-full md:w-3/5 bg-gradient-to-r from-[var(--color-surface-raised)] via-[var(--color-surface-raised)]/85 to-transparent pointer-events-none z-0" />
+      <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-[var(--color-surface-raised)]/90 via-transparent to-transparent pointer-events-none z-0 md:hidden" />
 
       {/* 3. Hero Content Container */}
       <div className="relative z-10 h-full w-full flex flex-col justify-between p-6 sm:p-10 max-w-2xl">

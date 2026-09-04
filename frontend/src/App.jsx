@@ -14,6 +14,7 @@ import usePlayerStore from "@/store/usePlayerStore";
 import HelpFeedback from "@/pages/HelpFeedback";
 import PlaylistModal from "@/components/Playlist/PlaylistModal";
 import PlaylistsPage from "@/pages/PlaylistsPage";
+import PlaylistDetailPage from "@/pages/PlaylistDetailPage";
 import HistoryPage from "@/pages/HistoryPage";
 
 /**
@@ -75,7 +76,7 @@ function AppContent() {
       {user && track && <PlayerContainer uid={user.id} />}
 
       {/* Persistent Playlist Selection Modal */}
-      {user && <PlaylistModal userId={user.id} />}
+      <PlaylistModal userId={user?.id} />
 
       {/* Route Definitions */}
       <Routes>
@@ -84,6 +85,7 @@ function AppContent() {
         <Route path="/explore" element={user ? <ExplorePage /> : <Navigate to="/" replace />} />
         <Route path="/favourites" element={user ? <FavoritesPage /> : <Navigate to="/" replace />} />
         <Route path="/playlists" element={user ? <PlaylistsPage /> : <Navigate to="/" replace />} />
+        <Route path="/playlists/:id" element={user ? <PlaylistDetailPage /> : <Navigate to="/" replace />} />
         <Route path="/history" element={user ? <HistoryPage /> : <Navigate to="/" replace />} />
         <Route path="/help" element={<HelpFeedback />} />
         {/* Profile fallback route */}

@@ -138,12 +138,21 @@ const ExplorePage = () => {
     <AppLayout>
       <div className="w-full mx-auto py-2 animate-in fade-in duration-300">
         
-        {/* Page Title */}
-        <div className="flex items-center justify-between mb-4">
-          <h1 className="text-2xl sm:text-3xl font-extrabold text-[var(--color-on-surface)] tracking-tight flex items-center gap-2.5">
-            <Compass className="text-[var(--color-primary)] flex-shrink-0" size={28} />
-            <span>Explore Music</span>
-          </h1>
+        {/* Page Title Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/30 flex items-center justify-center shadow-md shadow-[var(--color-primary)]/10 backdrop-blur-md shrink-0">
+              <Compass className="text-[var(--color-primary)] animate-spin-slow" size={22} />
+            </div>
+            <div>
+              <h1 className="font-display text-3xl sm:text-4xl font-extrabold tracking-tight text-[var(--color-on-surface)] flex items-center gap-2">
+                Explore <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-primary)] to-pink-500">Music</span>
+              </h1>
+              <p className="text-xs font-semibold text-[var(--color-on-surface-variant)] tracking-wide mt-0.5">
+                Discover trending tracks, genres, and spotlight mixes
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* 1. Category Filter Boxes (Compact Pill Bar) */}

@@ -8,7 +8,8 @@ import { useRefreshOn } from "@/store/useDataRefreshStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import SectionHeader from "@/components/Home/SectionHeader";
 import MusicCard from "@/components/Cards/MusicCard";
-import { getValidThumbnailUrl, getHighResThumbnailUrl, handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
+import { getValidThumbnailUrl, getHighResThumbnailUrl } from "@/utils/youtubeUtils";
+import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 import toast from "react-hot-toast";
 
 /**
@@ -39,6 +40,7 @@ const RecentlyPlayed = ({ userId }) => {
   const [loading, setLoading] = useState(true);
   const [isExpanded, setIsExpanded] = useState(false);
   const { openModal } = usePlaylistStore();
+  const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
 
   const loadRecentlyPlayed = (showLoader = true) => {
     if (userId) {
@@ -146,6 +148,7 @@ const RecentlyPlayed = ({ userId }) => {
           {/* Left Column (5 Cols): Hero Last-Played Spotlight Card */}
           {heroTrack && (() => {
             const heroId = heroTrack.id || heroTrack.videoId;
+            const isHeroDead = isImageDead(heroId);
             const heroHdImage = getHighResThumbnailUrl(heroTrack.thumbnail, heroId) || getValidThumbnailUrl(heroTrack.thumbnail || placeholder);
             return (
               <div className="lg:col-span-5">
@@ -153,14 +156,20 @@ const RecentlyPlayed = ({ userId }) => {
                   onClick={() => handlePlayTrack(heroTrack)}
                   className="group relative h-full min-h-[280px] rounded-3xl p-6 bg-[var(--color-surface-raised)] border border-[var(--color-border-strong)] shadow-xl hover:shadow-2xl transition-all duration-300 overflow-hidden cursor-pointer flex flex-col justify-between"
                 >
-                  {/* Full-Bleed HD Artwork Image with Subtle Scale */}
-                  <img
-                    src={heroHdImage}
-                    alt={heroTrack.name || heroTrack.title}
-                    onLoad={handleThumbnailLoad}
-                    onError={(e) => handleThumbnailError(e, heroId)}
-                    className="absolute inset-0 w-full h-full object-cover opacity-45 group-hover:scale-105 transition-transform duration-700 pointer-events-none"
-                  />
+                  {/* Full-Bleed HD Artwork Image with Fallback */}
+                  {!isHeroDead ? (
+                    <img
+                      src={heroHdImage}
+                      alt={heroTrack.name || heroTrack.title}
+                      onLoad={(e) => handleImgLoad(e, heroId, heroId)}
+                      onError={(e) => handleImgError(e, heroId, heroId)}
+                      className="absolute inset-0 w-full h-full object-cover opacity-45 group-hover:scale-105 transition-transform duration-700 pointer-events-none"
+                    />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-900/60 via-indigo-950/80 to-black flex items-center justify-center pointer-events-none">
+                      <Music size={64} className="text-[var(--color-primary)] opacity-20" />
+                    </div>
+                  )}
                   
                   {/* Soft Vignette Overlay */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent pointer-events-none" />

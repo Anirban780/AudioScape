@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import axios from "axios";
 import placeholder from "@/assets/placeholder.jpg";
 import { getBackendURL } from "@/utils/api";
-import { getValidThumbnailUrl } from "@/utils/youtubeUtils";
+import { getValidThumbnailUrl, handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
 import toast from "react-hot-toast";
 
 /**
@@ -481,8 +481,10 @@ const SearchBar = ({ onSelectTrack }) => {
                   onMouseDown={() => handleTrackSelect(track)}
                 >
                   <img
-                    src={track.thumbNail || placeholder}
+                    src={getValidThumbnailUrl(track.thumbNail || track.thumbnail) || placeholder}
                     alt="Thumbnail"
+                    onLoad={handleThumbnailLoad}
+                    onError={(e) => handleThumbnailError(e, track.videoId || track.id)}
                     className="w-11 h-11 rounded-lg object-cover mr-3 flex-shrink-0 shadow-sm"
                   />
                   <div className="flex flex-col min-w-0 flex-1">

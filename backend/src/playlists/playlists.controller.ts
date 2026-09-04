@@ -50,6 +50,19 @@ export class PlaylistsController {
   }
 
   /**
+   * Retrieve list of playlist IDs containing a given track for authenticated user.
+   * @route GET `/api/playlists/membership/:videoId`
+   * @header Authorization Bearer <google_id_token>
+   */
+  @Get('membership/:videoId')
+  async getTrackMembership(
+    @GetUser('id') userId: string,
+    @Param('videoId') videoId: string,
+  ) {
+    return this.playlistsService.getTrackMembership(userId, videoId);
+  }
+
+  /**
    * Retrieve single playlist details by ID with ordered tracks.
    * @route GET `/api/playlists/:id`
    * @header Authorization Bearer <google_id_token>

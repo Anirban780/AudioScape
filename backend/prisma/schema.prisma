@@ -50,11 +50,13 @@ model ListenHistory {
 }
 
 model Playlist {
-  id        String   @id @default(uuid())
-  userId    String   @map("user_id")
-  name      String
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String
+  description String?
+  coverUrl    String?  @map("cover_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
   tracks PlaylistTrack[]
