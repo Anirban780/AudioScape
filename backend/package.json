@@ -4,9 +4,10 @@
   "description": "",
   "main": "src/main.ts",
   "scripts": {
-    "start": "ts-node src/main.ts",
-    "dev": "prisma generate && nodemon --watch 'src/**/*.ts' --exec ts-node src/main.ts",
+    "build": "prisma generate && tsc",
+    "start": "node dist/main.js",
     "start:dev": "nodemon --watch 'src/**/*.ts' --exec ts-node src/main.ts",
+    "dev": "prisma generate && nodemon --watch 'src/**/*.ts' --exec ts-node src/main.ts",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio --browser none --port 5555",

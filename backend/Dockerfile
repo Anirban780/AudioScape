@@ -15,9 +15,9 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Generate Prisma Client
+# Generate Prisma Client & Build TypeScript into dist/
 ENV DATABASE_URL="postgresql://postgres:postgrespassword@localhost:5432/audioscape?schema=public"
-RUN npx prisma generate
+RUN npm run build
 
 # Stage 2: Runner stage
 FROM node:22-alpine AS runner
@@ -33,6 +33,5 @@ COPY --from=build /app ./
 # Expose backend port
 EXPOSE 5000
 
-# Run in development mode
-CMD ["npm", "run", "dev"]
-
+# Run compiled JavaScript server in production
+CMD ["npm", "run", "start"]
