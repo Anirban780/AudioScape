@@ -16,6 +16,7 @@ import PlaylistModal from "@/components/Playlist/PlaylistModal";
 import PlaylistsPage from "@/pages/PlaylistsPage";
 import PlaylistDetailPage from "@/pages/PlaylistDetailPage";
 import HistoryPage from "@/pages/HistoryPage";
+import { getBackendURL } from "@/utils/api";
 
 /**
  * ============================================================================
@@ -43,10 +44,26 @@ function AppContent() {
   const { track } = usePlayerStore();
 
   useEffect(() => {
-    // Attempt silent auth session refresh on mount using HttpOnly refresh cookie
+    // 1. Early non-blocking background wake-up ping for Render & Neon PostgreSQL
+    getBackendURL().then((backendUrl) => {
+      if (backendUrl) {
+        fetch(`${backendUrl}/healthcheck`, { method: "GET" })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data?.status === "ok") {
+              console.log(`⚡ AudioScape Backend & Database operational (${data.database?.latencyMs ?? 0}ms)`);
+            }
+          })
+          .catch(() => {
+            console.log("⏳ AudioScape Backend waking up in background...");
+          });
+      }
+    });
+
+    // 2. Attempt silent auth session refresh on mount using HttpOnly refresh cookie
     useAuthStore.getState().refreshAuthSession();
 
-    // Initialize Google Identity Services SDK once on application mount
+    // 3. Initialize Google Identity Services SDK once on application mount
     const timer = setTimeout(() => {
       initGoogleAuth();
       if (!useAuthStore.getState().user) {

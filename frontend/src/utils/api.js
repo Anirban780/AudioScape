@@ -9,14 +9,21 @@ const PROD_API_URL = import.meta.env.VITE_PROD_BACKEND_URL || import.meta.env.VI
  * Dynamically determines whether to use the local or production backend.
  */
 export async function getBackendURL() {
+    // If running in browser on a deployed domain (Vercel, etc.), use the configured production backend directly
+    const isLocalhost = typeof window !== "undefined" && 
+        (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
+    if (!isLocalhost && PROD_API_URL) {
+        return PROD_API_URL;
+    }
+
     try {
         const response = await fetch(`${LOCAL_API_URL}/healthcheck`, { method: "GET" });
         if (response.ok) {
-            console.log("Using Local Backend");
             return LOCAL_API_URL;
         }
-    } catch (error) {
-        console.log("Local backend not found, using Vercel/Production Backend");
+    } catch {
+        // Local backend not running
     }
     return PROD_API_URL || LOCAL_API_URL;
 }
