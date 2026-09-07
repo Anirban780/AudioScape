@@ -16,6 +16,8 @@ DOCKER_PACKAGE_GUIDE.md
 .devcontainer
 .github
 audioscape_backup.sql
+*.sql
+
 
 # Editor directories and files
 .vscode/*
