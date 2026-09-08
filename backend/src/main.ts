@@ -23,7 +23,32 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
  */
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
+
+  // Enforce secure secrets assertion in production environment
+  if (process.env.NODE_ENV === 'production') {
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret || jwtSecret === 'audioscape_jwt_secret_key_default') {
+      logger.error('FATAL CONFIGURATION ERROR: JWT_SECRET must be set to a secure cryptographic secret in production. Halting process.');
+      process.exit(1);
+    }
+    if (!process.env.CRON_SECRET) {
+      logger.warn('WARNING: CRON_SECRET is not configured in production environment. Background cron endpoints will reject all requests.');
+    }
+  }
+
   const app = await NestFactory.create(AppModule);
+
+  // Security Headers Middleware (OWASP recommended defense-in-depth headers)
+  app.use((_req: any, res: any, next: () => void) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  });
 
   // Enable cookie parsing middleware for HttpOnly refresh cookies
   app.use(cookieParser());
@@ -31,7 +56,7 @@ async function bootstrap() {
   // Enable graceful shutdown hooks for container orchestrators (Render / Kubernetes)
   app.enableShutdownHooks();
 
-  // Configure robust CORS allowed origins
+  // Configure robust CORS allowed origins with strict domain matching
   const envOrigins = [process.env.PROD_FRONTEND_URL, process.env.FRONTEND_URL]
     .filter((url): url is string => Boolean(url))
     .flatMap((url) => url.split(','))
@@ -56,11 +81,11 @@ async function bootstrap() {
 
       const normalizedOrigin = origin.trim().replace(/\/+$/, '');
 
-      // Allow if explicit match or matches any *.vercel.app deployment for audioscape
+      // Strict origin matching: whitelisted production domains and official project preview branches
       const isAllowed =
         defaultAllowedOrigins.includes(normalizedOrigin) ||
-        /^https:\/\/audioscape[a-zA-Z0-9-]*\.vercel\.app$/.test(normalizedOrigin) ||
-        /^https:\/\/.*audioscape.*\.vercel\.app$/.test(normalizedOrigin);
+        /^https:\/\/audioscape(-[a-zA-Z0-9]+)*\.vercel\.app$/.test(normalizedOrigin) ||
+        /^https:\/\/audio-scape-pi(-[a-zA-Z0-9]+)*\.vercel\.app$/.test(normalizedOrigin);
 
       if (isAllowed) {
         return callback(null, true);

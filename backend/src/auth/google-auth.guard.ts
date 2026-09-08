@@ -5,9 +5,11 @@ import {
   UnauthorizedException,
   Logger,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { OAuth2Client } from 'google-auth-library';
 import * as jwt from 'jsonwebtoken';
 import { PrismaService } from '../prisma/prisma.service';
+import { IS_CRON_KEY } from './decorators/is-cron.decorator';
 
 /**
  * ============================================================================
@@ -26,7 +28,10 @@ export class GoogleAuthGuard implements CanActivate {
   private readonly logger = new Logger(GoogleAuthGuard.name);
   private readonly googleClient: OAuth2Client;
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly reflector: Reflector,
+  ) {
     this.googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
   }
 
@@ -37,8 +42,12 @@ export class GoogleAuthGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     
-    // Allow background cron pre-warming endpoints to be called by platform schedulers
-    if (request.path && request.path.includes('/cron/')) {
+    // Check if endpoint is decorated with @IsCron() to delegate authentication to CronAuthGuard
+    const isCron = this.reflector.getAllAndOverride<boolean>(IS_CRON_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    if (isCron) {
       return true;
     }
 

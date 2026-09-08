@@ -1,8 +1,10 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { Response } from 'express';
 import axios from 'axios';
 import { PrismaService } from '../prisma/prisma.service';
 import { ApiEndpoint, QueryType } from '@prisma/client';
 import { YouTubeKeyManager } from './youtube-key-manager';
+import { SearchRateLimiterService } from './search-rate-limiter.service';
 import { getValidThumbnailUrl } from '../utils/youtubeUtils';
 
 /**
@@ -15,6 +17,7 @@ import { getValidThumbnailUrl } from '../utils/youtubeUtils';
  * Proxies YouTube Data API v3 requests (search, track details, categories), implements
  * a high-performance PostgreSQL cache layer with 24-hour TTL expiry aligned with the
  * database schema (SearchQuery, QueryTrackResult, Tracks, Channel, ApiQuotaUsage),
+ * enforces multi-tier live search rate limits (3/min, 20/day), provides 30-day ToS refresh,
  * and tracks daily API quota usage across dual key pools via YouTubeKeyManager.
  * ============================================================================
  */
@@ -33,6 +36,7 @@ export class TracksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly keyManager: YouTubeKeyManager,
+    private readonly rateLimiter: SearchRateLimiterService,
   ) {}
 
   /**
@@ -123,7 +127,13 @@ export class TracksService {
    * @param pageToken - Optional YouTube API pagination page token
    * @returns Object containing tracks array, nextPageToken, and cache telemetry flags
    */
-  async searchTracks(query: string, pageToken: string = '', dbOnly: boolean = false) {
+  async searchTracks(
+    query: string,
+    pageToken: string = '',
+    dbOnly: boolean = false,
+    clientId: string = 'unknown',
+    res?: Response,
+  ) {
     if (!query || !query.trim()) {
       throw new HttpException('Search query parameter is required', HttpStatus.BAD_REQUEST);
     }
@@ -132,7 +142,7 @@ export class TracksService {
     const targetPageToken = pageToken.trim() || null;
     const FTS_MATCH_THRESHOLD = 3; // Lowered from 8 to 3 to maximize local PostgreSQL FTS cache hits & save YouTube API quota
 
-    // STEP 1: Check Relational SearchQueryPage Database Cache
+    // STEP 1: Check Relational SearchQueryPage Database Cache (Exempt from rate limits)
     try {
       const pageTokenFilter = targetPageToken
         ? { pageToken: targetPageToken }
@@ -160,6 +170,7 @@ export class TracksService {
         cachedQuery.pages.length > 0 &&
         cachedQuery.pages[0].results.length > 0
       ) {
+        if (res) res.setHeader('X-Cache', 'HIT');
         const cachedPage = cachedQuery.pages[0];
         this.logger.log(`Cache HIT (Relational Page Cache) for query: "${query}" [pageToken: ${pageToken || 'initial'}]`);
 
@@ -191,7 +202,7 @@ export class TracksService {
       this.logger.warn(`Relational page cache lookup error: ${dbError.message}. Proceeding to next search tier.`);
     }
 
-    // STEP 2: Page 0 Local PostgreSQL Full-Text Search (FTS) Lookup
+    // STEP 2: Page 0 Local PostgreSQL Full-Text Search (FTS) Lookup (Exempt from rate limits)
     if (!targetPageToken && normalizedQuery) {
       try {
         const localMatches = await this.prisma.$queryRaw<Array<any>>`
@@ -207,6 +218,7 @@ export class TracksService {
         `;
 
         if (localMatches && localMatches.length > 0 && (dbOnly || localMatches.length >= FTS_MATCH_THRESHOLD)) {
+          if (res) res.setHeader('X-Cache', 'HIT');
           this.logger.log(
             `Cache HIT (Local PostgreSQL FTS) for query: "${query}" (${localMatches.length} local track matches, dbOnly=${dbOnly}). Skipping YouTube API.`,
           );
@@ -242,6 +254,7 @@ export class TracksService {
 
     // Guard: In dbOnly mode (during live user typing), DO NOT query YouTube API
     if (dbOnly) {
+      if (res) res.setHeader('X-Cache', 'HIT-LOCAL');
       return {
         tracks: [],
         nextPageToken: null,
@@ -252,6 +265,11 @@ export class TracksService {
     }
 
     // STEP 3: Cache MISS — Query YouTube Data API `/v3/search` Proxy
+    if (res) res.setHeader('X-Cache', 'MISS');
+
+    // Enforce multi-tier sliding-window rate limiting (3 live searches/min, 20 live searches/day)
+    this.rateLimiter.checkAndConsume(clientId, res);
+
     this.logger.log(`Cache MISS for search query: "${query}" [pageToken: ${pageToken || 'initial'}]. Calling YouTube API...`);
     const musicCategoryId = await this.getMusicCategoryId();
     const { key, keyId } = await this.getActiveKey();
@@ -746,5 +764,149 @@ export class TracksService {
         channelId: validChannelId,
       },
     });
+  }
+
+  /**
+   * Refreshes metadata for tracks fetched > 30 days ago to comply with YouTube API Services ToS Section III.E.4.
+   * Batch processes up to 50 tracks in a single YouTube `videos.list` request (costing only 1 quota unit).
+   * Soft-deletes tracks that are removed, made private, non-embeddable, or no longer exist on YouTube.
+   *
+   * @param limit - Maximum tracks to process in this maintenance run (default: 50)
+   * @returns Telemetry summary of processed, refreshed, and soft-deleted track counts
+   */
+  async batchRefreshStaleTracks(limit: number = 50): Promise<{
+    processed: number;
+    refreshed: number;
+    softDeleted: number;
+    hasMore: boolean;
+  }> {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    // 1. Query oldest stale tracks that are currently marked as available
+    const staleTracks = await this.prisma.tracks.findMany({
+      where: {
+        lastFetchedAt: { lt: thirtyDaysAgo },
+        isAvailable: true,
+      },
+      orderBy: { lastFetchedAt: 'asc' },
+      take: Math.min(limit, 50),
+      select: { youtubeVideoId: true },
+    });
+
+    if (staleTracks.length === 0) {
+      this.logger.log('YouTube ToS Stale Track Refresh: 0 tracks require refresh (all tracks within 30-day TTL).');
+      return { processed: 0, refreshed: 0, softDeleted: 0, hasMore: false };
+    }
+
+    const videoIds = staleTracks.map((t) => t.youtubeVideoId);
+    const idList = videoIds.join(',');
+
+    this.logger.log(
+      `YouTube ToS Stale Track Refresh: Processing batch of ${videoIds.length} tracks fetched > 30 days ago...`,
+    );
+
+    // 2. Fetch live metadata from YouTube videos.list in a single API call (1 quota unit)
+    const { key, keyId } = await this.getActiveKey();
+    const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,status&id=${idList}&key=${key}`;
+
+    try {
+      const response = await axios.get(url);
+      await this.keyManager.recordQuotaUsage(ApiEndpoint.VIDEOS_LIST, 1, keyId);
+
+      const items = response.data.items || [];
+      const foundVideoIds = new Set<string>();
+      let refreshedCount = 0;
+      let softDeletedCount = 0;
+
+      for (const item of items) {
+        const videoId = item.id;
+        foundVideoIds.add(videoId);
+
+        const isEmbeddable = item.status?.embeddable !== false;
+        const isPublic = item.status?.privacyStatus === 'public';
+        const isPlayable = isEmbeddable && isPublic;
+
+        if (!isPlayable) {
+          // Soft-delete if video became private, unlisted, or disabled embedding
+          await this.prisma.tracks.update({
+            where: { youtubeVideoId: videoId },
+            data: {
+              isAvailable: false,
+              isEmbeddable: false,
+              lastFetchedAt: new Date(),
+            },
+          });
+          softDeletedCount++;
+          continue;
+        }
+
+        const rawDuration = item.contentDetails?.duration || null;
+        const durationSeconds = this.parseIsoDurationSeconds(rawDuration);
+        const validChannelId = await this.ensureChannelExists(
+          item.snippet?.channelId || null,
+          item.snippet?.channelTitle || 'Unknown Artist',
+        );
+
+        await this.prisma.tracks.update({
+          where: { youtubeVideoId: videoId },
+          data: {
+            title: item.snippet?.title || 'Unknown Title',
+            artist: item.snippet?.channelTitle || 'Unknown Artist',
+            thumbnailUrl:
+              item.snippet?.thumbnails?.high?.url ||
+              item.snippet?.thumbnails?.medium?.url ||
+              item.snippet?.thumbnails?.default?.url ||
+              '',
+            duration: rawDuration,
+            durationSeconds,
+            channelId: validChannelId,
+            tags: item.snippet?.tags || [],
+            isAvailable: true,
+            isEmbeddable: true,
+            lastFetchedAt: new Date(),
+          },
+        });
+        refreshedCount++;
+      }
+
+      // 3. Mark any requested video ID omitted from YouTube's response as deleted/unavailable
+      const missingVideoIds = videoIds.filter((id) => !foundVideoIds.has(id));
+      if (missingVideoIds.length > 0) {
+        await this.prisma.tracks.updateMany({
+          where: {
+            youtubeVideoId: { in: missingVideoIds },
+          },
+          data: {
+            isAvailable: false,
+            lastFetchedAt: new Date(),
+          },
+        });
+        softDeletedCount += missingVideoIds.length;
+        this.logger.log(
+          `Soft-deleted ${missingVideoIds.length} tracks no longer returned by YouTube: ${missingVideoIds.join(', ')}`,
+        );
+      }
+
+      const totalStaleRemaining = await this.prisma.tracks.count({
+        where: {
+          lastFetchedAt: { lt: thirtyDaysAgo },
+          isAvailable: true,
+        },
+      });
+
+      this.logger.log(
+        `YouTube ToS Stale Track Refresh completed: ${refreshedCount} updated, ${softDeletedCount} soft-deleted, ${totalStaleRemaining} remaining.`,
+      );
+
+      return {
+        processed: videoIds.length,
+        refreshed: refreshedCount,
+        softDeleted: softDeletedCount,
+        hasMore: totalStaleRemaining > 0,
+      };
+    } catch (err: any) {
+      this.logger.error(`YouTube ToS Stale Track Refresh failed: ${err.message}`);
+      throw new HttpException('Failed to refresh stale tracks batch from YouTube API', HttpStatus.INTERNAL_SERVER_ERROR);
+    }
   }
 }

@@ -1,0 +1,59 @@
+name: AudioScape Maintenance & Cache Pre-warming Cron
+
+on:
+  schedule:
+    # Runs daily at 03:00 UTC (during low traffic hours)
+    - cron: '0 3 * * *'
+  workflow_dispatch:
+    # Allows manual trigger via GitHub Actions UI
+
+jobs:
+  maintenance-cron:
+    name: Execute Platform Maintenance & Pre-warming
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Assert Required Secrets
+        run: |
+          if [ -z "${{ secrets.CRON_SECRET }}" ]; then
+            echo "::error::CRON_SECRET secret is missing in GitHub Repository Secrets!"
+            exit 1
+          fi
+
+      - name: 1. Pre-warm Explore Categories Cache
+        run: |
+          BACKEND_URL="${{ secrets.BACKEND_URL || 'https://audio-scape-pi.vercel.app' }}"
+          echo "Triggering Explore Cache Pre-warming on ${BACKEND_URL}..."
+          
+          HTTP_STATUS=$(curl -s -o response_explore.json -w "%{http_code}" \
+            -X POST "${BACKEND_URL}/api/music/cron/refresh-explore-cache" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          echo "Response HTTP Status: ${HTTP_STATUS}"
+          cat response_explore.json
+          echo ""
+
+          if [ "${HTTP_STATUS}" -ne 200 ] && [ "${HTTP_STATUS}" -ne 201 ]; then
+            echo "::error::Explore Cache pre-warming failed with HTTP status ${HTTP_STATUS}"
+            exit 1
+          fi
+
+      - name: 2. YouTube ToS 30-Day Stale Track Refresh & Soft-Delete
+        run: |
+          BACKEND_URL="${{ secrets.BACKEND_URL || 'https://audio-scape-pi.vercel.app' }}"
+          echo "Triggering YouTube ToS 30-day Metadata Refresh on ${BACKEND_URL}..."
+          
+          HTTP_STATUS=$(curl -s -o response_stale.json -w "%{http_code}" \
+            -X POST "${BACKEND_URL}/youtube/cron/refresh-stale-tracks" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          echo "Response HTTP Status: ${HTTP_STATUS}"
+          cat response_stale.json
+          echo ""
+
+          if [ "${HTTP_STATUS}" -ne 200 ] && [ "${HTTP_STATUS}" -ne 201 ]; then
+            echo "::error::YouTube ToS Stale Track Refresh failed with HTTP status ${HTTP_STATUS}"
+            exit 1
+          fi
