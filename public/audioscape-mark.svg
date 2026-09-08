@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- HD Aura Lumina Gradient -->
+    <linearGradient id="hd-aura-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F0FF" />
+      <stop offset="52%" stop-color="#8A2BE2" />
+      <stop offset="100%" stop-color="#FF66CC" />
+    </linearGradient>
+
+    <!-- HD High-Definition Neon Glow -->
+    <filter id="hd-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16" result="blur1" />
+      <feGaussianBlur stdDeviation="6" result="blur2" />
+      <feMerge>
+        <feMergeNode in="blur1" />
+        <feMergeNode in="blur2" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- HD Redesigned AudioScape Mark (Transparent Background) -->
+  <g filter="url(#hd-glow)">
+    <!-- Architectural 'A' Chevron Frame -->
+    <path 
+      d="M 256 84 
+         C 268 84, 280 92, 286 105 
+         L 428 396 
+         C 436 414, 426 428, 406 428 
+         L 332 428 
+         C 318 428, 306 419, 300 406 
+         L 256 300 
+         L 212 406 
+         C 206 419, 194 428, 180 428 
+         L 106 428 
+         C 86 428, 76 414, 84 396 
+         L 226 105 
+         C 232 92, 244 84, 256 84 Z" 
+      fill="url(#hd-aura-grad)" 
+    />
+
+    <!-- Precision Audio Waveform Pulse Crossbar -->
+    <path 
+      d="M 136 308 
+         L 188 308 
+         Q 222 236, 256 308 
+         T 324 308 
+         L 376 308" 
+      fill="none" 
+      stroke="#00F0FF" 
+      stroke-width="26" 
+      stroke-linecap="round" 
+      stroke-linejoin="round" 
+    />
+  </g>
+</svg>

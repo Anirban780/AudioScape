@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import Footer from "@/components/Home/Footer";
 import { useTheme } from "@/ThemeProvider";
+import { AudioScapeMark } from "@/components/common/AudioScapeLogo";
 
 // Import actual AudioScape dashboard screenshot assets provided for branding showcase
 import dashboardPreview1 from "@/assets/dashboard_preview_1.png";
@@ -171,10 +172,10 @@ const LandingPage = () => {
             className="flex items-center space-x-3 cursor-pointer group"
             onClick={() => navigate("/")}
           >
-            <div className="p-2 rounded-xl bg-gradient-to-tr from-[var(--color-primary)] to-[var(--color-secondary)] text-white shadow-md group-hover:scale-105 transition-transform">
-              <Music className="w-5 h-5" />
+            <div className="p-1.5 rounded-xl bg-[#0A0E1A]/90 border border-[#00F0FF]/30 text-white shadow-[0_0_12px_rgba(0,240,255,0.25)] group-hover:scale-105 transition-transform">
+              <AudioScapeMark size={24} variant="gradient" />
             </div>
-            <span className="font-display text-2xl sm:text-3xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-[var(--color-primary)] via-purple-400 to-[var(--color-secondary)]">
+            <span className="font-display text-2xl sm:text-3xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-[#00F0FF] via-[#8A2BE2] to-[#FF66CC]">
               AudioScape
             </span>
           </div>

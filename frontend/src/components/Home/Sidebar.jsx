@@ -5,6 +5,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import usePlayerStore from '@/store/usePlayerStore';
 import useSidebarStore from '@/store/useSidebarStore';
+import { AudioScapeMark } from '@/components/common/AudioScapeLogo';
 
 /**
  * ============================================================================
@@ -101,29 +102,33 @@ const Sidebar = ({
         'h-full px-3 py-3 sidebar-transition bg-[var(--color-surface-raised)] text-[var(--color-on-surface)] flex flex-col w-full select-none'
       )}
     >
-      {/* Sidebar Header: Toggle Button FIRST on Left, Followed by "AudioScape" Title */}
+      {/* Sidebar Header: Brand Logo & Title (Uncompressed, spacious layout) */}
       <div
         className={cn(
           'min-h-[56px] flex items-center mb-4 sidebar-transition',
-          isCollapsed ? 'justify-center w-full' : 'justify-start gap-3 w-full px-1'
+          isCollapsed ? 'justify-center w-full' : 'justify-start w-full px-1.5'
         )}
       >
-        {/* New PanelLeft Toggle Button */}
-        <button 
-          onClick={handleToggle}
-          className="w-10 h-10 flex items-center justify-center hover:bg-[var(--color-primary)]/10 rounded-xl shrink-0 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] transition-all cursor-pointer"
-          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        <Link
+          to="/home"
+          className={cn(
+            'flex items-center gap-3 cursor-pointer group transition-transform duration-200',
+            isCollapsed && 'justify-center'
+          )}
+          title="AudioScape Home"
         >
-          {isCollapsed ? <PanelLeftOpen size={22} /> : <PanelLeftClose size={22} />}
-        </button>
+          {/* Brand Mark in Dark Obsidian Squircle */}
+          <div className="p-1.5 rounded-xl bg-[#0A0E1A]/90 border border-[#00F0FF]/30 text-white shadow-[0_0_12px_rgba(0,240,255,0.25)] group-hover:scale-105 transition-transform shrink-0">
+            <AudioScapeMark size={isCollapsed ? 24 : 26} variant="gradient" />
+          </div>
 
-        {/* Brand Header Name - Displayed ONLY in Expanded State */}
-        {!isCollapsed && (
-          <h1 className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-[var(--color-primary)] via-purple-400 to-[var(--color-secondary)] tracking-tight truncate">
-            AudioScape
-          </h1>
-        )}
+          {/* Brand Header Name - Displayed ONLY in Expanded State */}
+          {!isCollapsed && (
+            <h1 className="text-xl font-black bg-clip-text text-transparent bg-gradient-to-r from-[#00F0FF] via-[#8A2BE2] to-[#FF66CC] tracking-tight truncate leading-tight">
+              AudioScape
+            </h1>
+          )}
+        </Link>
       </div>
 
       {/* Navigation Links List */}
@@ -133,6 +138,32 @@ const Sidebar = ({
         <MenuItem icon={Heart} text="Favourites" to="/favourites" />
         <MenuItem icon={Library} text="Playlists" to="/playlists" />
       </ul>
+
+      {/* Sidebar Footer: Toggle Button Moved to Bottom for Clean Header UX */}
+      <div className={cn('mt-auto pt-2 border-t border-[var(--color-border-default)]/30', isCollapsed && 'flex justify-center')}>
+        <button
+          onClick={handleToggle}
+          className={cn(
+            'flex items-center transition-all duration-200 cursor-pointer text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10',
+            isCollapsed 
+              ? 'w-12 h-12 justify-center rounded-2xl' 
+              : 'w-full py-2.5 px-3.5 gap-3 rounded-2xl'
+          )}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {isCollapsed ? (
+            <PanelLeftOpen size={20} className="shrink-0 transition-transform hover:scale-110" />
+          ) : (
+            <>
+              <PanelLeftClose size={20} className="shrink-0 transition-transform hover:scale-110" />
+              <span className="truncate text-xs font-semibold tracking-wider uppercase text-[var(--color-on-surface-variant)]">
+                Collapse
+              </span>
+            </>
+          )}
+        </button>
+      </div>
     </div>
   );
 };
