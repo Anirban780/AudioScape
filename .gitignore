@@ -14,7 +14,8 @@ dist-ssr
 *.local
 DOCKER_PACKAGE_GUIDE.md
 .devcontainer
-.github
+!.github/
+!.github/workflows/
 audioscape_backup.sql
 *.sql
 
@@ -24,8 +25,8 @@ audioscape_backup.sql
 !.vscode/extensions.json
 .idea
 .DS_Store
-plan/*
 plan/
+plan/*
 *.suo
 *.ntvs*
 *.njsproj

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, UseGuards, Res, Req, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Delete, Body, UseGuards, Res, Req, UnauthorizedException } from '@nestjs/common';
 import { Response, Request } from 'express';
 import { AuthService } from './auth.service';
 import { GoogleLoginDto } from './dto/google-login.dto';
@@ -14,7 +14,7 @@ import { GetUser } from './decorators/get-user.decorator';
  * 
  * PURPOSE:
  * Exposes REST endpoints for client Google OAuth verification, persistent JWT session
- * management, token refresh, and user profile retrieval.
+ * management, token refresh, user profile retrieval, and account deletion.
  * ============================================================================
  */
 @Controller('api/auth')
@@ -28,7 +28,7 @@ export class AuthController {
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-      path: '/',
+      path: '/api/auth',
     });
   }
 
@@ -38,7 +38,7 @@ export class AuthController {
       httpOnly: true,
       secure: isProd,
       sameSite: isProd ? 'none' : 'lax',
-      path: '/',
+      path: '/api/auth',
     });
   }
 
@@ -116,5 +116,21 @@ export class AuthController {
   @Get('me')
   async getProfile(@GetUser('id') userId: string) {
     return this.authService.getUserProfile(userId);
+  }
+
+  /**
+   * Protected endpoint for GDPR/CCPA user account and history deletion.
+   * Permanently deletes user account, listening history, playlists, and clears cookies.
+   * @route DELETE `/api/auth/me`
+   * @header Authorization Bearer <jwt_access_token>
+   */
+  @UseGuards(GoogleAuthGuard)
+  @Delete('me')
+  async deleteAccount(
+    @GetUser('id') userId: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    this.clearRefreshCookie(res);
+    return this.authService.deleteAccount(userId);
   }
 }

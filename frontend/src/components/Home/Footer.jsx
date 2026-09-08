@@ -12,6 +12,7 @@ import {
   ArrowUp,
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { AudioScapeMark } from "@/components/common/AudioScapeLogo";
 
 /**
  * ============================================================================
@@ -57,10 +58,10 @@ const Footer = () => {
           {/* Column 1: Brand Identity & Description */}
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/30 flex items-center justify-center text-[var(--color-primary)] shadow-xs shrink-0">
-                <Music className="w-5 h-5 animate-pulse" />
+              <div className="w-9 h-9 rounded-xl bg-[#0A0E1A] border border-[#00F0FF]/30 flex items-center justify-center text-[#00F0FF] shadow-[0_0_10px_rgba(0,240,255,0.2)] shrink-0">
+                <AudioScapeMark size={20} variant="gradient" />
               </div>
-              <span className="text-xl sm:text-2xl font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-[var(--color-primary)] via-purple-400 to-[var(--color-secondary)] font-display uppercase">
+              <span className="text-xl sm:text-2xl font-black tracking-wider bg-clip-text text-transparent bg-gradient-to-r from-[#00F0FF] via-[#8A2BE2] to-[#FF66CC] font-display uppercase">
                 AudioScape
               </span>
             </div>

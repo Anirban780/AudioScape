@@ -220,4 +220,34 @@ export class AuthService {
 
     return user;
   }
+
+  /**
+   * Permanently deletes user account, listening history, playlists, and playlist tracks from PostgreSQL.
+   * Enforces GDPR / CCPA right-to-be-forgotten compliance via database cascade.
+   *
+   * @param userId - Internal PostgreSQL user UUID
+   * @returns Confirmation message with deletion timestamp
+   */
+  async deleteAccount(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID '${userId}' not found`);
+    }
+
+    // Cascade delete user and all associated child entities
+    await this.prisma.user.delete({
+      where: { id: userId },
+    });
+
+    this.logger.log(`User account permanently deleted (GDPR): ${userId} (${user.email || 'no-email'})`);
+
+    return {
+      message: 'User account and all associated listening data permanently deleted',
+      deletedUserId: userId,
+      timestamp: new Date().toISOString(),
+    };
+  }
 }

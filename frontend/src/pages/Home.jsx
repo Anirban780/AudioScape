@@ -19,7 +19,21 @@ import { getRecommendations } from "@/utils/api";
 const HomePage = () => {
   const user = useAuthStore((s) => s.user);
   const userId = user?.id || "";
-  const [recommendations, setRecommendations] = useState([]);
+
+  // Initialize recommendations from SWR localStorage cache for instant Hero & Mix card rendering on refresh
+  const [recommendations, setRecommendations] = useState(() => {
+    try {
+      const raw = localStorage.getItem("audioscape_cached_recommendations");
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (Date.now() - parsed.timestamp < 30 * 60 * 1000 && Array.isArray(parsed.data)) {
+        return parsed.data;
+      }
+    } catch {
+      return [];
+    }
+    return [];
+  });
 
   useEffect(() => {
     let isMounted = true;
@@ -49,8 +63,8 @@ const HomePage = () => {
         {/* 2. Recently Played Album Grid */}
         <RecentlyPlayed userId={userId} />
 
-        {/* 3. Featured Daily Mix & AI Recommendations */}
-        <RecommendForYou userId={userId} />
+        {/* 3. Featured Daily Mix & AI Recommendations (reusing shared recommendations to prevent duplicate fetches) */}
+        <RecommendForYou userId={userId} sharedRecommendations={recommendations} />
 
         {/* 4. Favorite Songs Carousel (At the bottom) */}
         <FavoriteSongs userId={userId} />

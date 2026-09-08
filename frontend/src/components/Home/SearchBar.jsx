@@ -5,6 +5,7 @@ import axios from "axios";
 import placeholder from "@/assets/placeholder.jpg";
 import { getBackendURL } from "@/utils/api";
 import { getValidThumbnailUrl, handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
+import useAuthStore from "@/store/useAuthStore";
 import toast from "react-hot-toast";
 
 /**
@@ -191,7 +192,9 @@ const SearchBar = ({ onSelectTrack }) => {
         nextPage ? `&pageToken=${nextPage}` : ""
       }`;
 
-      const response = await axios.get(url, { signal });
+      const token = useAuthStore.getState().idToken;
+      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const response = await axios.get(url, { signal, headers });
       const rawTracks = response.data.tracks || [];
       const msg = response.data.message || (isDbOnly ? "Showing database matches" : "Fetched live results from YouTube API");
       const src = response.data.source || (isDbOnly ? "postgres_fts" : "youtube_api");
@@ -220,6 +223,12 @@ const SearchBar = ({ onSelectTrack }) => {
     } catch (error) {
       if (axios.isCancel(error)) {
         // Request intentionally aborted by user typing — ignore silently
+        return;
+      }
+      if (error.response?.status === 429) {
+        const errorMsg = error.response.data?.message || "Search rate limit reached (max 3/min, 20/day). Cached tracks remain available.";
+        toast.error(errorMsg, { duration: 6000, id: "rate-limit-toast" });
+        setSearchStatusMsg("Rate limit reached. Try searching local cached tracks.");
         return;
       }
       console.error("Error fetching search results:", error);

@@ -20,36 +20,107 @@ import ExploreSection from "@/components/Explore/ExploreSection";
  * Assembles the primary Stitch Music Discovery & Search view.
  */
 
+const CACHE_KEY_PREFIX = "audioscape_cached_explore_feed";
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 mins
+
+/**
+ * Safely reads cached explore feed sections from localStorage for instant, zero-latency initial render on page refresh or navigation.
+ * Adheres to Stale-While-Revalidate (SWR): renders cached sections and hero spotlight instantly, then revalidates in the background.
+ */
+const getInitialCachedExploreFeed = (uid) => {
+  try {
+    const key = uid ? `${CACHE_KEY_PREFIX}_${uid}` : CACHE_KEY_PREFIX;
+    const raw = localStorage.getItem(key) || (!uid ? null : localStorage.getItem(CACHE_KEY_PREFIX));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp < CACHE_TTL_MS && Array.isArray(parsed.data) && parsed.data.length > 0) {
+      return parsed.data;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+};
+
 const ExplorePage = () => {
   const user = useAuthStore((s) => s.user);
-  const [exploreFeed, setExploreFeed] = useState([]);
-  const [visibleTracks, setVisibleTracks] = useState({});
-  const [loading, setLoading] = useState(true);
+  const userId = user?.id || "";
+  const cachedInitial = useMemo(() => getInitialCachedExploreFeed(userId), [userId]);
+  const [exploreFeed, setExploreFeed] = useState(cachedInitial || []);
+  const [visibleTracks, setVisibleTracks] = useState(() => {
+    if (cachedInitial && Array.isArray(cachedInitial)) {
+      const initialVisible = {};
+      cachedInitial.forEach(({ title }) => {
+        initialVisible[title] = 5;
+      });
+      return initialVisible;
+    }
+    return {};
+  });
+  const [loading, setLoading] = useState(!cachedInitial || cachedInitial.length === 0);
   const [activeFilter, setActiveFilter] = useState("All");
 
-  const userId = user?.id || "";
+  // Sync cache if userId updates after mount
+  useEffect(() => {
+    if (userId) {
+      const userCached = getInitialCachedExploreFeed(userId);
+      if (userCached && userCached.length > 0) {
+        setExploreFeed(userCached);
+        setVisibleTracks((prev) => {
+          const next = { ...prev };
+          userCached.forEach(({ title }) => {
+            if (!next[title]) next[title] = 5;
+          });
+          return next;
+        });
+        setLoading(false);
+      }
+    }
+  }, [userId]);
 
   useEffect(() => {
     let isMounted = true;
 
     const fetchExploreSections = async () => {
-      setLoading(true);
+      // SWR: Only display full screen loader if no cached explore feed data is currently rendered
+      if (!exploreFeed || exploreFeed.length === 0) {
+        setLoading(true);
+      }
 
       try {
         const exploreData = await fetchExploreFeed();
 
         if (!isMounted) return;
 
-        setExploreFeed(exploreData);
+        if (Array.isArray(exploreData) && exploreData.length > 0) {
+          setExploreFeed(exploreData);
 
-        const initialVisible = {};
-        exploreData.forEach(({ title }) => {
-          initialVisible[title] = 5;
-        });
-        setVisibleTracks(initialVisible);
+          setVisibleTracks((prev) => {
+            const nextVisible = { ...prev };
+            exploreData.forEach(({ title }) => {
+              if (!nextVisible[title]) {
+                nextVisible[title] = 5;
+              }
+            });
+            return nextVisible;
+          });
+
+          // Update SWR cache in localStorage for instant render on subsequent visits
+          try {
+            const key = userId ? `${CACHE_KEY_PREFIX}_${userId}` : CACHE_KEY_PREFIX;
+            localStorage.setItem(
+              key,
+              JSON.stringify({ timestamp: Date.now(), data: exploreData })
+            );
+          } catch {
+            // Ignore localStorage quota errors
+          }
+        }
       } catch (err) {
         console.error("Explore fetch failed:", err);
-        if (isMounted) setExploreFeed([]);
+        if (isMounted && (!exploreFeed || exploreFeed.length === 0)) {
+          setExploreFeed([]);
+        }
       } finally {
         if (isMounted) setLoading(false);
       }

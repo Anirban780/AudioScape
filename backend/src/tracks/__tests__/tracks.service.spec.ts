@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { TracksService } from '../tracks.service';
 import { PrismaService } from '../../prisma/prisma.service';
 import { YouTubeKeyManager } from '../youtube-key-manager';
+import { SearchRateLimiterService } from '../search-rate-limiter.service';
 import axios from 'axios';
 
 jest.mock('axios');
@@ -49,6 +50,11 @@ describe('TracksService QA Unit Test Suite', () => {
     recordQuotaUsage: jest.fn().mockResolvedValue(undefined),
   };
 
+  const mockSearchRateLimiterService = {
+    checkAndConsume: jest.fn(),
+    getRemaining: jest.fn().mockReturnValue({ remainingMinute: 3, remainingDay: 20 }),
+  };
+
   beforeEach(async () => {
     jest.clearAllMocks();
 
@@ -57,6 +63,7 @@ describe('TracksService QA Unit Test Suite', () => {
         TracksService,
         { provide: PrismaService, useValue: mockPrismaService },
         { provide: YouTubeKeyManager, useValue: mockYouTubeKeyManager },
+        { provide: SearchRateLimiterService, useValue: mockSearchRateLimiterService },
       ],
     }).compile();
 
@@ -213,6 +220,8 @@ describe('TracksService QA Unit Test Suite', () => {
 
       // Verify quota usage logged
       expect(mockYouTubeKeyManager.recordQuotaUsage).toHaveBeenCalledWith('SEARCH_LIST', 100, 'A');
+      // Verify rate limiter checkAndConsume was invoked
+      expect(mockSearchRateLimiterService.checkAndConsume).toHaveBeenCalled();
     });
   });
 

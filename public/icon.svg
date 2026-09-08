@@ -1,4 +1,73 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<svg version="1.1" xmlns="http://www.w3.org/2000/svg" width="16" height="16">
-<path d="M0 0 C5.28 0 10.56 0 16 0 C16 5.28 16 10.56 16 16 C10.72 16 5.44 16 0 16 C0 10.72 0 5.44 0 0 Z " fill="#C9C7D2" transform="translate(0,0)"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <!-- Aura Lumina Gradient (Neon Cyan -> Velvet Violet -> Magenta) -->
+    <linearGradient id="aura-grad-icon" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F0FF" />
+      <stop offset="55%" stop-color="#8A2BE2" />
+      <stop offset="100%" stop-color="#FF66CC" />
+    </linearGradient>
+
+    <!-- Chrome Tab High-Contrast Border Gradient -->
+    <linearGradient id="tab-border-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F0FF" stop-opacity="0.8" />
+      <stop offset="100%" stop-color="#8A2BE2" stop-opacity="0.4" />
+    </linearGradient>
+
+    <!-- Ambient Center Halo for Tab Pop -->
+    <radialGradient id="tab-glow-radial" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#00F0FF" stop-opacity="0.25" />
+      <stop offset="60%" stop-color="#8A2BE2" stop-opacity="0.12" />
+      <stop offset="100%" stop-color="#0A0E1A" stop-opacity="0" />
+    </radialGradient>
+
+    <!-- Subtle Neon Glow Filter -->
+    <filter id="tab-neon-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.2" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Midnight Studio High-Contrast Squircle Container (Stands out on Dark & Light Chrome tabs) -->
+  <rect width="64" height="64" rx="15" fill="#0A0E1A" stroke="url(#tab-border-grad)" stroke-width="1.75" />
+
+  <!-- Ambient Light Field -->
+  <circle cx="32" cy="32" r="25" fill="url(#tab-glow-radial)" />
+
+  <!-- The Redesigned AudioScape 'A' Mark: Chevron Soundwave Apex -->
+  <g filter="url(#tab-neon-glow)">
+    <!-- Sleek Architectural 'A' Chevron -->
+    <path 
+      d="M 32 10.5 
+         C 33.6 10.5, 35 11.5, 35.8 13.1 
+         L 53.5 49.5 
+         C 54.5 51.7, 53.2 53.5, 50.8 53.5 
+         L 41.5 53.5 
+         C 39.8 53.5, 38.3 52.4, 37.5 50.8 
+         L 32 37.5 
+         L 26.5 50.8 
+         C 25.7 52.4, 24.2 53.5, 22.5 53.5 
+         L 13.2 53.5 
+         C 10.8 53.5, 9.5 51.7, 10.5 49.5 
+         L 28.2 13.1 
+         C 29 11.5, 30.4 10.5, 32 10.5 Z" 
+      fill="url(#aura-grad-icon)" 
+    />
+
+    <!-- Precision Audio Waveform Pulse Crossbar (Pure Neon Cyan #00F0FF) -->
+    <path 
+      d="M 17 38.5 
+         L 23.5 38.5 
+         Q 27.8 29.5, 32 38.5 
+         T 40.5 38.5 
+         L 47 38.5" 
+      fill="none" 
+      stroke="#00F0FF" 
+      stroke-width="3.5" 
+      stroke-linecap="round" 
+      stroke-linejoin="round" 
+    />
+  </g>
 </svg>

@@ -5,7 +5,9 @@ import { CacheRelatedTracksDto } from './dto/cache-related-tracks.dto';
 import { GenerateQueueDto } from './dto/generate-queue.dto';
 import { ExtendQueueDto } from './dto/extend-queue.dto';
 import { GoogleAuthGuard } from '../auth/google-auth.guard';
+import { CronAuthGuard } from '../auth/cron-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
+import { IsCron } from '../auth/decorators/is-cron.decorator';
 
 /**
  * ============================================================================
@@ -109,16 +111,21 @@ export class RecommendationsController {
 
   /**
    * Triggers background pre-warming of top Explore categories in PostgreSQL.
-   * Executed by platform schedulers (Vercel Cron, GitHub Actions, AWS EventBridge) or admin triggers.
+   * Executed by platform schedulers (GitHub Actions, Vercel Cron, AWS EventBridge) with CRON_SECRET.
    * @route POST `/api/music/cron/refresh-explore-cache`
    * @route GET `/api/music/cron/refresh-explore-cache`
+   * @header Authorization: Bearer <CRON_SECRET>
    */
+  @IsCron()
+  @UseGuards(CronAuthGuard)
   @Post('cron/refresh-explore-cache')
   async triggerRefreshExploreCachePost(@Query('max') max?: string) {
     const maxCount = max ? parseInt(max, 10) : 20;
     return this.recommendationsService.refreshExploreCache(maxCount);
   }
 
+  @IsCron()
+  @UseGuards(CronAuthGuard)
   @Get('cron/refresh-explore-cache')
   async triggerRefreshExploreCacheGet(@Query('max') max?: string) {
     const maxCount = max ? parseInt(max, 10) : 20;

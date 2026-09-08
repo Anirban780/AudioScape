@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TracksService } from './tracks.service';
 import { TracksController } from './tracks.controller';
 import { YouTubeKeyManager } from './youtube-key-manager';
+import { SearchRateLimiterService } from './search-rate-limiter.service';
 
 /**
  * ============================================================================
@@ -10,17 +11,19 @@ import { YouTubeKeyManager } from './youtube-key-manager';
  * @module TracksModule
  * 
  * PURPOSE:
- * Encapsulates track searching, YouTube API proxying, dual key quota management, and PostgreSQL search caching logic.
+ * Encapsulates track searching, YouTube API proxying, dual key quota management,
+ * PostgreSQL search caching logic, and multi-tiered search rate limiting.
  *
  * WHY THIS IS NEEDED FOR PRODUCTION:
- * - Modular Encapsulation: Groups `TracksController`, `TracksService`, and `YouTubeKeyManager` into a clean feature boundary.
- * - Service Export: Exports `TracksService` and `YouTubeKeyManager` so downstream feature modules (e.g. RecommendationsModule)
- *   can utilize track caching and detail resolution methods.
+ * - Modular Encapsulation: Groups `TracksController`, `TracksService`, `YouTubeKeyManager`,
+ *   and `SearchRateLimiterService` into a clean feature boundary.
+ * - Service Export: Exports services so downstream feature modules (e.g. RecommendationsModule)
+ *   can utilize track caching, rate limiting, and detail resolution methods.
  * ============================================================================
  */
 @Module({
   controllers: [TracksController],
-  providers: [TracksService, YouTubeKeyManager],
-  exports: [TracksService, YouTubeKeyManager],
+  providers: [TracksService, YouTubeKeyManager, SearchRateLimiterService],
+  exports: [TracksService, YouTubeKeyManager, SearchRateLimiterService],
 })
 export class TracksModule {}

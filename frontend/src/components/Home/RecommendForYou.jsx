@@ -46,9 +46,30 @@ const FALLBACK_RECOMMENDATIONS = [
   { id: "wA0C0u85y1y", videoId: "wA0C0u85y1y", title: "Deep Focus Ambient Rain", name: "Deep Focus Ambient Rain", artist: "Rainy Mood", channelTitle: "Rainy Mood", thumbnail: "https://img.youtube.com/vi/wA0C0u85y1y/maxresdefault.jpg" },
 ];
 
-const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
-  const [recommendedSongs, setRecommendedSongs] = useState([]);
-  const [loading, setLoading] = useState(true);
+const CACHE_KEY = "audioscape_cached_recommendations";
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 mins
+
+/**
+ * Safely reads cached recommendations from localStorage for instant, zero-latency initial render on page refresh.
+ */
+const getInitialCachedRecommendations = () => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp < CACHE_TTL_MS && Array.isArray(parsed.data) && parsed.data.length > 0) {
+      return parsed.data;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+};
+
+const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimation = true }) => {
+  const cachedInitial = getInitialCachedRecommendations();
+  const [recommendedSongs, setRecommendedSongs] = useState(cachedInitial || []);
+  const [loading, setLoading] = useState(!cachedInitial || cachedInitial.length === 0);
   const [bannerIndex, setBannerIndex] = useState(0);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showScrollRight, setShowScrollRight] = useState(false);
@@ -57,13 +78,25 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
   const { openModal } = usePlaylistStore();
   const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
 
-  const loadRecommendations = async (showLoader = true) => {
-    if (showLoader) setLoading(true);
+  // Synchronize immediately if parent Home component already resolved shared recommendations
+  useEffect(() => {
+    if (Array.isArray(sharedRecommendations) && sharedRecommendations.length > 0) {
+      setRecommendedSongs(sharedRecommendations);
+      setLoading(false);
+    }
+  }, [sharedRecommendations]);
+
+  const loadRecommendations = async (showLoader = false) => {
+    // Only display full skeleton loader if there are no cached tracks currently rendered
+    if (showLoader && (!recommendedSongs || recommendedSongs.length === 0)) {
+      setLoading(true);
+    }
 
     try {
+      // Robust call: passes topN = 20 directly, preventing UUID parameter misplacement
       let songs = [];
       if (userId) {
-        songs = await getRecommendations(userId, 20);
+        songs = await getRecommendations(20);
       }
 
       if (!Array.isArray(songs) || songs.length === 0) {
@@ -89,22 +122,36 @@ const RecommendForYou = ({ userId, enablePanAnimation = true }) => {
           ).values()
         );
         setRecommendedSongs(uniqueSongs);
-      } else {
+
+        // Update local SWR cache for instant load on subsequent page refreshes
+        try {
+          localStorage.setItem(
+            CACHE_KEY,
+            JSON.stringify({ timestamp: Date.now(), data: uniqueSongs })
+          );
+        } catch {
+          // Ignore quota errors
+        }
+      } else if (!recommendedSongs || recommendedSongs.length === 0) {
         setRecommendedSongs(FALLBACK_RECOMMENDATIONS);
       }
     } catch (err) {
       console.error("Error loading recommendations, using fallback:", err);
-      setRecommendedSongs(FALLBACK_RECOMMENDATIONS);
+      if (!recommendedSongs || recommendedSongs.length === 0) {
+        setRecommendedSongs(FALLBACK_RECOMMENDATIONS);
+      }
     } finally {
-      if (showLoader) setLoading(false);
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadRecommendations(true);
+    // If cached tracks already populate the view, revalidate silently in the background
+    const hasCachedData = Boolean(cachedInitial && cachedInitial.length > 0);
+    loadRecommendations(!hasCachedData);
   }, [userId]);
 
-  // Automatically refetch recommendations 5 seconds after like/unlike mutations
+  // Automatically refetch recommendations 5 seconds after like/unlike mutations (silent background revalidation)
   useRefreshOn("recommendations", () => loadRecommendations(false), 5000);
 
   const handleScroll = () => {

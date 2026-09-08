@@ -5,27 +5,38 @@ import { getValidThumbnailUrl } from "./youtubeUtils";
 const LOCAL_API_URL = "http://localhost:5000";
 const PROD_API_URL = import.meta.env.VITE_PROD_BACKEND_URL || import.meta.env.VITE_BACKEND_URL;
 
+// In-memory memoization cache for resolved backend URL to prevent repetitive /healthcheck pings
+let cachedBackendURL = null;
+
 /**
  * Dynamically determines whether to use the local or production backend.
+ * Memoizes result in memory so subsequent calls across components execute with 0ms latency.
  */
 export async function getBackendURL() {
+    if (cachedBackendURL) {
+        return cachedBackendURL;
+    }
+
     // If running in browser on a deployed domain (Vercel, etc.), use the configured production backend directly
     const isLocalhost = typeof window !== "undefined" && 
         (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 
     if (!isLocalhost && PROD_API_URL) {
-        return PROD_API_URL;
+        cachedBackendURL = PROD_API_URL;
+        return cachedBackendURL;
     }
 
     try {
         const response = await fetch(`${LOCAL_API_URL}/healthcheck`, { method: "GET" });
         if (response.ok) {
-            return LOCAL_API_URL;
+            cachedBackendURL = LOCAL_API_URL;
+            return cachedBackendURL;
         }
     } catch {
         // Local backend not running
     }
-    return PROD_API_URL || LOCAL_API_URL;
+    cachedBackendURL = PROD_API_URL || LOCAL_API_URL;
+    return cachedBackendURL;
 }
 
 /**
@@ -238,12 +249,27 @@ export const cacheRelatedTracks = async (keyword, tracks) => {
 
 /**
  * Fetches TF-IDF AI music recommendations from NestJS recommendations service.
+ * Supports both getRecommendations(topN) and getRecommendations(userId, topN).
+ * Updates localStorage SWR cache to enable instantaneous loading on page refresh.
  */
-export const getRecommendations = async (topN = 10) => {
+export const getRecommendations = async (arg1 = 10, arg2) => {
     try {
         const headers = await getAuthHeader();
         const API_URL = await getBackendURL();
-        const userId = useAuthStore.getState().user?.id;
+        const stateUser = useAuthStore.getState().user;
+
+        // Defensive parameter resolution: ensures topN is always a sanitized integer
+        let topN = 10;
+        let userId = stateUser?.id;
+
+        if (typeof arg1 === "number") {
+            topN = arg1;
+        } else if (typeof arg2 === "number") {
+            topN = arg2;
+            if (typeof arg1 === "string" && arg1) userId = arg1;
+        } else if (typeof arg1 === "string" && !isNaN(Number(arg1))) {
+            topN = Number(arg1);
+        }
 
         const response = await fetch(`${API_URL}/api/music/recommend`, {
             method: "POST",
@@ -255,13 +281,13 @@ export const getRecommendations = async (topN = 10) => {
         });
 
         if (!response.ok) {
-            throw new Error("Failed to fetch recommendations");
+            throw new Error(`Failed to fetch recommendations: ${response.status} ${response.statusText}`);
         }
 
         const data = await response.json();
         const recommendations = data.recommendations || data.tracks || (Array.isArray(data) ? data : []);
 
-        return recommendations.map((item) => {
+        const formatted = recommendations.map((item) => {
             const thumb = getValidThumbnailUrl(item.thumbNail || item.thumbnail || "") || "";
             return {
                 id: item.videoId || item.id,
@@ -275,6 +301,20 @@ export const getRecommendations = async (topN = 10) => {
                 sourceKeyword: item.sourceKeyword || item.keyword || (Array.isArray(item.genre) ? item.genre[0] : item.genre) || "Daily Mix",
             };
         });
+
+        // Update local SWR cache for instant load on refresh
+        if (formatted.length > 0) {
+            try {
+                localStorage.setItem(
+                    "audioscape_cached_recommendations",
+                    JSON.stringify({ timestamp: Date.now(), data: formatted })
+                );
+            } catch {
+                // Ignore storage quota errors
+            }
+        }
+
+        return formatted;
     } catch (err) {
         console.error("Recommendation error:", err);
         return [];
