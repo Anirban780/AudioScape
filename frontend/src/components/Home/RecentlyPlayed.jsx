@@ -35,16 +35,53 @@ import toast from "react-hot-toast";
  * - Remaining items render as compact `<MusicCard variant="compact" />` rows.
  */
 
+const CACHE_KEY_PREFIX = "audioscape_cached_recently_played";
+const CACHE_TTL_MS = 30 * 60 * 1000; // 30 mins
+
+/**
+ * Safely reads cached recently played tracks from localStorage for instant, zero-latency initial render on page refresh.
+ * Adheres to Stale-While-Revalidate (SWR): renders cached tracks immediately on mount, then revalidates in the background.
+ */
+const getInitialCachedRecentlyPlayed = (uid) => {
+  try {
+    const key = uid ? `${CACHE_KEY_PREFIX}_${uid}` : CACHE_KEY_PREFIX;
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp < CACHE_TTL_MS && Array.isArray(parsed.data) && parsed.data.length > 0) {
+      return parsed.data;
+    }
+  } catch {
+    return null;
+  }
+  return null;
+};
+
 const RecentlyPlayed = ({ userId }) => {
-  const [recentlyPlayed, setRecentlyPlayed] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cachedInitial = getInitialCachedRecentlyPlayed(userId);
+  const [recentlyPlayed, setRecentlyPlayed] = useState(cachedInitial || []);
+  const [loading, setLoading] = useState(!cachedInitial || cachedInitial.length === 0);
   const [isExpanded, setIsExpanded] = useState(false);
   const { openModal } = usePlaylistStore();
   const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
 
-  const loadRecentlyPlayed = (showLoader = true) => {
+  // If userId changes or rehydrates after initial mount, sync from cache if present
+  useEffect(() => {
     if (userId) {
-      if (showLoader) setLoading(true);
+      const userCached = getInitialCachedRecentlyPlayed(userId);
+      if (userCached && userCached.length > 0) {
+        setRecentlyPlayed(userCached);
+        setLoading(false);
+      }
+    }
+  }, [userId]);
+
+  const loadRecentlyPlayed = (showLoader = false) => {
+    if (userId) {
+      // SWR Pattern: Only show skeleton loader if there is no cached track data currently rendered
+      if (showLoader && (!recentlyPlayed || recentlyPlayed.length === 0)) {
+        setLoading(true);
+      }
       fetchLastPlayed(userId)
         .then((songs) => {
           if (Array.isArray(songs) && songs.length > 0) {
@@ -56,16 +93,34 @@ const RecentlyPlayed = ({ userId }) => {
               ).values()
             );
             setRecentlyPlayed(uniqueSongs);
+
+            // Update SWR cache in localStorage
+            try {
+              const key = userId ? `${CACHE_KEY_PREFIX}_${userId}` : CACHE_KEY_PREFIX;
+              localStorage.setItem(
+                key,
+                JSON.stringify({ timestamp: Date.now(), data: uniqueSongs })
+              );
+            } catch {
+              // Ignore localStorage quota errors
+            }
           } else {
             setRecentlyPlayed([]);
+            try {
+              const key = userId ? `${CACHE_KEY_PREFIX}_${userId}` : CACHE_KEY_PREFIX;
+              localStorage.removeItem(key);
+            } catch {}
           }
         })
         .catch((err) => {
           console.error("Error fetching recent tracks:", err);
-          setRecentlyPlayed([]);
+          // On network failure, retain existing cached items if available
+          if (!recentlyPlayed || recentlyPlayed.length === 0) {
+            setRecentlyPlayed([]);
+          }
         })
         .finally(() => {
-          if (showLoader) setLoading(false);
+          setLoading(false);
         });
     } else {
       setLoading(false);
@@ -73,10 +128,11 @@ const RecentlyPlayed = ({ userId }) => {
   };
 
   useEffect(() => {
-    loadRecentlyPlayed(true);
+    // Initial fetch on mount: silent background revalidation if cached data exists
+    loadRecentlyPlayed(false);
   }, [userId]);
 
-  // Automatically refetch history 5 seconds after a track listen event
+  // Automatically refetch history 5 seconds after a track listen event (silent background refresh)
   useRefreshOn("history", () => loadRecentlyPlayed(false), 5000);
 
   const handlePlayTrack = (song) => {
