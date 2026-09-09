@@ -348,5 +348,53 @@ describe('RecommendationsService QA Test Suite', () => {
       // Disjoint items between page 1 and page 2
       expect(page2.recommendations[0].videoId).not.toBe(page1.recommendations[0].videoId);
     });
+
+    it('TC-REC-09: guarantees exact 16 fresh and 4 rediscovery tracks per 20-track page with and without shuffle', async () => {
+      const history = [
+        ...Array.from({ length: 10 }, (_, i) => makeHistoryItem(`recent_${i}`, 'Artist X', 0.5, 2, false)),
+        makeHistoryItem('rediscover_cand_1', 'Nostalgic Band 1', 25, 1, true),
+        makeHistoryItem('rediscover_cand_2', 'Nostalgic Band 2', 20, 2, true),
+        makeHistoryItem('rediscover_cand_3', 'Nostalgic Band 3', 30, 1, false),
+        makeHistoryItem('rediscover_cand_4', 'Nostalgic Band 4', 18, 2, false),
+      ];
+
+      (mockPrismaService.listenHistory.findMany as jest.Mock).mockResolvedValue(history);
+
+      const candidates = Array.from({ length: 100 }, (_, i) => ({
+        youtubeVideoId: `track_cand_${i}`,
+        title: `Track ${i}`,
+        artist: 'Artist X',
+        isEmbeddable: true,
+        thumbnailUrl: 'https://i.ytimg.com/vi/thumb.jpg',
+        genre: ['Rock'],
+      }));
+
+      (mockPrismaService.tracks.findMany as jest.Mock).mockResolvedValue(candidates);
+      (mockPrismaService.queryTrackResult.findMany as jest.Mock).mockResolvedValue([]);
+
+      // Page 1 (Ordered)
+      const page1 = await service.getPaginatedRecommendations('user-paged-rec-ratio', 1, 20, false);
+      expect(page1.recommendations.length).toBe(20);
+      const p1Rediscover = page1.recommendations.filter((r) => r.sourceKeyword?.startsWith('Rediscover:'));
+      const p1Fresh = page1.recommendations.filter((r) => !r.sourceKeyword?.startsWith('Rediscover:'));
+      expect(p1Rediscover.length).toBe(4);
+      expect(p1Fresh.length).toBe(16);
+
+      // Page 2 (Ordered)
+      const page2 = await service.getPaginatedRecommendations('user-paged-rec-ratio', 2, 20, false);
+      expect(page2.recommendations.length).toBe(20);
+      const p2Rediscover = page2.recommendations.filter((r) => r.sourceKeyword?.startsWith('Rediscover:'));
+      const p2Fresh = page2.recommendations.filter((r) => !r.sourceKeyword?.startsWith('Rediscover:'));
+      expect(p2Rediscover.length).toBe(4);
+      expect(p2Fresh.length).toBe(16);
+
+      // Page 1 (Shuffled)
+      const page1Shuffled = await service.getPaginatedRecommendations('user-paged-rec-ratio', 1, 20, true);
+      expect(page1Shuffled.recommendations.length).toBe(20);
+      const p1ShuffledRediscover = page1Shuffled.recommendations.filter((r) => r.sourceKeyword?.startsWith('Rediscover:'));
+      const p1ShuffledFresh = page1Shuffled.recommendations.filter((r) => !r.sourceKeyword?.startsWith('Rediscover:'));
+      expect(p1ShuffledRediscover.length).toBe(4);
+      expect(p1ShuffledFresh.length).toBe(16);
+    });
   });
 });

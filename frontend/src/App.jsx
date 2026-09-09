@@ -16,6 +16,7 @@ import PlaylistModal from "@/components/Playlist/PlaylistModal";
 import PlaylistsPage from "@/pages/PlaylistsPage";
 import PlaylistDetailPage from "@/pages/PlaylistDetailPage";
 import HistoryPage from "@/pages/HistoryPage";
+import RecommendationsPage from "@/pages/RecommendationsPage";
 import { getBackendURL } from "@/utils/api";
 
 /**
@@ -99,6 +100,7 @@ function AppContent() {
       <Routes>
         <Route path="/" element={user ? <Navigate to="/home" replace /> : <LandingPage />} />
         <Route path="/home" element={user ? <Home /> : <Navigate to="/" replace />} />
+        <Route path="/recommendations" element={user ? <RecommendationsPage /> : <Navigate to="/" replace />} />
         <Route path="/explore" element={user ? <ExplorePage /> : <Navigate to="/" replace />} />
         <Route path="/favourites" element={user ? <FavoritesPage /> : <Navigate to="/" replace />} />
         <Route path="/playlists" element={user ? <PlaylistsPage /> : <Navigate to="/" replace />} />

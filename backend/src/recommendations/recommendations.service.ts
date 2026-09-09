@@ -376,45 +376,52 @@ export class RecommendationsService {
     }
 
     // STEP 6: 80% Discovery vs 20% Rediscovery Slot Assembly
-    // Slices top-scoring fresh discovery tracks and interleaves 4 rediscovery tracks
-    // from the user's older or lightly-played history.
+    // Slices top-scoring fresh discovery tracks and interleaves 4 rediscovery tracks per 20-track block
+    // from the user's older or lightly-played history to guarantee an exact 16 fresh / 4 rediscovery ratio.
     const sortedDiscovery = Array.from(candidateMap.values()).sort((a, b) => b.score - a.score);
 
-    // Rediscovery Allocation:
-    // For topN >= 20, allocate 4 rediscovery tracks (or proportional if topN is smaller)
-    // Capped by the number of qualifying rediscovery candidates available in rediscoveryPool.
-    const maxRediscoveryTarget = topN >= 20 ? 4 : Math.min(4, Math.max(1, Math.floor(topN * 0.20)));
-    const rediscoveryCount = Math.min(maxRediscoveryTarget, rediscoveryPool.length);
-    const discoveryCount = Math.max(0, topN - rediscoveryCount);
+    const selectedCandidates: CandidateItem[] = [];
 
-    // Extract fresh discovery tracks
-    const selectedCandidates: CandidateItem[] = sortedDiscovery.slice(0, discoveryCount);
+    if (rediscoveryPool.length === 0) {
+      // If user has 0 qualifying rediscovery items (e.g. cold start / new history), serve fresh discovery candidates
+      selectedCandidates.push(...sortedDiscovery.slice(0, topN));
+    } else {
+      // Assemble in 20-track blocks maintaining exactly 16 fresh + 4 rediscovery tracks per block (80% / 20% ratio)
+      const numBlocks = Math.ceil(topN / 20);
+      const totalRediscoveryNeeded = numBlocks * 4;
 
-    // Extract up to 4 top-scoring rediscovery tracks
-    if (rediscoveryCount > 0) {
-      const topRediscoveries = rediscoveryPool.slice(0, rediscoveryCount);
-      const rediscoveryItems: CandidateItem[] = topRediscoveries.map((item) => {
+      // Prepare rediscovery candidates, cycling through rediscoveryPool if user has fewer qualifying items
+      const rediscoveryItems: CandidateItem[] = [];
+      for (let i = 0; i < totalRediscoveryNeeded; i++) {
+        const item = rediscoveryPool[i % rediscoveryPool.length];
         const artistName = item.history.track.artistName || item.history.track.artist || 'Favorite';
-        return {
+        rediscoveryItems.push({
           track: item.history.track,
           score: Math.max(0.90, item.score),
           sourceKeyword: `Rediscover: ${artistName}`,
           signal: 'rediscover',
-        };
-      });
+        });
+      }
 
-      // Interleave rediscovery tracks evenly across the recommendation set
-      // For a 20-track payload (16 fresh + 4 rediscovery), tracks are placed at indices ~3, ~8, ~13, ~18
-      // creating an optimal pacing of ~4 new songs followed by 1 familiar rediscovery song.
-      rediscoveryItems.forEach((rediscoveryItem, idx) => {
-        const spacingInterval = Math.max(3, Math.floor(selectedCandidates.length / (rediscoveryCount + 1)));
-        const targetIndex = Math.min(selectedCandidates.length, (idx + 1) * spacingInterval + idx);
-        selectedCandidates.splice(targetIndex, 0, rediscoveryItem);
-      });
+      for (let b = 0; b < numBlocks; b++) {
+        const blockFresh = sortedDiscovery.slice(b * 16, (b + 1) * 16);
+        const blockRedis = rediscoveryItems.slice(b * 4, (b + 1) * 4);
+
+        const blockCandidates = [...blockFresh];
+        // Interleave the 4 rediscovery tracks evenly across the block at indices 3, 7, 11, 15 (positions 4, 8, 12, 16)
+        blockRedis.forEach((rItem, idx) => {
+          const targetIndex = Math.min(blockCandidates.length, (idx + 1) * 4 - 1);
+          blockCandidates.splice(targetIndex, 0, rItem);
+        });
+
+        selectedCandidates.push(...blockCandidates);
+      }
     }
 
+    const finalCandidates = selectedCandidates.slice(0, topN);
+
     // Format output matching frontend schema and RecommendedTrackResult interface
-    const finalRecommendations: RecommendedTrackResult[] = selectedCandidates.map((c) => ({
+    const finalRecommendations: RecommendedTrackResult[] = finalCandidates.map((c) => ({
       videoId: c.track.youtubeVideoId,
       title: c.track.title,
       artist: c.track.artist || c.track.artistName || 'Unknown Artist',
@@ -467,6 +474,7 @@ export class RecommendationsService {
 
   /**
    * Retrieves paginated personalized recommendations for infinite scroll or paginated browse pages.
+   * Guarantees an exact 16 fresh / 4 rediscovery ratio on every 20-track page.
    * 
    * @param userId - User PostgreSQL UUID
    * @param page - 1-based page number
@@ -484,7 +492,32 @@ export class RecommendationsService {
     let pool = [...(recResult.recommendations || [])];
 
     if (shuffle) {
-      pool = this.shuffleArray(pool);
+      // Windowed/block shuffle: preserves the deterministic 16 fresh / 4 rediscovery ratio per page!
+      // Shuffles fresh tracks among fresh, and rediscovery tracks among rediscovery, then re-interleaves them.
+      const pageSize = limit;
+      const totalBlocks = Math.ceil(pool.length / pageSize);
+      const shuffledPool: RecommendedTrackResult[] = [];
+
+      for (let b = 0; b < totalBlocks; b++) {
+        const block = pool.slice(b * pageSize, (b + 1) * pageSize);
+        const fresh = block.filter(
+          (t) => !t.sourceKeyword?.toLowerCase().includes('rediscover'),
+        );
+        const redis = block.filter((t) =>
+          t.sourceKeyword?.toLowerCase().includes('rediscover'),
+        );
+
+        const shuffledFresh = this.shuffleArray(fresh);
+        const shuffledRedis = this.shuffleArray(redis);
+
+        const reassembled = [...shuffledFresh];
+        shuffledRedis.forEach((rItem, idx) => {
+          const insertIndex = Math.min(reassembled.length, (idx + 1) * 4 - 1);
+          reassembled.splice(insertIndex, 0, rItem);
+        });
+        shuffledPool.push(...reassembled);
+      }
+      pool = shuffledPool;
     }
 
     const total = pool.length;

@@ -340,6 +340,92 @@ export const getRecommendations = async (arg1 = 10, arg2) => {
 };
 
 /**
+ * ============================================================================
+ * FETCH PAGINATED RECOMMENDATIONS (fetchPaginatedRecommendations)
+ * ============================================================================
+ * Calls NestJS backend GET /api/music/recommendations with pagination and shuffle options.
+ * Queries 100% indexed local PostgreSQL catalog with zero YouTube API quota consumption.
+ * 
+ * @param {Object} options
+ * @param {number} [options.page=1] - 1-based page number
+ * @param {number} [options.limit=20] - Page size
+ * @param {boolean} [options.shuffle=false] - When true, applies windowed Fisher-Yates shuffling
+ * @returns {Promise<{ data: Array, meta: Object }>}
+ */
+export const fetchPaginatedRecommendations = async ({ page = 1, limit = 20, shuffle = false } = {}) => {
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
+
+        const params = new URLSearchParams({
+            page: String(page),
+            limit: String(limit),
+            shuffle: String(shuffle),
+        });
+
+        const response = await fetch(`${API_URL}/api/music/recommendations?${params.toString()}`, {
+            method: "GET",
+            headers: { ...headers },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch paginated recommendations: ${response.status} ${response.statusText}`);
+        }
+
+        const json = await response.json();
+        const rawData = json.recommendations || json.data || (Array.isArray(json) ? json : []);
+        const total = typeof json.total === "number" ? json.total : (json.meta?.total ?? rawData.length);
+        const limitNum = typeof json.limit === "number" ? json.limit : (json.meta?.limit ?? limit);
+        const totalPages = typeof json.totalPages === "number" ? json.totalPages : (json.meta?.totalPages ?? Math.max(1, Math.ceil(total / limitNum)));
+        const currentPage = typeof json.page === "number" ? json.page : (json.meta?.page ?? page);
+
+        const meta = {
+            total,
+            page: currentPage,
+            limit: limitNum,
+            totalPages,
+            hasNext: currentPage < totalPages,
+            hasPrev: currentPage > 1,
+            isShuffled: typeof json.isShuffled === "boolean" ? json.isShuffled : (json.meta?.isShuffled ?? Boolean(shuffle)),
+        };
+
+        const formattedData = rawData.map((item) => {
+            const thumb = getValidThumbnailUrl(item.thumbNail || item.thumbnail || "") || item.thumbNail || item.thumbnail || "";
+            return {
+                id: item.videoId || item.id,
+                videoId: item.videoId || item.id,
+                title: item.title || item.name || "Unknown Title",
+                name: item.title || item.name || "Unknown Title",
+                artist: item.artist || item.channelTitle || "Unknown Artist",
+                channelTitle: item.artist || item.channelTitle || "Unknown Artist",
+                thumbnail: thumb,
+                thumbNail: thumb,
+                sourceKeyword: item.sourceKeyword || item.keyword || (Array.isArray(item.genre) ? item.genre[0] : item.genre) || "Discovery",
+            };
+        });
+
+        return {
+            data: formattedData,
+            meta,
+        };
+    } catch (err) {
+        console.error("fetchPaginatedRecommendations error:", err);
+        return {
+            data: [],
+            meta: {
+                total: 0,
+                page,
+                limit,
+                totalPages: 0,
+                hasNext: false,
+                hasPrev: false,
+                isShuffled: Boolean(shuffle),
+            },
+        };
+    }
+};
+
+/**
  * Extracts music listening keywords via NestJS backend proxy.
  */
 export async function fetchKeywordsFromAI(history = []) {
