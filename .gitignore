@@ -18,6 +18,7 @@ DOCKER_PACKAGE_GUIDE.md
 !.github/workflows/
 audioscape_backup.sql
 *.sql
+!backend/prisma/migrations/**/*.sql
 
 
 # Editor directories and files

@@ -12,7 +12,12 @@
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio --browser none --port 5555",
     "backfill": "node scripts/backfill-firestore-to-postgres.js",
+    "enrich:batch": "ts-node scripts/batch-enrich-tracks.ts",
+    "enrich:batch:test": "ts-node scripts/batch-enrich-tracks.ts --limit=10 --batch-size=2",
+    "enrich:batch:fast": "ts-node scripts/batch-enrich-tracks.ts --batch-size=50",
+    "enrich:batch:dry": "ts-node scripts/batch-enrich-tracks.ts --limit=5 --dry-run",
     "test": "node scripts/test-endpoints.js",
+    "test:unit": "jest",
     "test:api": "node scripts/test-endpoints.js"
   },
   "keywords": [],
@@ -69,7 +74,7 @@
       "json",
       "ts"
     ],
-    "rootDir": "src",
+    "rootDir": ".",
     "testRegex": ".*\\.spec\\.ts$",
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
