@@ -6,6 +6,7 @@ import { ApiEndpoint, QueryType } from '@prisma/client';
 import { YouTubeKeyManager } from './youtube-key-manager';
 import { SearchRateLimiterService } from './search-rate-limiter.service';
 import { getValidThumbnailUrl } from '../utils/youtubeUtils';
+import { parseTrackTitle } from './utils/title-parser.util';
 
 /**
  * ============================================================================
@@ -297,6 +298,8 @@ export class TracksService {
               '') as string,
             channelTitle: (item.snippet.channelTitle || 'Unknown Artist') as string,
             channelId: (item.snippet.channelId || '') as string,
+            publishedAt: item.snippet.publishedAt ? new Date(item.snippet.publishedAt) : null,
+            description: (item.snippet.description || null) as string | null,
           };
         });
 
@@ -327,39 +330,56 @@ export class TracksService {
   }
 
   /**
-   * Retrieves detailed track metadata (duration, genre tags, channel) by YouTube video ID.
+   * Retrieves detailed track metadata (duration, genre tags, channel, statistics) by YouTube video ID.
+   *
+   * @param videoId - Natural YouTube video ID
+   * @param forceRefresh - If true, bypasses local PostgreSQL cache to enrich missing fields
+   * @returns Comprehensive track details object
    */
-  async getTrackDetails(videoId: string) {
+  async getTrackDetails(videoId: string, forceRefresh: boolean = false) {
     if (!videoId) {
       throw new HttpException('Video ID parameter is required', HttpStatus.BAD_REQUEST);
     }
 
-    // STEP 1: Check PostgreSQL `Tracks` table
-    try {
-      const existingTrack = await this.prisma.tracks.findUnique({
-        where: { youtubeVideoId: videoId },
-      });
+    // STEP 1: Check PostgreSQL `Tracks` table (skipped if forceRefresh is true)
+    if (!forceRefresh) {
+      try {
+        const existingTrack = await this.prisma.tracks.findUnique({
+          where: { youtubeVideoId: videoId },
+        });
 
-      if (existingTrack && existingTrack.duration) {
-        this.logger.log(`Cache HIT for track details: ${videoId}`);
-        return {
-          videoId: existingTrack.youtubeVideoId,
-          title: existingTrack.title,
-          thumbNail: getValidThumbnailUrl(existingTrack.thumbnailUrl || '') || '',
-          channelTitle: existingTrack.artist || 'Unknown Artist',
-          duration: existingTrack.duration,
-          durationSeconds: existingTrack.durationSeconds,
-          genre: existingTrack.genre || [],
-          channelId: existingTrack.channelId || 'Unknown',
-        };
+        // When not forcing refresh, any existing record with duration is considered a cache HIT
+        if (existingTrack && existingTrack.duration) {
+          this.logger.log(`Cache HIT for track details: ${videoId}`);
+          return {
+            videoId: existingTrack.youtubeVideoId,
+            title: existingTrack.title,
+            rawTitle: existingTrack.rawTitle || existingTrack.title,
+            artistName: existingTrack.artistName || existingTrack.artist || 'Unknown Artist',
+            thumbNail: getValidThumbnailUrl(existingTrack.thumbnailUrl || '') || '',
+            channelTitle: existingTrack.artist || 'Unknown Artist',
+            duration: existingTrack.duration,
+            durationSeconds: existingTrack.durationSeconds,
+            genre: existingTrack.genre || [],
+            tags: existingTrack.tags || [],
+            channelId: existingTrack.channelId || 'Unknown',
+            viewCount: existingTrack.viewCount ? existingTrack.viewCount.toString() : null,
+            likeCount: existingTrack.likeCount ? existingTrack.likeCount.toString() : null,
+            publishedAt: existingTrack.publishedAt,
+            description: existingTrack.description,
+            categoryId: existingTrack.categoryId,
+            licensedContent: existingTrack.licensedContent,
+            isEmbeddable: existingTrack.isEmbeddable,
+          };
+        }
+      } catch (dbErr: any) {
+        this.logger.warn(`DB lookup failed for track ${videoId}: ${dbErr.message}`);
       }
-    } catch (dbErr: any) {
-      this.logger.warn(`DB lookup failed for track ${videoId}: ${dbErr.message}`);
     }
 
-    // STEP 2: Cache MISS — Query YouTube API `/v3/videos`
+    // STEP 2: Cache MISS or forceRefresh — Query YouTube API `/v3/videos` with snippet, contentDetails, statistics, status
     const { key, keyId } = await this.getActiveKey();
-    const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics&id=${videoId}&key=${key}`;
+    const url = `https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails,statistics,status&id=${videoId}&key=${key}`;
 
     try {
       const response = await axios.get(url);
@@ -373,24 +393,49 @@ export class TracksService {
       const trackItem = items[0];
       const rawDuration = trackItem.contentDetails?.duration || 'PT0S';
       const durationSeconds = this.parseIsoDurationSeconds(rawDuration);
+      const viewCount = trackItem.statistics?.viewCount ? BigInt(trackItem.statistics.viewCount) : null;
+      const likeCount = trackItem.statistics?.likeCount ? BigInt(trackItem.statistics.likeCount) : null;
+      const publishedAt = trackItem.snippet?.publishedAt ? new Date(trackItem.snippet.publishedAt) : null;
+      const description = trackItem.snippet?.description || null;
+      const categoryId = trackItem.snippet?.categoryId || null;
+      const licensedContent = Boolean(trackItem.contentDetails?.licensedContent);
+      const isEmbeddable = trackItem.status?.embeddable !== false;
+      const rawTitle = trackItem.snippet?.title || 'Unknown Title';
+      const channelTitle = trackItem.snippet?.channelTitle || 'Unknown Artist';
+      const parsed = parseTrackTitle(rawTitle, channelTitle);
+      const tags = trackItem.snippet?.tags || [];
 
-      const result = {
+      const trackPayload = {
         videoId: trackItem.id,
-        title: trackItem.snippet?.title || 'Unknown Title',
+        title: parsed.cleanTitle || rawTitle,
+        rawTitle,
+        artistName: parsed.artistName,
         thumbNail: getValidThumbnailUrl(trackItem.snippet?.thumbnails?.high?.url || trackItem.snippet?.thumbnails?.medium?.url || trackItem.snippet?.thumbnails?.default?.url || '') || '',
-        channelTitle: trackItem.snippet?.channelTitle || 'Unknown Artist',
+        channelTitle,
         duration: rawDuration,
         durationSeconds,
-        genre: trackItem.snippet?.tags || [],
+        genre: tags,
+        tags,
         channelId: trackItem.snippet?.channelId || 'Unknown',
+        viewCount,
+        likeCount,
+        publishedAt,
+        description,
+        categoryId,
+        licensedContent,
+        isEmbeddable,
       };
 
       // Asynchronously store full track details in PostgreSQL
-      this.upsertTrackInPostgres(result).catch((err) =>
+      this.upsertTrackInPostgres(trackPayload).catch((err) =>
         this.logger.error(`Failed to upsert track ${videoId}: ${err.message}`),
       );
 
-      return result;
+      return {
+        ...trackPayload,
+        viewCount: viewCount ? viewCount.toString() : null,
+        likeCount: likeCount ? likeCount.toString() : null,
+      };
     } catch (error: any) {
       if (error instanceof HttpException) throw error;
       this.logger.error(`Error fetching track details for ${videoId}: ${error.message}`);
@@ -412,7 +457,15 @@ export class TracksService {
   private async cacheSearchResultsInPostgres(
     rawQuery: string,
     normalizedQuery: string,
-    tracks: Array<{ videoId: string; title: string; thumbNail: string; channelTitle: string; channelId?: string }>,
+    tracks: Array<{
+      videoId: string;
+      title: string;
+      thumbNail: string;
+      channelTitle: string;
+      channelId?: string;
+      publishedAt?: Date | null;
+      description?: string | null;
+    }>,
     pageToken: string | null = null,
     nextPageToken: string | null = null,
     queryType: QueryType = QueryType.USER_SEARCH,
@@ -469,22 +522,31 @@ export class TracksService {
       const t = tracks[index];
       const validChannelId = await this.ensureChannelExists(t.channelId || null, t.channelTitle);
       const overallRank = pageIndex * 50 + index + 1;
+      const parsed = parseTrackTitle(t.title, t.channelTitle);
 
       await this.prisma.tracks.upsert({
         where: { youtubeVideoId: t.videoId },
         update: {
-          title: t.title,
+          title: parsed.cleanTitle || t.title,
           artist: t.channelTitle,
+          artistName: parsed.artistName,
+          rawTitle: parsed.rawTitle,
           thumbnailUrl: t.thumbNail,
           channelId: validChannelId,
           lastFetchedAt: new Date(),
+          ...(t.publishedAt ? { publishedAt: t.publishedAt } : {}),
+          ...(t.description !== undefined && t.description !== null ? { description: t.description } : {}),
         },
         create: {
           youtubeVideoId: t.videoId,
-          title: t.title,
+          title: parsed.cleanTitle || t.title,
           artist: t.channelTitle,
+          artistName: parsed.artistName,
+          rawTitle: parsed.rawTitle,
           thumbnailUrl: t.thumbNail,
           channelId: validChannelId,
+          publishedAt: t.publishedAt || null,
+          description: t.description || null,
         },
       });
 
@@ -571,6 +633,8 @@ export class TracksService {
               '') as string,
             channelTitle: (item.snippet.channelTitle || 'Unknown Artist') as string,
             channelId: (item.snippet.channelId || '') as string,
+            publishedAt: item.snippet.publishedAt ? new Date(item.snippet.publishedAt) : null,
+            description: (item.snippet.description || null) as string | null,
           };
         });
 
@@ -726,42 +790,79 @@ export class TracksService {
 
   /**
    * Helper upserting full metadata details for a single track into PostgreSQL `Tracks` table.
+   * Persists all rich metadata signals including view/like counts, tags, publishedAt, descriptions,
+   * licensing status, and heuristic title/artist breakdown.
    */
   private async upsertTrackInPostgres(track: {
     videoId: string;
     title: string;
+    rawTitle?: string | null;
+    artistName?: string | null;
     thumbNail: string;
     channelTitle: string;
-    duration: string;
-    durationSeconds: number | null;
-    genre: string[];
-    channelId: string;
+    duration?: string | null;
+    durationSeconds?: number | null;
+    genre?: string[];
+    tags?: string[];
+    channelId?: string | null;
+    viewCount?: bigint | null;
+    likeCount?: bigint | null;
+    publishedAt?: Date | null;
+    description?: string | null;
+    categoryId?: string | null;
+    licensedContent?: boolean;
+    isEmbeddable?: boolean;
   }) {
-    const validChannelId = await this.ensureChannelExists(track.channelId, track.channelTitle);
+    const validChannelId = await this.ensureChannelExists(track.channelId || null, track.channelTitle);
+    const parsed =
+      track.rawTitle && track.artistName
+        ? { rawTitle: track.rawTitle, cleanTitle: track.title, artistName: track.artistName }
+        : parseTrackTitle(track.rawTitle || track.title, track.channelTitle);
+
+    const tags = track.tags || track.genre || [];
+    const genre = track.genre || tags;
 
     await this.prisma.tracks.upsert({
       where: { youtubeVideoId: track.videoId },
       update: {
-        title: track.title,
+        title: parsed.cleanTitle || track.title,
+        rawTitle: parsed.rawTitle,
+        artistName: parsed.artistName,
         artist: track.channelTitle,
         thumbnailUrl: track.thumbNail,
         duration: track.duration,
         durationSeconds: track.durationSeconds,
-        genre: track.genre,
-        tags: track.genre,
+        genre,
+        tags,
         channelId: validChannelId,
         lastFetchedAt: new Date(),
+        ...(track.viewCount !== undefined ? { viewCount: track.viewCount } : {}),
+        ...(track.likeCount !== undefined ? { likeCount: track.likeCount } : {}),
+        ...(track.publishedAt !== undefined ? { publishedAt: track.publishedAt } : {}),
+        ...(track.description !== undefined ? { description: track.description } : {}),
+        ...(track.categoryId !== undefined ? { categoryId: track.categoryId } : {}),
+        ...(track.licensedContent !== undefined ? { licensedContent: track.licensedContent } : {}),
+        ...(track.isEmbeddable !== undefined ? { isEmbeddable: track.isEmbeddable } : {}),
       },
       create: {
         youtubeVideoId: track.videoId,
-        title: track.title,
+        title: parsed.cleanTitle || track.title,
+        rawTitle: parsed.rawTitle,
+        artistName: parsed.artistName,
         artist: track.channelTitle,
         thumbnailUrl: track.thumbNail,
-        duration: track.duration,
-        durationSeconds: track.durationSeconds,
-        genre: track.genre,
-        tags: track.genre,
+        duration: track.duration || null,
+        durationSeconds: track.durationSeconds || null,
+        genre,
+        tags,
         channelId: validChannelId,
+        viewCount: track.viewCount || null,
+        likeCount: track.likeCount || null,
+        publishedAt: track.publishedAt || null,
+        description: track.description || null,
+        categoryId: track.categoryId || null,
+        licensedContent: track.licensedContent ?? false,
+        isEmbeddable: track.isEmbeddable ?? true,
       },
     });
   }

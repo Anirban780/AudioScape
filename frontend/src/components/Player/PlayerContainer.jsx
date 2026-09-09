@@ -80,7 +80,11 @@ const PlayerContainer = ({ onClose, uid }) => {
         try {
           const generatedQueue = await generateQueueFromBackend(track.id, keyword);
           if (Array.isArray(generatedQueue) && generatedQueue.length > 0) {
-            setQueue(generatedQueue);
+            const queueWithSource = generatedQueue.map((t, idx) => ({
+              ...t,
+              source: idx === 0 ? (track.source || "SEARCH") : "RELATED_QUEUE",
+            }));
+            setQueue(queueWithSource);
             setCurrentIndex(0);
           }
         } catch (err) {
@@ -90,16 +94,12 @@ const PlayerContainer = ({ onClose, uid }) => {
 
       fetchQueue();
     }
-  }, [track?.id, queue.length, setQueue, setCurrentIndex]);
+  }, [track?.id, track?.source, queue.length, setQueue, setCurrentIndex]);
 
   // STEP 2: Continuous Radio Auto-Refill near Queue End
   useEffect(() => {
-    if (
-      !isAutoRefillEnabled ||
-      isExtendingRef.current ||
-      queue.length === 0 ||
-      currentIndex < queue.length - 2
-    ) {
+    const isNearEnd = currentIndex >= queue.length - 2;
+    if (!isAutoRefillEnabled || !isNearEnd || isExtendingRef.current || queue.length === 0) {
       return;
     }
 
@@ -112,7 +112,8 @@ const PlayerContainer = ({ onClose, uid }) => {
 
         if (Array.isArray(extension) && extension.length > 0) {
           console.debug(`[Radio Auto-Refill] Appended ${extension.length} new tracks to queue.`);
-          setQueue([...queue, ...extension]);
+          const extensionWithSource = extension.map((t) => ({ ...t, source: "RELATED_QUEUE" }));
+          setQueue([...queue, ...extensionWithSource]);
         }
       } catch (err) {
         console.error("Queue auto-refill failed:", err);

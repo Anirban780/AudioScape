@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import placeholder from "@/assets/placeholder.jpg";
-import { Sparkles, Play, ChevronLeft, ChevronRight, Heart, ListPlus } from "lucide-react";
+import { Sparkles, Play, ChevronLeft, ChevronRight, Heart, ListPlus, Music } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
 import usePlaylistStore from "@/store/usePlaylistStore";
 import { useRefreshOn } from "@/store/useDataRefreshStore";
@@ -204,6 +204,7 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
       name: song.name || song.title,
       artist: song.artist || song.channelTitle,
       thumbnail: song.thumbnail || song.thumbNail,
+      source: "RECOMMENDATION",
     });
     usePlayerStore.getState().setIsPlaying(true);
     toast.success(`Playing: ${song.name || song.title}`);
@@ -216,6 +217,7 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
       name: cleanName,
       artist: song.artist || song.channelTitle || "Unknown Artist",
       thumbnail: song.thumbnail || song.thumbNail,
+      source: "RECOMMENDATION",
     });
     toast.success(`Added "${cleanName}" to queue`);
   };

@@ -147,9 +147,9 @@ const DailyMixCards = ({ recommendations = [] }) => {
   const handlePlayMix = (mix, e) => {
     e.stopPropagation();
     if (!mix.tracks || mix.tracks.length === 0) return;
-    setQueue(mix.tracks);
+    setQueue(mix.tracks, "RECOMMENDATION");
     setCurrentIndex(0);
-    setTrack(mix.tracks[0]);
+    setTrack(mix.tracks[0], "RECOMMENDATION");
     setIsPlaying(true);
   };
 

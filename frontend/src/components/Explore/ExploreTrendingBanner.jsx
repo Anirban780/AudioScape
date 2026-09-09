@@ -100,7 +100,8 @@ const ExploreTrendingBanner = ({
       name: trackName,
       artist: artistName,
       thumbnail: artwork,
-    });
+      source: "EXPLORE",
+    }, "EXPLORE");
     usePlayerStore.getState().setIsPlaying(true);
     toast.success(`Playing: ${trackName}`);
   };

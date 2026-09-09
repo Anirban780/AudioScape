@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect } from "react";
 import YouTube from "react-youtube";
 import { saveSongListen } from "@/utils/api";
 import usePlayerStore from "@/store/usePlayerStore";
@@ -16,13 +16,22 @@ import usePlayerStore from "@/store/usePlayerStore";
  *    FullScreenPlayer view switches.
  * 2. Event Delegation: Listens for playback state events (PLAYING, PAUSED, ENDED)
  *    and delegates completion to `onTrackEnd` callback to eliminate state race conditions.
+ * 3. Accurate Source Attribution & Dedup: Captures track playback source and prevents
+ *    duplicate play counts when users pause and resume the same song.
  * 
  * HOW IT WORKS:
  * - `handleStateChange`: Sets `isPlaying` and `duration` in `usePlayerStore`.
+ * - On `state === 1` (PLAYING): Logs listen event once per track using `recordedTrackRef`.
  * - On `state === 0` (ENDED): Calls `onTrackEnd()` prop to advance queue cleanly.
  */
 const YouTubePlayer = ({ trackId, onReady, onTrackEnd }) => {
-  const { setIsPlaying, setDuration } = usePlayerStore();
+  const { setIsPlaying, setDuration, track, playbackSource } = usePlayerStore();
+  const recordedTrackRef = useRef(null);
+
+  useEffect(() => {
+    // Reset recorded track whenever video ID changes
+    recordedTrackRef.current = null;
+  }, [trackId]);
 
   const opts = {
     height: "0",
@@ -59,7 +68,12 @@ const YouTubePlayer = ({ trackId, onReady, onTrackEnd }) => {
       setIsPlaying(true);
       setDuration(player.getDuration());
 
-      if (trackId) saveSongListen(trackId).catch(console.error);
+      // Deduplicate: record once per track, avoiding artificial playCount spikes on pause/resume
+      if (trackId && recordedTrackRef.current !== trackId) {
+        recordedTrackRef.current = trackId;
+        const source = track?.source || playbackSource || "SEARCH";
+        saveSongListen(trackId, source, track).catch(console.error);
+      }
     } 
     else if (state === 2) {
       // PAUSED

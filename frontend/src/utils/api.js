@@ -49,15 +49,33 @@ async function getAuthHeader() {
 }
 
 /**
- * Saves a song listen event to NestJS backend database.
- * @param {string} videoId - The ID of the song/video.
+ * Saves a song listen event to NestJS backend database with full playback attribution context.
+ *
+ * @param {string} videoId - The YouTube ID of the song/video.
+ * @param {string} source - Playback attribution source ('SEARCH' | 'EXPLORE' | 'RECOMMENDATION' | 'PLAYLIST' | 'RELATED_QUEUE')
+ * @param {object} track - Optional track metadata object for automatic PostgreSQL provisioning
  */
-export async function saveSongListen(videoId) {
+export async function saveSongListen(videoId, source = "SEARCH", track = {}) {
     if (!videoId) return;
 
     try {
         const headers = await getAuthHeader();
         const API_URL = await getBackendURL();
+
+        const payload = {
+            videoId,
+            source,
+        };
+
+        if (track?.title || track?.name) {
+            payload.title = track.title || track.name;
+        }
+        if (track?.artist || track?.channelTitle) {
+            payload.artist = track.artist || track.channelTitle;
+        }
+        if (track?.thumbnail || track?.thumbNail) {
+            payload.thumbnailUrl = track.thumbnail || track.thumbNail;
+        }
 
         const response = await fetch(`${API_URL}/api/music/history`, {
             method: "POST",
@@ -65,14 +83,14 @@ export async function saveSongListen(videoId) {
                 "Content-Type": "application/json",
                 ...headers,
             },
-            body: JSON.stringify({ videoId }),
+            body: JSON.stringify(payload),
         });
 
         if (!response.ok) {
             throw new Error(`Failed to save song listen: ${response.status} ${response.statusText}`);
         }
 
-        console.log("Song saved to database successfully");
+        console.log(`Song saved to database successfully (source: ${source})`);
         // Trigger delayed invalidation for playback history subscribers
         useDataRefreshStore.getState().invalidate("history");
     } catch (error) {

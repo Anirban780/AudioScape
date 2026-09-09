@@ -27,6 +27,7 @@ const usePlayerStore = create((set, get) => ({
     volume: 80,
     isMuted: false,
     isLiked: false,
+    playbackSource: 'SEARCH',
     player: null,
     isPlayerReady: false,
 
@@ -34,7 +35,7 @@ const usePlayerStore = create((set, get) => ({
     // TRACK ACTIONS
     // ------------------------------------------------------------------------
 
-    setTrack: async (track) => {
+    setTrack: async (track, source = null) => {
         const user = useAuthStore.getState().user;
         let liked = false;
 
@@ -42,8 +43,13 @@ const usePlayerStore = create((set, get) => ({
             liked = await fetchLikedStatus(user.id, track.id);
         }
 
-        set({ track, isLiked: liked });
+        const effectiveSource = source || track?.source || get().playbackSource || 'SEARCH';
+        const taggedTrack = track ? { ...track, source: effectiveSource } : null;
+
+        set({ track: taggedTrack, isLiked: liked, playbackSource: effectiveSource });
     },
+    
+    setPlaybackSource: (playbackSource) => set({ playbackSource }),
     
     setIsPlaying: (isPlaying) => set({ isPlaying }),
     setProgress: (progress) => set({ progress }),
@@ -136,21 +142,30 @@ const usePlayerStore = create((set, get) => ({
     isShuffling: false,
     isAutoRefillEnabled: true,
 
-    setQueue: (queue) => set({ queue }),
+    setQueue: (queue, source = null) => {
+        const effectiveSource = source || get().playbackSource || 'SEARCH';
+        const taggedQueue = (queue || []).map((item) => ({
+            ...item,
+            source: item.source || effectiveSource,
+        }));
+        set({ queue: taggedQueue, playbackSource: effectiveSource });
+    },
     setCurrentIndex: (index) => set({ currentIndex: index }),
     setAutoRefillEnabled: (isAutoRefillEnabled) => set({ isAutoRefillEnabled }),
 
     toggleLooping: () => set((state) => ({ isLooping: !state.isLooping })),
     toggleShuffling: () => set((state) => ({ isShuffling: !state.isShuffling })),
 
-    addToQueue: (track) => {
+    addToQueue: (track, source = null) => {
         if (!track || (!track.id && !track.videoId)) return;
+        const effectiveSource = source || track.source || get().playbackSource || 'SEARCH';
         const normalizedTrack = {
             id: track.id || track.videoId,
             name: track.name || track.title || "Unknown Track",
             artist: track.artist || track.channelTitle || "Unknown Artist",
             thumbnail: track.thumbnail || track.thumbNail || "",
             genre: track.genre || [],
+            source: effectiveSource,
         };
 
         const { queue, track: currentTrack } = get();
