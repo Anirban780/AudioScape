@@ -1,8 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
 import AppLayout from "@/components/Layout/AppLayout";
 import useAuthStore from "@/store/useAuthStore";
-import { fetchYoutubeMusic } from "@/utils/youtube";
-import { fetchExploreFeed } from "@/utils/api";
+import { fetchExploreFeed, fetchCategoryTracks } from "@/utils/api";
 import Loader from "@/components/Home/Loader";
 import toast from "react-hot-toast";
 import { Compass } from "lucide-react";
@@ -141,31 +140,88 @@ const ExplorePage = () => {
   };
 
   /**
+   * Helper matching section against active category filter across title, keyword, slug, and distinctive tokens.
+   */
+  const isMatchingSection = (sec, filter) => {
+    if (!sec || !filter || filter === "All") return true;
+    const f = filter.toLowerCase().trim();
+    const title = (sec.title || "").toLowerCase().trim();
+    const category = (sec.category || "").toLowerCase().trim();
+    const keyword = (sec.keyword || "").toLowerCase().trim();
+
+    // Direct equality against title, category slug, or query keyword
+    if (title === f || category === f || keyword === f) return true;
+
+    // Substring containment
+    if (title.includes(f) || f.includes(title)) return true;
+    if (category && (category.includes(f) || f.includes(category))) return true;
+    if (keyword && (keyword.includes(f) || f.includes(keyword))) return true;
+
+    // Distinctive token / stem overlap (e.g. "study" in "study music" and "Study Focus")
+    const stopWords = new Set(["music", "song", "songs", "track", "tracks", "hits", "beats", "chill", "and", "&"]);
+    const filterTokens = f.split(/[\s&/_-]+/).filter((w) => w.length > 2 && !stopWords.has(w));
+    const titleTokens = title.split(/[\s&/_-]+/).filter((w) => w.length > 2);
+    const keywordTokens = keyword.split(/[\s&/_-]+/).filter((w) => w.length > 2 && !stopWords.has(w));
+
+    return (
+      filterTokens.some((t) => titleTokens.includes(t)) ||
+      filterTokens.some((t) => keywordTokens.includes(t))
+    );
+  };
+
+  /**
    * Category Filter Selection Handler
    */
-  const handleSelectCategory = async (categoryQuery) => {
+  const handleSelectCategory = async (categoryQuery, categoryMeta = null) => {
     if (!categoryQuery) return;
     setActiveFilter(categoryQuery);
 
     if (categoryQuery === "All") return;
 
     // Check if section already exists in explore feed
-    const existingIndex = exploreFeed.findIndex(
-      (sec) => sec.title.toLowerCase().includes(categoryQuery.toLowerCase()) ||
-               categoryQuery.toLowerCase().includes(sec.title.toLowerCase())
-    );
+    const existingIndex = exploreFeed.findIndex((sec) => isMatchingSection(sec, categoryQuery));
 
-    if (existingIndex !== -1) return;
+    // If section already exists with tracks, ensure visible count is set and reuse it
+    if (existingIndex !== -1 && exploreFeed[existingIndex]?.tracks?.length > 0) {
+      const existingSec = exploreFeed[existingIndex];
+      setVisibleTracks((prev) => ({
+        ...prev,
+        [existingSec.title]: prev[existingSec.title] || 5,
+      }));
+      return;
+    }
 
-    // Otherwise fetch fresh music section for this category
-    toast.loading(`Loading ${categoryQuery}...`, { id: "explore-genre" });
+    // Otherwise fetch fresh music section for this category from PostgreSQL (0-Quota rule)
+    const displayName = categoryMeta?.name || categoryQuery;
+    toast.loading(`Loading ${displayName}...`, { id: "explore-genre" });
     try {
-      const tracks = await fetchYoutubeMusic(categoryQuery, 15);
-      setExploreFeed((prev) => [{ title: categoryQuery, tracks }, ...prev]);
-      setVisibleTracks((prev) => ({ ...prev, [categoryQuery]: 5 }));
-      toast.success(`Loaded ${categoryQuery}`, { id: "explore-genre" });
+      const { title, category, keyword, tracks } = await fetchCategoryTracks(categoryQuery, 20);
+      if (tracks && tracks.length > 0) {
+        const sectionTitle = title || categoryMeta?.name || categoryQuery;
+        const newSection = {
+          title: sectionTitle,
+          category: category || categoryQuery,
+          keyword: keyword || categoryQuery,
+          tracks,
+        };
+
+        // Prepend new section and remove any prior empty or duplicate section for this category
+        setExploreFeed((prev) => [
+          newSection,
+          ...prev.filter((sec) => !isMatchingSection(sec, categoryQuery)),
+        ]);
+
+        setVisibleTracks((prev) => ({
+          ...prev,
+          [sectionTitle]: 5,
+          [categoryQuery]: 5,
+        }));
+        toast.success(`Loaded ${sectionTitle}`, { id: "explore-genre" });
+      } else {
+        toast.error(`No tracks found for ${displayName}`, { id: "explore-genre" });
+      }
     } catch (e) {
-      toast.error(`Failed to load ${categoryQuery}`, { id: "explore-genre" });
+      toast.error(`Failed to load ${displayName}`, { id: "explore-genre" });
     }
   };
 
@@ -182,10 +238,7 @@ const ExplorePage = () => {
         .slice(0, 8);
     }
 
-    const matchingSec = exploreFeed.find(
-      (sec) => sec.title.toLowerCase().includes(activeFilter.toLowerCase()) ||
-               activeFilter.toLowerCase().includes(sec.title.toLowerCase())
-    );
+    const matchingSec = exploreFeed.find((sec) => isMatchingSection(sec, activeFilter));
 
     return (matchingSec?.tracks || []).slice(0, 5).map((t) => ({
       ...t,
@@ -199,10 +252,7 @@ const ExplorePage = () => {
   const displayedSections = useMemo(() => {
     if (activeFilter === "All") return exploreFeed;
 
-    return exploreFeed.filter(
-      (sec) => sec.title.toLowerCase().includes(activeFilter.toLowerCase()) ||
-               activeFilter.toLowerCase().includes(sec.title.toLowerCase())
-    );
+    return exploreFeed.filter((sec) => isMatchingSection(sec, activeFilter));
   }, [exploreFeed, activeFilter]);
 
   return (

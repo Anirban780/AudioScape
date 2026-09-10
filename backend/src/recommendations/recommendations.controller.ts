@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Param, UseGuards } from '@nestjs/common';
 import { RecommendationsService } from './recommendations.service';
 import { GetRecommendationsDto } from './dto/get-recommendations.dto';
 import { PaginatedRecommendationsDto } from './dto/paginated-recommendations.dto';
@@ -116,6 +116,21 @@ export class RecommendationsController {
   ) {
     const limitPerCategory = limit ? parseInt(limit, 10) : 5;
     return this.recommendationsService.getExploreFeed(userId, limitPerCategory);
+  }
+
+  /**
+   * Retrieves tracks for a specific category or genre directly from PostgreSQL (0-quota rule).
+   * Executes 100% against local database catalog and ranks candidates via dual engagement (website + YouTube).
+   * @route GET `/api/music/explore/category/:keyword?limit=20`
+   * @header Authorization Bearer <google_id_token>
+   */
+  @Get('explore/category/:keyword')
+  async getCategoryTracks(
+    @Param('keyword') keyword: string,
+    @Query('limit') limit?: string,
+  ) {
+    const limitNum = limit ? parseInt(limit, 10) : 20;
+    return this.recommendationsService.getCategoryTracks(keyword, limitNum);
   }
 
   /**

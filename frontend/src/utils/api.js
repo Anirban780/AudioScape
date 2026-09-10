@@ -478,6 +478,8 @@ export async function fetchExploreFeed() {
         // Map backend schema (id, name, artist, thumbnail) to frontend schema (videoId, title, channelTitle, thumbNail)
         return (data || []).map((section) => ({
             title: section.title,
+            keyword: section.keyword || section.title,
+            category: section.category || section.title,
             tracks: (section.tracks || []).map((t) => {
                 const thumb = getValidThumbnailUrl(t.thumbnail || t.thumbNail || "") || "";
                 return {
@@ -519,6 +521,67 @@ export async function fetchExploreCategories() {
     } catch (error) {
         console.error("Error fetching explore categories:", error);
         return [];
+    }
+}
+
+/**
+ * Fetches tracks for a specific genre or category directly from PostgreSQL (0-quota rule).
+ * Replaces legacy client-side YouTube Data API v3 search calls to eliminate 100 quota units/click.
+ *
+ * @param {string} keyword - Category query keyword, slug, or label.
+ * @param {number} [limit=20] - Number of tracks to retrieve.
+ * @returns {Promise<{ title: string, category: string, tracks: Array }>} Category payload with tracks.
+ */
+export async function fetchCategoryTracks(keyword, limit = 20) {
+    if (!keyword || !keyword.trim()) return { title: "", category: "", tracks: [] };
+
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
+
+        const response = await fetch(
+            `${API_URL}/api/music/explore/category/${encodeURIComponent(keyword.trim())}?limit=${limit}`,
+            {
+                method: "GET",
+                headers: { ...headers },
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch category tracks for "${keyword}": ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const rawTracks = Array.isArray(data) ? data : data.tracks || [];
+
+        const tracks = rawTracks.map((t) => {
+            const thumb = getValidThumbnailUrl(t.thumbnail || t.thumbNail || "") || "";
+            return {
+                id: t.id || t.videoId,
+                videoId: t.id || t.videoId,
+                name: t.name || t.title || "Unknown Title",
+                title: t.name || t.title || "Unknown Title",
+                artist: t.artist || t.channelTitle || "Unknown Artist",
+                channelTitle: t.artist || t.channelTitle || "Unknown Artist",
+                thumbnail: thumb,
+                thumbNail: thumb,
+            };
+        });
+
+        return {
+            title: data.title || keyword,
+            category: data.category || keyword,
+            keyword,
+            tracks,
+        };
+    } catch (error) {
+        console.error(`Error fetching category tracks for "${keyword}":`, error);
+        return {
+            title: keyword,
+            category: keyword,
+            keyword,
+            tracks: [],
+        };
     }
 }
 

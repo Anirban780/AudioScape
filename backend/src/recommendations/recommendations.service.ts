@@ -4,7 +4,7 @@ import { TracksService } from '../tracks/tracks.service';
 import { TfIdfEngine, UserHistoryItem, CandidateQueryGroup, RecommendedTrackResult } from './tfidf-engine';
 import { TrackItemDto } from './dto/cache-related-tracks.dto';
 import { CURATED_GENRES, CURATED_CATEGORIES } from './curated-genres';
-import { QueryType } from '@prisma/client';
+import { QueryType, Prisma } from '@prisma/client';
 import { calculateTasteWeight, calculateQualityScore } from './taste-weight.util';
 import { getValidThumbnailUrl } from '../utils/youtubeUtils';
 
@@ -35,8 +35,11 @@ export class RecommendationsService {
   private readonly affinityCache = new Map<string, { data: Map<string, number>; expiresAt: number }>();
   // In-memory cache mapping `${userId || 'anonymous'}:${limitPerCategory}` -> { feed, expiresAt }
   private readonly exploreFeedCache = new Map<string, { feed: any[]; expiresAt: number }>();
+  // In-memory cache mapping `${normalizedKeyword}:${limit}` -> { result: any, expiresAt: number }
+  private readonly categoryTracksCache = new Map<string, { result: any; expiresAt: number }>();
   private readonly CACHE_TTL_MS = 60 * 60 * 1000; // 1 Hour
   private readonly EXPLORE_CACHE_TTL_MS = 15 * 60 * 1000; // 15 Minutes
+  private readonly CATEGORY_CACHE_TTL_MS = 15 * 60 * 1000; // 15 Minutes
 
   constructor(
     private readonly prisma: PrismaService,
@@ -925,12 +928,16 @@ export class RecommendationsService {
 
           return {
             title: sectionTitle,
+            keyword,
+            category: categoryMeta?.slug || keyword,
             tracks: mappedTracks,
           };
         } catch (err: any) {
           this.logger.error(`Explore section processing failed for keyword '${keyword}': ${err.message}`);
           return {
             title: keyword,
+            keyword,
+            category: keyword,
             tracks: [],
           };
         }
@@ -944,6 +951,365 @@ export class RecommendationsService {
     });
 
     return exploreFeed;
+  }
+
+  /**
+   * Helper computing a normalized query string (lowercase, trimmed, collapsed whitespace, punctuation stripped).
+   */
+  private normalizeCategoryKeyword(raw: string): string {
+    if (!raw) return '';
+    return raw
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, ' ')
+      .replace(/[^\w\s]/g, '');
+  }
+
+  /**
+   * Retrieves tracks for a specific category or genre directly from PostgreSQL (0-quota rule).
+   * 
+   * KEY ARCHITECTURAL PRINCIPLES:
+   * 1. 0 YouTube API Quota Units: Runs 100% against local PostgreSQL catalog (Tracks, ListenHistory, QueryTrackResult).
+   * 2. Intelligent Taxonomy Resolution: Maps slugs ('lofi-chill'), labels ('Lofi & Chill'), or keywords ('lofi music')
+   *    to canonical taxonomy metadata in CURATED_CATEGORIES.
+   * 3. Background Pre-Warming Registration: If the category query is new or thin in PostgreSQL, records a SearchQuery
+   *    with QueryType.CURATED_KEYWORD so background cron jobs refresh/populate it later without blocking live response.
+   * 4. Dual-Engagement Composite Ranking:
+   *    Ranks candidates by combining website engagement (website likes + plays from listen_history) with YouTube engagement
+   *    (YouTube likeCount * qualityScore):
+   *      WebsiteEngagement = (websiteLikes * 3.0) + (websitePlays * 1.0)
+   *      YouTubeEngagement = log10(youtubeLikes + 1) * qualityScore
+   *      CompositeScore = (normWebsite * 0.5) + (normYouTube * 0.5)
+   * 5. Layer 0 In-Memory Caching: 15-minute TTL memory cache for sub-millisecond response times.
+   * 
+   * @param keyword - Category keyword, slug, or display label
+   * @param limit - Number of tracks to return (default: 20)
+   * @returns Category payload with resolved title and scored track list
+   */
+  async getCategoryTracks(keyword: string, limit: number = 20) {
+    if (!keyword || !keyword.trim()) {
+      throw new HttpException('Keyword parameter is required for category exploration', HttpStatus.BAD_REQUEST);
+    }
+
+    const trimmed = keyword.trim();
+    const normalized = this.normalizeCategoryKeyword(trimmed);
+    const cacheKey = `${normalized}:${limit}`;
+
+    // STEP 1: Check In-Memory Category Cache (Layer 0)
+    const cached = this.categoryTracksCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) {
+      this.logger.log(`In-memory cache HIT for category tracks [key: ${cacheKey}]`);
+      return cached.result;
+    }
+
+    // STEP 2: Taxonomy & Synonym Resolution
+    const categoryMeta = CURATED_CATEGORIES.find(
+      (c) =>
+        c.slug.toLowerCase() === trimmed.toLowerCase() ||
+        c.keyword.toLowerCase() === trimmed.toLowerCase() ||
+        c.label.toLowerCase() === trimmed.toLowerCase() ||
+        this.normalizeCategoryKeyword(c.keyword) === normalized ||
+        this.normalizeCategoryKeyword(c.label) === normalized,
+    );
+
+    const canonicalKeyword = categoryMeta ? categoryMeta.keyword : trimmed;
+    const sectionTitle = categoryMeta ? categoryMeta.label : (trimmed.charAt(0).toUpperCase() + trimmed.slice(1));
+
+    // Generic music stop words that should NOT be standalone single-word search tokens
+    // Prevents generic tags like 'music' from matching unrelated metal/pop/shorts in study music
+    const GENERIC_STOP_WORDS = new Set([
+      'music', 'song', 'songs', 'track', 'tracks', 'audio', 'video',
+      'hits', 'official', 'mix', 'playlist', 'sound', 'sounds', 'beats', 'cover', 'covers',
+    ]);
+
+    // Distinctive single words (e.g. 'study', 'focus' - excluding 'music')
+    const distinctiveWords = Array.from(
+      new Set([
+        ...trimmed.toLowerCase().split(/\s+/),
+        ...canonicalKeyword.toLowerCase().split(/\s+/),
+        ...(categoryMeta ? categoryMeta.label.toLowerCase().split(/\s+/) : []),
+      ]),
+    ).filter((w) => w.length > 2 && !GENERIC_STOP_WORDS.has(w));
+
+    // Full multi-word phrases (e.g. 'study music', 'study focus')
+    const fullPhrases = Array.from(
+      new Set([
+        trimmed.toLowerCase(),
+        canonicalKeyword.toLowerCase(),
+        ...(categoryMeta ? [categoryMeta.label.toLowerCase()] : []),
+      ]),
+    );
+
+    // Specific search tokens: full phrases + distinctive words (never generic stop words)
+    const searchTokens = Array.from(new Set([...fullPhrases, ...distinctiveWords]));
+
+    // STEP 3: Asynchronously register categorical term for Cron pre-warming
+    // User feedback: "save the categorical terms and use cron jobs to refresh it later in the day"
+    this.registerCategoryForCronPrewarm(canonicalKeyword, normalized).catch((err) =>
+      this.logger.warn(`Failed to register category "${canonicalKeyword}" for cron pre-warming: ${err.message}`),
+    );
+
+    // Helper checking if track is a YouTube Short or micro-clip
+    const isShortTrack = (t: any) =>
+      (t.title && /#shorts?\b/i.test(t.title)) ||
+      (t.rawTitle && /#shorts?\b/i.test(t.rawTitle)) ||
+      (Array.isArray(t.tags) && t.tags.some((tag: string) => /^#?shorts?$/i.test(tag))) ||
+      (typeof t.durationSeconds === 'number' && t.durationSeconds > 0 && t.durationSeconds < 60);
+
+    // STEP 4: Query PostgreSQL Tracks Corpus (100% Local, 0 YouTube Quota)
+    let candidateTracks: any[] = [];
+    try {
+      const orConditions: Prisma.TracksWhereInput[] = [
+        { genre: { hasSome: searchTokens } },
+        { tags: { hasSome: searchTokens } },
+        { artist: { contains: canonicalKeyword, mode: 'insensitive' } },
+        { artistName: { contains: canonicalKeyword, mode: 'insensitive' } },
+        { title: { contains: canonicalKeyword, mode: 'insensitive' } },
+        {
+          queryResults: {
+            some: {
+              query: {
+                OR: [
+                  { rawQuery: { contains: canonicalKeyword, mode: 'insensitive' } },
+                  { normalizedQuery: { contains: normalized } },
+                ],
+              },
+            },
+          },
+        },
+      ];
+
+      if (distinctiveWords.length > 0) {
+        orConditions.push({ title: { contains: distinctiveWords[0], mode: 'insensitive' } });
+      }
+
+      candidateTracks = await this.prisma.tracks.findMany({
+        where: {
+          isEmbeddable: true,
+          isAvailable: true,
+          NOT: [
+            { title: { contains: '#shorts', mode: 'insensitive' } },
+            { title: { contains: '#short', mode: 'insensitive' } },
+          ],
+          OR: orConditions,
+        },
+        include: {
+          listenHistory: {
+            select: {
+              playCount: true,
+              liked: true,
+            },
+          },
+          queryResults: {
+            select: {
+              query: {
+                select: {
+                  rawQuery: true,
+                  normalizedQuery: true,
+                },
+              },
+            },
+          },
+        },
+        take: Math.max(100, limit * 4),
+      });
+
+      // Filter out any lingering shorts or micro-clips safely in memory
+      candidateTracks = candidateTracks.filter((t) => !isShortTrack(t));
+    } catch (err: any) {
+      this.logger.error(`PostgreSQL category track query failed for "${keyword}": ${err.message}`);
+    }
+
+    // STEP 5: Fallback if candidate pool is empty
+    if (!candidateTracks || candidateTracks.length === 0) {
+      this.logger.warn(`No direct matches for category "${keyword}" in local DB. Serving high-quality catalog fallbacks.`);
+      try {
+        const fallbacks = await this.prisma.tracks.findMany({
+          where: {
+            isEmbeddable: true,
+            isAvailable: true,
+            NOT: [
+              { title: { contains: '#shorts', mode: 'insensitive' } },
+              { title: { contains: '#short', mode: 'insensitive' } },
+            ],
+          },
+          include: {
+            listenHistory: {
+              select: {
+                playCount: true,
+                liked: true,
+              },
+            },
+            queryResults: {
+              select: {
+                query: {
+                  select: {
+                    rawQuery: true,
+                    normalizedQuery: true,
+                  },
+                },
+              },
+            },
+          },
+          take: limit * 2,
+          orderBy: { likeCount: 'desc' },
+        });
+        candidateTracks = fallbacks.filter((t) => !isShortTrack(t)).slice(0, limit);
+      } catch (fallbackErr: any) {
+        this.logger.error(`Catalog fallback failed: ${fallbackErr.message}`);
+        candidateTracks = [];
+      }
+    }
+
+    // STEP 6: Dual-Engagement Composite Ranking with Semantic Relevance Weighting
+    // Computes:
+    // - Semantic Relevance: Evaluates title/tags alignment with category (penalizes peripheral matches)
+    // - Website Engagement: websiteLikes * 3.0 + websitePlays * 1.0 (from listen_history)
+    // - YouTube Engagement: log10(youtubeLikes + 1) * qualityScore
+    // - Composite Score: ((normWebsite * 0.5) + (normYouTube * 0.5)) * relevance
+    let maxWebsiteEngagement = 0;
+    let maxYouTubeEngagement = 0;
+
+    const computeRelevance = (track: any): number => {
+      const titleLower = (track.title || '').toLowerCase();
+      const rawTitleLower = (track.rawTitle || '').toLowerCase();
+      const trackTags = [...(track.genre || []), ...(track.tags || [])].map((t: string) => t.toLowerCase());
+
+      // 1. Direct query result from YouTube search for this category
+      const isDirectQueryResult = (track.queryResults || []).some((qr: any) => {
+        const q = qr.query;
+        if (!q) return false;
+        return (
+          q.normalizedQuery === normalized ||
+          q.rawQuery?.toLowerCase() === canonicalKeyword.toLowerCase() ||
+          q.rawQuery?.toLowerCase() === trimmed.toLowerCase()
+        );
+      });
+      if (isDirectQueryResult) return 1.0;
+
+      // 2. Full phrase in title
+      if (fullPhrases.some((phrase) => titleLower.includes(phrase) || rawTitleLower.includes(phrase))) {
+        return 0.95;
+      }
+
+      // 3. Distinctive keyword in title
+      if (distinctiveWords.some((kw) => titleLower.includes(kw) || rawTitleLower.includes(kw))) {
+        return 0.85;
+      }
+
+      // 4. Full phrase in tags/genre
+      if (fullPhrases.some((phrase) => trackTags.some((tag) => tag.includes(phrase)))) {
+        return 0.75;
+      }
+
+      // 5. Distinctive keyword in tags/genre
+      if (distinctiveWords.some((kw) => trackTags.some((tag) => tag.includes(kw)))) {
+        return 0.60;
+      }
+
+      return 0.20;
+    };
+
+    const analyzed = candidateTracks.map((t) => {
+      const history = t.listenHistory || [];
+      const websiteLikes = history.filter((h: any) => h.liked === true).length;
+      const websitePlays = history.reduce((sum: number, h: any) => sum + (h.playCount || 1), 0);
+      const websiteEngagement = websiteLikes * 3.0 + websitePlays * 1.0;
+
+      const youtubeLikes = Number(t.likeCount || 0);
+      const quality = calculateQualityScore(t);
+      const youtubeEngagement = Math.log10(youtubeLikes + 1) * quality;
+      const relevance = computeRelevance(t);
+
+      if (websiteEngagement > maxWebsiteEngagement) maxWebsiteEngagement = websiteEngagement;
+      if (youtubeEngagement > maxYouTubeEngagement) maxYouTubeEngagement = youtubeEngagement;
+
+      return {
+        track: t,
+        websiteLikes,
+        websitePlays,
+        websiteEngagement,
+        youtubeLikes,
+        quality,
+        youtubeEngagement,
+        relevance,
+      };
+    });
+
+    const scored = analyzed.map((item) => {
+      const normWebsite = maxWebsiteEngagement > 0 ? item.websiteEngagement / maxWebsiteEngagement : 0;
+      const normYouTube = maxYouTubeEngagement > 0 ? item.youtubeEngagement / maxYouTubeEngagement : 0;
+
+      const baseEngagement = maxWebsiteEngagement > 0
+        ? normWebsite * 0.5 + normYouTube * 0.5
+        : normYouTube;
+
+      // Multiply base engagement by semantic relevance to ensure topical accuracy
+      const compositeScore = baseEngagement * item.relevance;
+
+      return {
+        ...item,
+        compositeScore,
+      };
+    });
+
+    // Sort by composite score descending
+    scored.sort((a, b) => b.compositeScore - a.compositeScore);
+
+    // Map top N tracks to client-ready schema
+    const mappedTracks = scored.slice(0, limit).map(({ track }) => ({
+      id: track.youtubeVideoId,
+      videoId: track.youtubeVideoId,
+      name: track.title,
+      title: track.title,
+      artist: track.artist || track.artistName || 'Unknown Artist',
+      channelTitle: track.artist || track.artistName || 'Unknown Artist',
+      thumbnail: getValidThumbnailUrl(track.thumbnailUrl) || '',
+      thumbNail: getValidThumbnailUrl(track.thumbnailUrl) || '',
+    }));
+
+    const result = {
+      success: true,
+      category: canonicalKeyword,
+      title: sectionTitle,
+      count: mappedTracks.length,
+      tracks: mappedTracks,
+      cached: false,
+    };
+
+    // Save to Layer 0 In-Memory Cache
+    this.categoryTracksCache.set(cacheKey, {
+      result: { ...result, cached: true },
+      expiresAt: Date.now() + this.CATEGORY_CACHE_TTL_MS,
+    });
+
+    return result;
+  }
+
+  /**
+   * Asynchronously registers or increments hitCount for a requested category in SearchQuery.
+   * Ensures that popular or novel user-filtered categories are prioritized by the background cron
+   * pre-warming job (refreshExploreCache) later in the day.
+   */
+  private async registerCategoryForCronPrewarm(rawQuery: string, normalizedQuery: string): Promise<void> {
+    try {
+      await this.prisma.searchQuery.upsert({
+        where: { normalizedQuery },
+        update: {
+          hitCount: { increment: 1 },
+          lastSearchedAt: new Date(),
+        },
+        create: {
+          rawQuery,
+          normalizedQuery,
+          queryType: QueryType.CURATED_KEYWORD,
+          hitCount: 1,
+          lastSearchedAt: new Date(),
+        },
+      });
+    } catch (err: any) {
+      this.logger.warn(`Failed to register search query for pre-warming: ${err.message}`);
+    }
   }
 
   /**
@@ -1168,8 +1534,9 @@ export class RecommendationsService {
       timestamp: new Date().toISOString(),
     };
 
-    // Invalidate in-memory explore feed cache so freshly pre-warmed categories are immediately served
+    // Invalidate in-memory explore feed and category caches so freshly pre-warmed categories are immediately served
     this.exploreFeedCache.clear();
+    this.categoryTracksCache.clear();
 
     this.logger.log(
       `[Cron Pre-Warming] Completed background pre-warming in ${durationSeconds}s: ${cacheHits} hits (DB), ${cacheMisses} missed/updated from YouTube.`,

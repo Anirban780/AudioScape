@@ -105,7 +105,7 @@ const ExploreFilterBar = ({ activeCategory, onSelectCategory }) => {
           return (
             <button
               key={cat.query}
-              onClick={() => onSelectCategory(cat.query)}
+              onClick={() => onSelectCategory(cat.query, cat)}
               className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap transition-all duration-200 cursor-pointer text-xs sm:text-sm font-semibold border ${
                 isActive
                   ? "bg-[var(--color-primary)] text-[var(--color-text-on-primary)] border-[var(--color-primary)] shadow-md scale-[1.02]"

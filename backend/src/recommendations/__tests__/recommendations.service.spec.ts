@@ -397,4 +397,163 @@ describe('RecommendationsService QA Test Suite', () => {
       expect(p1ShuffledFresh.length).toBe(16);
     });
   });
+
+  describe('getCategoryTracks (Phase 4.1 0-Quota Category Endpoint)', () => {
+    it('TC-CAT-01: retrieves category tracks from PostgreSQL with 0 YouTube API quota', async () => {
+      const mockCategoryTracks = [
+        {
+          youtubeVideoId: 'lofi_1',
+          title: 'Coffee Beans',
+          artist: 'Lofi Producer',
+          artistName: 'Lofi Producer',
+          isEmbeddable: true,
+          thumbnailUrl: 'https://i.ytimg.com/vi/lofi_1/hqdefault.jpg',
+          likeCount: BigInt(20000),
+          genre: ['lofi music', 'chill beats'],
+          tags: ['lofi', 'study'],
+          listenHistory: [{ playCount: 5, liked: true }],
+        },
+        {
+          youtubeVideoId: 'lofi_2',
+          title: 'Rainy Night',
+          artist: 'Chill Beats',
+          artistName: 'Chill Beats',
+          isEmbeddable: true,
+          thumbnailUrl: 'https://i.ytimg.com/vi/lofi_2/hqdefault.jpg',
+          likeCount: BigInt(50000),
+          genre: ['lofi music'],
+          tags: ['chill'],
+          listenHistory: [{ playCount: 2, liked: false }],
+        },
+      ];
+
+      (mockPrismaService.tracks.findMany as jest.Mock).mockResolvedValue(mockCategoryTracks);
+      (mockPrismaService.searchQuery.upsert as jest.Mock).mockResolvedValue({});
+
+      const result = await service.getCategoryTracks('lofi music', 10);
+
+      expect(result.success).toBe(true);
+      expect(result.category).toBe('lofi music');
+      expect(result.title).toBe('Lofi & Chill');
+      expect(result.tracks.length).toBe(2);
+      expect(result.tracks[0].id).toBe('lofi_1');
+      expect(result.tracks[0].title).toBe('Coffee Beans');
+      // Verify NO live YouTube API search was invoked
+      expect(mockTracksService.searchTracks).not.toHaveBeenCalled();
+    });
+
+    it('TC-CAT-02: ranks tracks using composite formula blending website engagement (likes + plays) and YouTube engagement', async () => {
+      const candidateTracks = [
+        {
+          youtubeVideoId: 'pop_low_local',
+          title: 'YouTube Giant Pop Hit',
+          artist: 'Mainstream Star',
+          artistName: 'Mainstream Star',
+          isEmbeddable: true,
+          thumbnailUrl: 'https://i.ytimg.com/vi/pop_low_local/hqdefault.jpg',
+          likeCount: BigInt(1000000),
+          genre: ['pop hits'],
+          tags: ['pop'],
+          listenHistory: [{ playCount: 1, liked: false }], // 0 website likes, 1 play
+        },
+        {
+          youtubeVideoId: 'pop_high_local',
+          title: 'Community Favorite Pop Anthem',
+          artist: 'Indie Darling',
+          artistName: 'Indie Darling',
+          isEmbeddable: true,
+          thumbnailUrl: 'https://i.ytimg.com/vi/pop_high_local/hqdefault.jpg',
+          likeCount: BigInt(10000),
+          genre: ['pop hits'],
+          tags: ['pop'],
+          // 3 website likes + 15 plays = high website engagement
+          listenHistory: [
+            { playCount: 5, liked: true },
+            { playCount: 5, liked: true },
+            { playCount: 5, liked: true },
+          ],
+        },
+      ];
+
+      (mockPrismaService.tracks.findMany as jest.Mock).mockResolvedValue(candidateTracks);
+      (mockPrismaService.searchQuery.upsert as jest.Mock).mockResolvedValue({});
+
+      // Use unique keyword to bypass in-memory cache
+      const result = await service.getCategoryTracks('pop hits', 10);
+
+      expect(result.success).toBe(true);
+      expect(result.tracks.length).toBe(2);
+      // Community Favorite should rank #1 because of strong website likes + play engagement
+      expect(result.tracks[0].id).toBe('pop_high_local');
+      expect(result.tracks[1].id).toBe('pop_low_local');
+    });
+
+    it('TC-CAT-03: serves repeat requests from in-memory categoryTracksCache within TTL', async () => {
+      const mockTracks = [
+        {
+          youtubeVideoId: 'synth_1',
+          title: 'Midnight Drive',
+          artist: 'Kavinsky Vibe',
+          isEmbeddable: true,
+          thumbnailUrl: 'https://i.ytimg.com/vi/synth_1/hqdefault.jpg',
+          likeCount: BigInt(5000),
+          listenHistory: [],
+        },
+      ];
+
+      (mockPrismaService.tracks.findMany as jest.Mock).mockResolvedValue(mockTracks);
+      (mockPrismaService.searchQuery.upsert as jest.Mock).mockResolvedValue({});
+
+      // First call -> cache miss, queries DB
+      const firstResult = await service.getCategoryTracks('synthwave', 5);
+      expect(firstResult.cached).toBe(false);
+      const dbCallCount = (mockPrismaService.tracks.findMany as jest.Mock).mock.calls.length;
+
+      // Second call -> in-memory cache HIT, skips DB
+      const secondResult = await service.getCategoryTracks('synthwave', 5);
+      expect(secondResult.cached).toBe(true);
+      expect((mockPrismaService.tracks.findMany as jest.Mock).mock.calls.length).toBe(dbCallCount);
+    });
+
+    it('TC-CAT-04: gracefully falls back to embeddable catalog tracks when category has 0 direct matches', async () => {
+      // First call (direct match) returns empty array
+      // Second call (catalog fallback) returns fallback track
+      (mockPrismaService.tracks.findMany as jest.Mock)
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([
+          {
+            youtubeVideoId: 'catalog_fallback_1',
+            title: 'Top Catalog Track',
+            artist: 'Popular Artist',
+            isEmbeddable: true,
+            thumbnailUrl: 'https://i.ytimg.com/vi/fb/hqdefault.jpg',
+            likeCount: BigInt(80000),
+            listenHistory: [],
+          },
+        ]);
+      (mockPrismaService.searchQuery.upsert as jest.Mock).mockResolvedValue({});
+
+      const result = await service.getCategoryTracks('obscure-genre-xyz', 5);
+      expect(result.success).toBe(true);
+      expect(result.tracks.length).toBe(1);
+      expect(result.tracks[0].id).toBe('catalog_fallback_1');
+    });
+
+    it('TC-CAT-05: registers requested category in searchQuery for cron pre-warming', async () => {
+      (mockPrismaService.tracks.findMany as jest.Mock).mockResolvedValue([]);
+      (mockPrismaService.searchQuery.upsert as jest.Mock).mockResolvedValue({});
+
+      await service.getCategoryTracks('afrobeats', 5);
+
+      expect(mockPrismaService.searchQuery.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { normalizedQuery: 'afrobeats' },
+          create: expect.objectContaining({
+            rawQuery: 'afrobeats',
+            queryType: QueryType.CURATED_KEYWORD,
+          }),
+        }),
+      );
+    });
+  });
 });
