@@ -7,9 +7,10 @@ import toast from "react-hot-toast";
 import { Compass } from "lucide-react";
 
 import ExploreTrendingBanner from "@/components/Explore/ExploreTrendingBanner";
-import ExploreFilterBar from "@/components/Explore/ExploreFilterBar";
+import ExploreDiscoveryBar from "@/components/Explore/ExploreDiscoveryBar";
 import ExploreSection from "@/components/Explore/ExploreSection";
 import { matchesCategory } from "@/constants/curatedCategories";
+import usePlayerStore from "@/store/usePlayerStore";
 
 /**
  * ============================================================================
@@ -204,6 +205,41 @@ const ExplorePage = () => {
   };
 
   /**
+   * Surprise Me / Random Station Mix Generator (Option 3 Discovery Bar)
+   * Samples a randomized 20-track mix across loaded sections for serendipitous listening.
+   */
+  const handleSurpriseMe = () => {
+    if (!exploreFeed || exploreFeed.length === 0) return;
+
+    // Aggregate all unique tracks across currently loaded sections
+    const allTracks = [];
+    exploreFeed.forEach((sec) => {
+      (sec.tracks || []).forEach((trk) => {
+        const id = trk.id || trk.videoId;
+        if (id && !allTracks.some((t) => (t.id || t.videoId) === id)) {
+          allTracks.push(trk);
+        }
+      });
+    });
+
+    if (allTracks.length === 0) {
+      toast.error("No tracks available for surprise mix");
+      return;
+    }
+
+    // Pick a random seed track and shuffle 20 tracks
+    const shuffled = [...allTracks].sort(() => 0.5 - Math.random()).slice(0, 20);
+
+    usePlayerStore.getState().playStation(shuffled, {
+      shuffle: true,
+      stationName: "Surprise Discovery Mix",
+      source: "EXPLORE_SURPRISE",
+    });
+
+    toast.success("🎲 Tuning into Surprise Discovery Mix (20 Tracks)!");
+  };
+
+  /**
    * Declarative Trending Tracks Derivation (useMemo):
    * - "All" mode: Top 1 song from each category section (up to 8 tracks)
    * - Filtered mode: Top 5 songs from the selected category section
@@ -268,6 +304,13 @@ const ExplorePage = () => {
     return exploreFeed.filter((sec) => matchesCategory(sec, activeFilter));
   }, [exploreFeed, activeFilter]);
 
+  /**
+   * Total tracks currently available across displayed sections
+   */
+  const totalAvailableTracks = useMemo(() => {
+    return displayedSections.reduce((acc, sec) => acc + (sec.tracks?.length || 0), 0);
+  }, [displayedSections]);
+
   return (
     <AppLayout>
       <div className="w-full mx-auto py-2 animate-in fade-in duration-300">
@@ -289,13 +332,7 @@ const ExplorePage = () => {
           </div>
         </div>
 
-        {/* 1. Category Filter Boxes (Compact Pill Bar) */}
-        <ExploreFilterBar
-          activeCategory={activeFilter}
-          onSelectCategory={handleSelectCategory}
-        />
-
-        {/* 2. Trending Spotlight Hero Banner (Full-Width HD, Auto Slow-Pan & Carousel) */}
+        {/* 1. Trending Spotlight Hero Banner (Full-Width HD, Auto Slow-Pan & Carousel) */}
         <ExploreTrendingBanner
           trendingTracks={trendingTracks}
           stationTracks={spotlightStationTracks}
@@ -303,6 +340,15 @@ const ExplorePage = () => {
           loading={loading}
           enablePanAnimation={true} // Enables automatic top-to-bottom slow pan vertical image animation
           imageObjectPosition="center center"
+        />
+
+        {/* 2. Sleek Discovery Control Bar (Option 3: Grouped Dropdown & Surprise Mix) */}
+        <ExploreDiscoveryBar
+          activeCategory={activeFilter}
+          onSelectCategory={handleSelectCategory}
+          onSurpriseMe={handleSurpriseMe}
+          totalSections={displayedSections.length}
+          totalTracks={totalAvailableTracks}
         />
 
         {/* 3. Categorized Music Track Sections */}
