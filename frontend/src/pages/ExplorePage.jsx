@@ -6,7 +6,7 @@ import Loader from "@/components/Home/Loader";
 import toast from "react-hot-toast";
 import { Compass } from "lucide-react";
 
-import ExploreTrendingBanner from "@/components/Explore/ExploreTrendingBanner";
+import ExploreSplitHero from "@/components/Explore/ExploreSplitHero";
 import ExploreDiscoveryBar from "@/components/Explore/ExploreDiscoveryBar";
 import ExploreSection from "@/components/Explore/ExploreSection";
 import { matchesCategory } from "@/constants/curatedCategories";
@@ -261,6 +261,34 @@ const ExplorePage = () => {
   }, [exploreFeed, activeFilter]);
 
   /**
+   * Top 4 Trending Leaderboard Tracks for ExploreSplitHero (Phase 4.4):
+   * - "All" mode: Selects top 4 ranked tracks across all sections in exploreFeed
+   * - Filtered mode: Selects top 4 ranked tracks of the selected category
+   */
+  const leaderboardTracks = useMemo(() => {
+    if (activeFilter === "All") {
+      const pool = [];
+      for (const sec of exploreFeed || []) {
+        for (const trk of sec.tracks || []) {
+          const id = trk.id || trk.videoId;
+          if (id && !pool.some((t) => (t.id || t.videoId) === id)) {
+            pool.push({ ...trk, categoryName: sec.title });
+            if (pool.length >= 4) break;
+          }
+        }
+        if (pool.length >= 4) break;
+      }
+      return pool.slice(0, 4);
+    }
+
+    const matchingSec = exploreFeed.find((sec) => matchesCategory(sec, activeFilter));
+    return (matchingSec?.tracks || []).slice(0, 4).map((t) => ({
+      ...t,
+      categoryName: matchingSec?.title || activeFilter,
+    }));
+  }, [exploreFeed, activeFilter]);
+
+  /**
    * Complete 20-track Station Playlist for Hero Spotlight Banner "Play Station" CTA:
    * - Filtered mode: Full 20-track section of the active category
    * - "All" mode: Round-robin across explore sections to guarantee exactly 20 unique tracks
@@ -332,13 +360,14 @@ const ExplorePage = () => {
           </div>
         </div>
 
-        {/* 1. Trending Spotlight Hero Banner (Full-Width HD, Auto Slow-Pan & Carousel) */}
-        <ExploreTrendingBanner
+        {/* 1. Cinematic Split Hero Layout (Phase 4.4: 70% Banner + 30% Hot 4 Leaderboard) */}
+        <ExploreSplitHero
           trendingTracks={trendingTracks}
           stationTracks={spotlightStationTracks}
+          leaderboardTracks={leaderboardTracks}
           activeCategory={activeFilter}
           loading={loading}
-          enablePanAnimation={true} // Enables automatic top-to-bottom slow pan vertical image animation
+          enablePanAnimation={true}
           imageObjectPosition="center center"
         />
 

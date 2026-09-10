@@ -178,25 +178,23 @@ html {
     font-size: 85%;
   }
 }
-/* Vertical Smooth Pan Animation for Hero Banner Background Artwork */
+/* Vertical Smooth Pan Animation for Hero Banner Background Artwork (Constant Scale, Zero Zoom In/Out Jitter) */
 @keyframes heroPanUpDown {
   0% {
     object-position: center 5%;
-    transform: scale(1.04);
   }
   50% {
     object-position: center 95%;
-    transform: scale(1.08);
   }
   100% {
     object-position: center 5%;
-    transform: scale(1.04);
   }
 }
 
 .animate-pan-vertical {
-  animation: heroPanUpDown 12s ease-in-out infinite alternate;
-  will-change: object-position, transform;
+  animation: heroPanUpDown 16s ease-in-out infinite alternate;
+  will-change: object-position;
+  transform: scale(1.05); /* Constant subtle scale prevents edge bleed during vertical pan */
 }
 
 /* Cinematic Zoom-In Animation for Hero Banner Background Artwork */

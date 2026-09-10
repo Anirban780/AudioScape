@@ -1268,6 +1268,8 @@ export class RecommendationsService {
       channelTitle: track.artist || track.artistName || 'Unknown Artist',
       thumbnail: getValidThumbnailUrl(track.thumbnailUrl) || '',
       thumbNail: getValidThumbnailUrl(track.thumbnailUrl) || '',
+      viewCount: track.viewCount ? Number(track.viewCount) : null,
+      likeCount: track.likeCount ? Number(track.likeCount) : null,
     }));
 
     const result = {
