@@ -23,6 +23,9 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     strictPort: true,
+    watch: {
+      usePolling: true,
+    },
   },
   test: {
     // Use jsdom to emulate browser APIs (localStorage, DOM, IntersectionObserver stub)

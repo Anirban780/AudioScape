@@ -22,7 +22,7 @@ import toast from "react-hot-toast";
  * 
  * HOW IT WORKS:
  * - Accepts `section` object (`title`, `tracks`), `visibleCount`, and `onLoadMore` handler.
- * - Clicking any track card sets active track in `usePlayerStore`.
+ * - Clicking any track card invokes `handlePlayTrack` to start playback with "EXPLORE" source.
  */
 
 const ExploreSection = ({ section, visibleCount = 5, onLoadMore }) => {
@@ -34,6 +34,18 @@ const ExploreSection = ({ section, visibleCount = 5, onLoadMore }) => {
 
   const displayedTracks = section.tracks.slice(0, visibleCount);
   const hasMore = visibleCount < section.tracks.length;
+
+  const handlePlayTrack = (track) => {
+    setTrack({
+      id: track.id || track.videoId,
+      name: track.name || track.title,
+      artist: track.artist || track.channelTitle,
+      thumbnail: track.thumbnail || track.thumbNail,
+      source: "EXPLORE",
+    }, "EXPLORE");
+    usePlayerStore.getState().setIsPlaying(true);
+    toast.success(`Playing: ${track.name || track.title}`);
+  };
 
   return (
     <div className="p-6 rounded-[28px] border border-[var(--color-border-default)] bg-[var(--color-surface-raised)] shadow-md mb-8 transition-all duration-300">
@@ -56,16 +68,7 @@ const ExploreSection = ({ section, visibleCount = 5, onLoadMore }) => {
             name={track.name || track.title}
             artist={track.artist || track.channelTitle}
             image={track.thumbnail || track.thumbNail}
-            onClick={() => {
-              setTrack({
-                id: track.id || track.videoId,
-                name: track.name || track.title,
-                artist: track.artist || track.channelTitle,
-                thumbnail: track.thumbnail || track.thumbNail,
-              });
-              usePlayerStore.getState().setIsPlaying(true);
-              toast.success(`Playing: ${track.name || track.title}`);
-            }}
+            onClick={() => handlePlayTrack(track)}
           />
         ))}
       </MediaGrid>

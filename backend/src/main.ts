@@ -21,6 +21,11 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
  * 5. Graceful Shutdown Hooks: Enables process signal handlers (`SIGTERM`, `SIGINT`) for clean database disconnection.
  * ============================================================================
  */
+// Polyfill BigInt serialization for JSON responses (Prisma BigInt columns like viewCount, likeCount)
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
 

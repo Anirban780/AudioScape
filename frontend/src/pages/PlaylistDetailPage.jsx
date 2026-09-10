@@ -123,24 +123,24 @@ const PlaylistDetailPage = () => {
     // ── Track Management & Playback ───────────────────────────────────────────
     const handlePlayTrack = (track) => {
         if (!localTracks.length) return;
-        setQueue(localTracks);
-        setTrack(track);
-        playTrack(track);
+        setQueue(localTracks, "PLAYLIST");
+        setTrack(track, "PLAYLIST");
+        if (typeof playTrack === 'function') playTrack(track);
     };
 
     const handlePlayAll = () => {
         if (!localTracks.length) return;
-        setQueue(localTracks);
-        setTrack(localTracks[0]);
-        playTrack(localTracks[0]);
+        setQueue(localTracks, "PLAYLIST");
+        setTrack(localTracks[0], "PLAYLIST");
+        if (typeof playTrack === 'function') playTrack(localTracks[0]);
     };
 
     const handleShuffle = () => {
         if (!localTracks.length) return;
         const shuffled = [...localTracks].sort(() => Math.random() - 0.5);
-        setQueue(shuffled);
-        setTrack(shuffled[0]);
-        playTrack(shuffled[0]);
+        setQueue(shuffled, "PLAYLIST");
+        setTrack(shuffled[0], "PLAYLIST");
+        if (typeof playTrack === 'function') playTrack(shuffled[0]);
     };
 
     const handleRemoveTrack = async (track) => {

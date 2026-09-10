@@ -268,4 +268,61 @@ describe('TracksService QA Unit Test Suite', () => {
       expect(mockedAxios.get).not.toHaveBeenCalled(); // 0 YouTube API quota units consumed!
     });
   });
+
+  /**
+   * TC-BE-07: Live Enrichment with Force Refresh
+   * Verifies that getTrackDetails bypasses local cache when forceRefresh is true,
+   * queries YouTube API with snippet, contentDetails, statistics, and status,
+   * and extracts statistics and licensing fields.
+   */
+  describe('Live Track Enrichment & Metadata Extraction', () => {
+    test('TC-BE-07: Should bypass cache and extract rich fields when forceRefresh is true', async () => {
+      mockPrismaService.tracks.findUnique.mockResolvedValue({
+        youtubeVideoId: 'track_enrich_1',
+        title: 'Old Title',
+        duration: 'PT3M0S',
+      });
+
+      mockedAxios.get.mockResolvedValueOnce({
+        data: {
+          items: [
+            {
+              id: 'track_enrich_1',
+              snippet: {
+                title: 'Arijit Singh - Tum Hi Ho (Official Video)',
+                description: 'Official music video for Tum Hi Ho',
+                channelTitle: 'T-Series',
+                channelId: 'ch_tseries',
+                publishedAt: '2013-04-08T00:00:00Z',
+                tags: ['bollywood', 'arijit singh', 'romance'],
+                categoryId: '10',
+              },
+              contentDetails: {
+                duration: 'PT4M22S',
+                licensedContent: true,
+              },
+              statistics: {
+                viewCount: '500000000',
+                likeCount: '3500000',
+              },
+              status: {
+                embeddable: true,
+              },
+            },
+          ],
+        },
+      });
+
+      const result = await service.getTrackDetails('track_enrich_1', true);
+
+      expect(mockedAxios.get).toHaveBeenCalled();
+      expect(result.videoId).toBe('track_enrich_1');
+      expect(result.artistName).toBe('Arijit Singh');
+      expect(result.title).toBe('Tum Hi Ho');
+      expect(result.viewCount).toBe('500000000');
+      expect(result.likeCount).toBe('3500000');
+      expect(result.isEmbeddable).toBe(true);
+      expect(result.licensedContent).toBe(true);
+    });
+  });
 });

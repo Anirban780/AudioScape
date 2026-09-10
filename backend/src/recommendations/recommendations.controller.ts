@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
 import { RecommendationsService } from './recommendations.service';
 import { GetRecommendationsDto } from './dto/get-recommendations.dto';
+import { PaginatedRecommendationsDto } from './dto/paginated-recommendations.dto';
 import { CacheRelatedTracksDto } from './dto/cache-related-tracks.dto';
 import { GenerateQueueDto } from './dto/generate-queue.dto';
 import { ExtendQueueDto } from './dto/extend-queue.dto';
@@ -22,7 +23,8 @@ import { IsCron } from '../auth/decorators/is-cron.decorator';
  * continuous playback queues.
  * 
  * ENDPOINTS:
- * - POST `/api/music/recommend`             -> Get personalized music recommendations
+ * - POST `/api/music/recommend`             -> Get personalized music recommendations (Home)
+ * - GET  `/api/music/recommendations`       -> Get paginated music recommendations (Explore/Infinite)
  * - POST `/api/music/cache-related-tracks` -> Cache keyword search results in PostgreSQL
  * - POST `/api/music/generate-queue`        -> Generate continuous queue for current track
  * - POST `/api/music/extend-queue`          -> Fetch additional non-duplicate queue tracks
@@ -44,8 +46,25 @@ export class RecommendationsController {
     @GetUser('id') userId: string,
     @Body() dto: GetRecommendationsDto,
   ) {
-    const topN = dto.topN || 5;
+    const topN = dto.topN || 20;
     return this.recommendationsService.getRecommendations(userId, topN);
+  }
+
+  /**
+   * Retrieves paginated personalized track recommendations for authenticated user.
+   * Supports infinite scrolling, pagination, and candidate set shuffling.
+   * @route GET `/api/music/recommendations?page=1&limit=20&shuffle=false`
+   * @header Authorization Bearer <google_id_token>
+   */
+  @Get('recommendations')
+  async getPaginatedRecommendations(
+    @GetUser('id') userId: string,
+    @Query() dto: PaginatedRecommendationsDto,
+  ) {
+    const page = dto.page || 1;
+    const limit = dto.limit || 20;
+    const shuffle = dto.shuffle === true || (dto.shuffle as any) === 'true';
+    return this.recommendationsService.getPaginatedRecommendations(userId, page, limit, shuffle);
   }
 
   /**

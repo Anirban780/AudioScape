@@ -49,15 +49,33 @@ async function getAuthHeader() {
 }
 
 /**
- * Saves a song listen event to NestJS backend database.
- * @param {string} videoId - The ID of the song/video.
+ * Saves a song listen event to NestJS backend database with full playback attribution context.
+ *
+ * @param {string} videoId - The YouTube ID of the song/video.
+ * @param {string} source - Playback attribution source ('SEARCH' | 'EXPLORE' | 'RECOMMENDATION' | 'PLAYLIST' | 'RELATED_QUEUE')
+ * @param {object} track - Optional track metadata object for automatic PostgreSQL provisioning
  */
-export async function saveSongListen(videoId) {
+export async function saveSongListen(videoId, source = "SEARCH", track = {}) {
     if (!videoId) return;
 
     try {
         const headers = await getAuthHeader();
         const API_URL = await getBackendURL();
+
+        const payload = {
+            videoId,
+            source,
+        };
+
+        if (track?.title || track?.name) {
+            payload.title = track.title || track.name;
+        }
+        if (track?.artist || track?.channelTitle) {
+            payload.artist = track.artist || track.channelTitle;
+        }
+        if (track?.thumbnail || track?.thumbNail) {
+            payload.thumbnailUrl = track.thumbnail || track.thumbNail;
+        }
 
         const response = await fetch(`${API_URL}/api/music/history`, {
             method: "POST",
@@ -65,14 +83,14 @@ export async function saveSongListen(videoId) {
                 "Content-Type": "application/json",
                 ...headers,
             },
-            body: JSON.stringify({ videoId }),
+            body: JSON.stringify(payload),
         });
 
         if (!response.ok) {
             throw new Error(`Failed to save song listen: ${response.status} ${response.statusText}`);
         }
 
-        console.log("Song saved to database successfully");
+        console.log(`Song saved to database successfully (source: ${source})`);
         // Trigger delayed invalidation for playback history subscribers
         useDataRefreshStore.getState().invalidate("history");
     } catch (error) {
@@ -318,6 +336,92 @@ export const getRecommendations = async (arg1 = 10, arg2) => {
     } catch (err) {
         console.error("Recommendation error:", err);
         return [];
+    }
+};
+
+/**
+ * ============================================================================
+ * FETCH PAGINATED RECOMMENDATIONS (fetchPaginatedRecommendations)
+ * ============================================================================
+ * Calls NestJS backend GET /api/music/recommendations with pagination and shuffle options.
+ * Queries 100% indexed local PostgreSQL catalog with zero YouTube API quota consumption.
+ * 
+ * @param {Object} options
+ * @param {number} [options.page=1] - 1-based page number
+ * @param {number} [options.limit=20] - Page size
+ * @param {boolean} [options.shuffle=false] - When true, applies windowed Fisher-Yates shuffling
+ * @returns {Promise<{ data: Array, meta: Object }>}
+ */
+export const fetchPaginatedRecommendations = async ({ page = 1, limit = 20, shuffle = false } = {}) => {
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
+
+        const params = new URLSearchParams({
+            page: String(page),
+            limit: String(limit),
+            shuffle: String(shuffle),
+        });
+
+        const response = await fetch(`${API_URL}/api/music/recommendations?${params.toString()}`, {
+            method: "GET",
+            headers: { ...headers },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch paginated recommendations: ${response.status} ${response.statusText}`);
+        }
+
+        const json = await response.json();
+        const rawData = json.recommendations || json.data || (Array.isArray(json) ? json : []);
+        const total = typeof json.total === "number" ? json.total : (json.meta?.total ?? rawData.length);
+        const limitNum = typeof json.limit === "number" ? json.limit : (json.meta?.limit ?? limit);
+        const totalPages = typeof json.totalPages === "number" ? json.totalPages : (json.meta?.totalPages ?? Math.max(1, Math.ceil(total / limitNum)));
+        const currentPage = typeof json.page === "number" ? json.page : (json.meta?.page ?? page);
+
+        const meta = {
+            total,
+            page: currentPage,
+            limit: limitNum,
+            totalPages,
+            hasNext: currentPage < totalPages,
+            hasPrev: currentPage > 1,
+            isShuffled: typeof json.isShuffled === "boolean" ? json.isShuffled : (json.meta?.isShuffled ?? Boolean(shuffle)),
+        };
+
+        const formattedData = rawData.map((item) => {
+            const thumb = getValidThumbnailUrl(item.thumbNail || item.thumbnail || "") || item.thumbNail || item.thumbnail || "";
+            return {
+                id: item.videoId || item.id,
+                videoId: item.videoId || item.id,
+                title: item.title || item.name || "Unknown Title",
+                name: item.title || item.name || "Unknown Title",
+                artist: item.artist || item.channelTitle || "Unknown Artist",
+                channelTitle: item.artist || item.channelTitle || "Unknown Artist",
+                thumbnail: thumb,
+                thumbNail: thumb,
+                sourceKeyword: item.sourceKeyword || item.keyword || (Array.isArray(item.genre) ? item.genre[0] : item.genre) || "Discovery",
+            };
+        });
+
+        return {
+            data: formattedData,
+            meta,
+        };
+    } catch (err) {
+        console.error("fetchPaginatedRecommendations error:", err);
+        return {
+            data: [],
+            meta: {
+                total: 0,
+                page,
+                limit,
+                totalPages: 0,
+                hasNext: false,
+                hasPrev: false,
+                isShuffled: Boolean(shuffle),
+            },
+        };
     }
 };
 

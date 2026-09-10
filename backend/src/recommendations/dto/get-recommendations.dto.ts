@@ -21,5 +21,5 @@ export class GetRecommendationsDto {
   @IsInt({ message: 'topN must be an integer' })
   @Min(1, { message: 'topN must be at least 1' })
   @Max(50, { message: 'topN cannot exceed 50' })
-  topN?: number = 5;
+  topN?: number = 20;
 }

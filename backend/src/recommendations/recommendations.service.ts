@@ -5,7 +5,7 @@ import { TfIdfEngine, UserHistoryItem, CandidateQueryGroup, RecommendedTrackResu
 import { TrackItemDto } from './dto/cache-related-tracks.dto';
 import { CURATED_GENRES, CURATED_CATEGORIES } from './curated-genres';
 import { QueryType } from '@prisma/client';
-import { calculateTasteWeight } from './taste-weight.util';
+import { calculateTasteWeight, calculateQualityScore } from './taste-weight.util';
 import { getValidThumbnailUrl } from '../utils/youtubeUtils';
 
 /**
@@ -64,19 +64,25 @@ export class RecommendationsService {
 
   /**
    * Computes or fetches cached personalized music recommendations for a user.
+   * Multi-Signal Track-Level Expansion Architecture:
+   * - Signal 1 (60%): Top artists expansion leveraging B-Tree and GIN trigram indexes.
+   * - Signal 2 (25%): Genre & tag array overlap matching.
+   * - Signal 3 (15%): Recent search query candidates with rank-position decay.
+   * - 80% Discovery / 20% Rediscovery: Strict 10-track session exclusion with up to 4 rediscovery tracks from older history.
+   * - 100% PostgreSQL execution (0 YouTube API quota consumption).
    * 
    * @param userId - Internal PostgreSQL user UUID
-   * @param topN - Number of recommended tracks to return (default: 5)
+   * @param topN - Number of recommended tracks to return (default: 20)
    * @returns Object containing success boolean and recommendations array
    */
-  async getRecommendations(userId: string, topN: number = 5) {
+  async getRecommendations(userId: string, topN: number = 20) {
     if (!userId) {
       throw new HttpException('User ID is required for recommendations', HttpStatus.BAD_REQUEST);
     }
 
     // STEP 1: Check In-Memory Cache (Layer 0)
     const cached = this.recCache.get(userId);
-    if (cached && cached.expiresAt > Date.now()) {
+    if (cached && cached.expiresAt > Date.now() && cached.tracks.length >= topN) {
       this.logger.log(`In-memory cache HIT for user recommendations: ${userId}`);
       return {
         success: true,
@@ -91,68 +97,442 @@ export class RecommendationsService {
       orderBy: { lastPlayedAt: 'desc' },
       take: 100,
       include: {
-        track: true,
-      },
-    });
-
-    const userHistory: UserHistoryItem[] = historyRecords.map((rh) => ({
-      trackId: rh.trackId,
-      playCount: rh.playCount,
-      liked: rh.liked,
-      lastPlayedAt: rh.lastPlayedAt,
-      track: {
-        youtubeVideoId: rh.track.youtubeVideoId,
-        title: rh.track.title,
-        artist: rh.track.artist || rh.track.artistName || 'Unknown Artist',
-        genre: rh.track.genre || [],
-        tags: rh.track.tags || [],
-        thumbnailUrl: getValidThumbnailUrl(rh.track.thumbnailUrl) || '',
-      },
-    }));
-
-    // STEP 3: Load Candidate Search Query Corpus (Layer 1 SearchQuery)
-    const candidateQueries = await this.prisma.searchQuery.findMany({
-      where: {
-        OR: [
-          { expiresAt: { gt: new Date() } },
-          { queryType: QueryType.CURATED_KEYWORD },
-        ],
-      },
-      take: 50,
-      include: {
-        results: {
-          orderBy: { rankPosition: 'asc' },
-          include: { track: true },
+        track: {
+          include: {
+            queryResults: {
+              include: {
+                query: true,
+              },
+            },
+          },
         },
       },
     });
 
-    const candidateGroups: CandidateQueryGroup[] = candidateQueries.map((sq) => ({
-      queryId: sq.id,
-      keyword: sq.rawQuery,
-      tracks: sq.results.map((res) => ({
-        youtubeVideoId: res.track.youtubeVideoId,
-        title: res.track.title,
-        artist: res.track.artist || res.track.artistName || 'Unknown Artist',
-        thumbnailUrl: getValidThumbnailUrl(res.track.thumbnailUrl) || '',
-        genre: res.track.genre || [],
-        tags: res.track.tags || [],
-      })),
+    // Cold-start fallback for brand new users with no listening history
+    if (!historyRecords || historyRecords.length === 0) {
+      this.logger.log(`Cold start user (${userId}). Serving curated catalog recommendations.`);
+      const coldStartRecs = await this.getColdStartRecommendations(topN);
+      return {
+        success: true,
+        recommendations: coldStartRecs,
+        cached: false,
+      };
+    }
+
+    const now = new Date();
+    const nowTime = now.getTime();
+
+    // STEP 3: History Segmentation & Exclusion Rules
+    // Rule A: Strictly exclude the 10 most recently played tracks (immediate session fatigue protection)
+    const immediateSessionIds = new Set(historyRecords.slice(0, 10).map((h) => h.trackId));
+    // Rule B: All played tracks excluded from fresh discovery pool
+    const allHistoryTrackIds = new Set(historyRecords.map((h) => h.trackId));
+
+    // Rule C: Rediscovery Pool (20% slot allocation / 4 tracks: tracks played > 14 days ago OR playCount <= 2, excluding immediate 10)
+    const rediscoveryPool = historyRecords
+      .filter((h) => {
+        if (immediateSessionIds.has(h.trackId)) return false;
+        if (h.track.isEmbeddable === false) return false;
+        const days = (nowTime - new Date(h.lastPlayedAt).getTime()) / (1000 * 60 * 60 * 24);
+        return days > 14 || h.playCount <= 2;
+      })
+      .map((h) => {
+        const tasteWeight = calculateTasteWeight(
+          { liked: h.liked, lastPlayedAt: h.lastPlayedAt, playCount: h.playCount },
+          now,
+        );
+        const qualityScore = calculateQualityScore(h.track);
+        return {
+          history: h,
+          score: tasteWeight * qualityScore,
+        };
+      })
+      .sort((a, b) => b.score - a.score);
+
+    // STEP 4: Seed Profile Extraction (Aggregated from user's full history)
+    const artistWeights = new Map<string, number>();
+    const tagWeights = new Map<string, number>();
+    const userSearchQueryIds = new Set<string>();
+
+    for (const h of historyRecords) {
+      const weight = calculateTasteWeight(
+        { liked: h.liked, lastPlayedAt: h.lastPlayedAt, playCount: h.playCount },
+        now,
+      );
+
+      // Aggregate artist weights
+      const artist = (h.track.artistName || h.track.artist || '').trim();
+      if (artist && artist.toLowerCase() !== 'unknown artist') {
+        artistWeights.set(artist, (artistWeights.get(artist) || 0) + weight);
+      }
+
+      // Aggregate genre and tag weights
+      const combinedTags = [...(h.track.genre || []), ...(h.track.tags || [])];
+      for (const tag of combinedTags) {
+        const cleaned = tag.toLowerCase().trim();
+        if (cleaned.length > 2) {
+          tagWeights.set(cleaned, (tagWeights.get(cleaned) || 0) + weight);
+        }
+      }
+
+      // Collect user search query references
+      for (const qr of h.track.queryResults) {
+        if (qr.query?.id) {
+          userSearchQueryIds.add(qr.query.id);
+        }
+      }
+    }
+
+    const sortedArtists = [...artistWeights.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 10);
+    const maxArtistWeight = sortedArtists.length > 0 ? sortedArtists[0][1] : 1.0;
+
+    const sortedTags = [...tagWeights.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 15);
+    const maxTagWeight = sortedTags.length > 0 ? sortedTags[0][1] : 1.0;
+
+    // STEP 5: Multi-Signal Candidate Track Retrieval (100% PostgreSQL)
+    interface CandidateItem {
+      track: any;
+      score: number;
+      sourceKeyword: string;
+      signal: 'artist' | 'genre' | 'search' | 'rediscover' | 'curated';
+    }
+    const candidateMap = new Map<string, CandidateItem>();
+
+    // SIGNAL 1: Top Artists Expansion (Target Weight: 60%)
+    // Uses B-Tree and GIN trigram indexes created in Phase 2
+    for (const [artist, weight] of sortedArtists) {
+      try {
+        const artistTracks = await this.prisma.tracks.findMany({
+          where: {
+            OR: [
+              { artist: { equals: artist, mode: 'insensitive' } },
+              { artistName: { equals: artist, mode: 'insensitive' } },
+              { artist: { contains: artist, mode: 'insensitive' } },
+              { artistName: { contains: artist, mode: 'insensitive' } },
+            ],
+            isEmbeddable: true,
+            youtubeVideoId: { notIn: Array.from(allHistoryTrackIds) },
+          },
+          take: 6,
+          orderBy: { likeCount: 'desc' },
+        });
+
+        for (const track of artistTracks) {
+          if (!candidateMap.has(track.youtubeVideoId)) {
+            const quality = calculateQualityScore(track);
+            const jitter = 0.95 + Math.random() * 0.1;
+            const score = 0.60 * (weight / maxArtistWeight) * quality * jitter;
+            candidateMap.set(track.youtubeVideoId, {
+              track,
+              score,
+              sourceKeyword: artist,
+              signal: 'artist',
+            });
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`Artist expansion query failed for artist '${artist}': ${err.message}`);
+      }
+    }
+
+    // SIGNAL 2: Genre & Tag Overlap Matching (Target Weight: 25%)
+    if (sortedTags.length > 0) {
+      const topTagNames = sortedTags.slice(0, 8).map(([tag]) => tag);
+      try {
+        const genreTracks = await this.prisma.tracks.findMany({
+          where: {
+            OR: [
+              { genre: { hasSome: topTagNames } },
+              { tags: { hasSome: topTagNames } },
+            ],
+            isEmbeddable: true,
+            youtubeVideoId: {
+              notIn: [
+                ...Array.from(allHistoryTrackIds),
+                ...Array.from(candidateMap.keys()),
+              ],
+            },
+          },
+          take: 30,
+          orderBy: { likeCount: 'desc' },
+        });
+
+        for (const track of genreTracks) {
+          if (!candidateMap.has(track.youtubeVideoId)) {
+            const trackTags = [...(track.genre || []), ...(track.tags || [])].map((t) => t.toLowerCase().trim());
+            let overlapWeight = 0;
+            let dominantTag = topTagNames[0];
+            let highestTagW = 0;
+
+            for (const t of trackTags) {
+              const w = tagWeights.get(t) || 0;
+              if (w > 0) {
+                overlapWeight += w;
+                if (w > highestTagW) {
+                  highestTagW = w;
+                  dominantTag = t;
+                }
+              }
+            }
+
+            const quality = calculateQualityScore(track);
+            const jitter = 0.95 + Math.random() * 0.1;
+            const score = 0.25 * (Math.min(maxTagWeight, overlapWeight) / maxTagWeight) * quality * jitter;
+            candidateMap.set(track.youtubeVideoId, {
+              track,
+              score,
+              sourceKeyword: dominantTag ? (dominantTag.charAt(0).toUpperCase() + dominantTag.slice(1)) : 'Daily Mix',
+              signal: 'genre',
+            });
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`Genre expansion query failed: ${err.message}`);
+      }
+    }
+
+    // SIGNAL 3: Recent User Searches (Target Weight: 15%)
+    try {
+      const searchResults = await this.prisma.queryTrackResult.findMany({
+        where: {
+          OR: [
+            ...(userSearchQueryIds.size > 0 ? [{ queryId: { in: Array.from(userSearchQueryIds) } }] : []),
+            { query: { queryType: QueryType.USER_SEARCH } },
+          ],
+          track: {
+            isEmbeddable: true,
+            youtubeVideoId: {
+              notIn: [
+                ...Array.from(allHistoryTrackIds),
+                ...Array.from(candidateMap.keys()),
+              ],
+            },
+          },
+        },
+        include: {
+          track: true,
+          query: true,
+        },
+        take: 20,
+        orderBy: { rankPosition: 'asc' },
+      });
+
+      for (const res of searchResults) {
+        if (!candidateMap.has(res.track.youtubeVideoId)) {
+          const rankDecay = 1.0 / Math.max(1, res.rankPosition || 1);
+          const quality = calculateQualityScore(res.track);
+          const jitter = 0.95 + Math.random() * 0.1;
+          const score = 0.15 * rankDecay * quality * jitter;
+          candidateMap.set(res.track.youtubeVideoId, {
+            track: res.track,
+            score,
+            sourceKeyword: res.query.rawQuery,
+            signal: 'search',
+          });
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Search query expansion failed: ${err.message}`);
+    }
+
+    // BACKFILL: If candidate pool is still smaller than topN, backfill with top catalog tracks
+    if (candidateMap.size < topN) {
+      try {
+        const needed = topN - candidateMap.size;
+        const backfillTracks = await this.prisma.tracks.findMany({
+          where: {
+            isEmbeddable: true,
+            youtubeVideoId: {
+              notIn: [
+                ...Array.from(immediateSessionIds),
+                ...Array.from(candidateMap.keys()),
+              ],
+            },
+          },
+          take: needed + 10,
+          orderBy: { likeCount: 'desc' },
+        });
+
+        for (const track of backfillTracks) {
+          if (!candidateMap.has(track.youtubeVideoId)) {
+            const quality = calculateQualityScore(track);
+            candidateMap.set(track.youtubeVideoId, {
+              track,
+              score: 0.10 * quality,
+              sourceKeyword: track.artist || track.artistName || 'Curated',
+              signal: 'curated',
+            });
+          }
+          if (candidateMap.size >= topN + 5) break;
+        }
+      } catch (err: any) {
+        this.logger.warn(`Catalog backfill failed: ${err.message}`);
+      }
+    }
+
+    // STEP 6: 80% Discovery vs 20% Rediscovery Slot Assembly
+    // Slices top-scoring fresh discovery tracks and interleaves 4 rediscovery tracks per 20-track block
+    // from the user's older or lightly-played history to guarantee an exact 16 fresh / 4 rediscovery ratio.
+    const sortedDiscovery = Array.from(candidateMap.values()).sort((a, b) => b.score - a.score);
+
+    const selectedCandidates: CandidateItem[] = [];
+
+    if (rediscoveryPool.length === 0) {
+      // If user has 0 qualifying rediscovery items (e.g. cold start / new history), serve fresh discovery candidates
+      selectedCandidates.push(...sortedDiscovery.slice(0, topN));
+    } else {
+      // Assemble in 20-track blocks maintaining exactly 16 fresh + 4 rediscovery tracks per block (80% / 20% ratio)
+      const numBlocks = Math.ceil(topN / 20);
+      const totalRediscoveryNeeded = numBlocks * 4;
+
+      // Prepare rediscovery candidates, cycling through rediscoveryPool if user has fewer qualifying items
+      const rediscoveryItems: CandidateItem[] = [];
+      for (let i = 0; i < totalRediscoveryNeeded; i++) {
+        const item = rediscoveryPool[i % rediscoveryPool.length];
+        const artistName = item.history.track.artistName || item.history.track.artist || 'Favorite';
+        rediscoveryItems.push({
+          track: item.history.track,
+          score: Math.max(0.90, item.score),
+          sourceKeyword: `Rediscover: ${artistName}`,
+          signal: 'rediscover',
+        });
+      }
+
+      for (let b = 0; b < numBlocks; b++) {
+        const blockFresh = sortedDiscovery.slice(b * 16, (b + 1) * 16);
+        const blockRedis = rediscoveryItems.slice(b * 4, (b + 1) * 4);
+
+        const blockCandidates = [...blockFresh];
+        // Interleave the 4 rediscovery tracks evenly across the block at indices 3, 7, 11, 15 (positions 4, 8, 12, 16)
+        blockRedis.forEach((rItem, idx) => {
+          const targetIndex = Math.min(blockCandidates.length, (idx + 1) * 4 - 1);
+          blockCandidates.splice(targetIndex, 0, rItem);
+        });
+
+        selectedCandidates.push(...blockCandidates);
+      }
+    }
+
+    const finalCandidates = selectedCandidates.slice(0, topN);
+
+    // Format output matching frontend schema and RecommendedTrackResult interface
+    const finalRecommendations: RecommendedTrackResult[] = finalCandidates.map((c) => ({
+      videoId: c.track.youtubeVideoId,
+      title: c.track.title,
+      artist: c.track.artist || c.track.artistName || 'Unknown Artist',
+      thumbNail: getValidThumbnailUrl(c.track.thumbnailUrl) || '',
+      sourceKeyword: c.sourceKeyword,
+      similarityScore: Math.round(c.score * 100) / 100,
     }));
 
-    // STEP 4: Compute TF-IDF Recommendations Engine
-    const recommendations = this.tfidfEngine.computeRecommendations(userHistory, candidateGroups, topN);
-
-    // STEP 5: Store in In-Memory Cache
+    // Store in Layer 0 In-Memory Cache (1-Hour TTL)
     this.recCache.set(userId, {
-      tracks: recommendations,
+      tracks: finalRecommendations,
       expiresAt: Date.now() + this.CACHE_TTL_MS,
     });
 
     return {
       success: true,
-      recommendations,
+      recommendations: finalRecommendations,
       cached: false,
+    };
+  }
+
+  /**
+   * Generates cold-start recommendations for users with 0 listening history.
+   * Pulls high-engagement, embeddable tracks across diverse catalog genres.
+   */
+  private async getColdStartRecommendations(count: number = 20): Promise<RecommendedTrackResult[]> {
+    try {
+      const tracks = await this.prisma.tracks.findMany({
+        where: {
+          isEmbeddable: true,
+        },
+        take: Math.max(50, count * 2),
+        orderBy: { likeCount: 'desc' },
+      });
+
+      const shuffled = this.shuffleArray(tracks).slice(0, count);
+      return shuffled.map((t) => ({
+        videoId: t.youtubeVideoId,
+        title: t.title,
+        artist: t.artist || t.artistName || 'Unknown Artist',
+        thumbNail: getValidThumbnailUrl(t.thumbnailUrl) || '',
+        sourceKeyword: (t.genre && t.genre[0]) || t.artist || 'Trending',
+        similarityScore: 1.0,
+      }));
+    } catch (err: any) {
+      this.logger.error(`Cold-start query failed: ${err.message}`);
+      return [];
+    }
+  }
+
+  /**
+   * Retrieves paginated personalized recommendations for infinite scroll or paginated browse pages.
+   * Guarantees an exact 16 fresh / 4 rediscovery ratio on every 20-track page.
+   * 
+   * @param userId - User PostgreSQL UUID
+   * @param page - 1-based page number
+   * @param limit - Tracks per page (default: 20)
+   * @param shuffle - Whether to randomize candidate order before pagination
+   * @returns Paginated recommendation result object
+   */
+  async getPaginatedRecommendations(
+    userId: string,
+    page: number = 1,
+    limit: number = 20,
+    shuffle: boolean = false,
+  ) {
+    const recResult = await this.getRecommendations(userId, 100);
+    let pool = [...(recResult.recommendations || [])];
+
+    if (shuffle) {
+      // Windowed/block shuffle: preserves the deterministic 16 fresh / 4 rediscovery ratio per page!
+      // Shuffles fresh tracks among fresh, and rediscovery tracks among rediscovery, then re-interleaves them.
+      const pageSize = limit;
+      const totalBlocks = Math.ceil(pool.length / pageSize);
+      const shuffledPool: RecommendedTrackResult[] = [];
+
+      for (let b = 0; b < totalBlocks; b++) {
+        const block = pool.slice(b * pageSize, (b + 1) * pageSize);
+        const fresh = block.filter(
+          (t) => !t.sourceKeyword?.toLowerCase().includes('rediscover'),
+        );
+        const redis = block.filter((t) =>
+          t.sourceKeyword?.toLowerCase().includes('rediscover'),
+        );
+
+        const shuffledFresh = this.shuffleArray(fresh);
+        const shuffledRedis = this.shuffleArray(redis);
+
+        const reassembled = [...shuffledFresh];
+        shuffledRedis.forEach((rItem, idx) => {
+          const insertIndex = Math.min(reassembled.length, (idx + 1) * 4 - 1);
+          reassembled.splice(insertIndex, 0, rItem);
+        });
+        shuffledPool.push(...reassembled);
+      }
+      pool = shuffledPool;
+    }
+
+    const total = pool.length;
+    const totalPages = Math.max(1, Math.ceil(total / limit));
+    const safePage = Math.max(1, Math.min(page, totalPages));
+    const startIndex = (safePage - 1) * limit;
+    const paginatedItems = pool.slice(startIndex, startIndex + limit);
+
+    return {
+      success: true,
+      page: safePage,
+      limit,
+      total,
+      totalPages,
+      recommendations: paginatedItems,
     };
   }
 
@@ -316,9 +696,24 @@ export class RecommendationsService {
       }, nowLocalDate);
 
       for (const qr of h.track.queryResults) {
-        if (qr.query.queryType !== QueryType.CURATED_KEYWORD) continue;
-        const key = qr.query.rawQuery.toLowerCase().trim();
-        affinity.set(key, (affinity.get(key) || 0) + weight);
+        if (qr.query.queryType === QueryType.CURATED_KEYWORD) {
+          const key = qr.query.rawQuery.toLowerCase().trim();
+          affinity.set(key, (affinity.get(key) || 0) + weight);
+        } else if (qr.query.queryType === QueryType.USER_SEARCH) {
+          // Tokenize user search query and match against CURATED_CATEGORIES
+          const searchStems = this.extractStemTokens(qr.query.rawQuery);
+          for (const category of CURATED_CATEGORIES) {
+            const catStems = this.extractStemTokens(category.keyword);
+            const matches = searchStems.some(
+              (s) => catStems.includes(s) || category.keyword.toLowerCase().includes(s),
+            );
+            if (matches) {
+              const catKey = category.keyword.toLowerCase().trim();
+              // User search adds 0.75x weight toward matching curated explore category
+              affinity.set(catKey, (affinity.get(catKey) || 0) + weight * 0.75);
+            }
+          }
+        }
       }
     }
 

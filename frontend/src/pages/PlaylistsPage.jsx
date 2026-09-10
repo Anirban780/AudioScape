@@ -64,8 +64,8 @@ const PlaylistsPage = () => {
                 toast("This playlist is empty. Add songs to start playing!", { icon: "🎵" });
                 return;
             }
-            setQueue(tracks);
-            await setTrack(tracks[0]);
+            setQueue(tracks, "PLAYLIST");
+            await setTrack(tracks[0], "PLAYLIST");
             setIsPlaying(true);
             toast.success(`Playing "${playlist.name}"`);
         } catch (err) {

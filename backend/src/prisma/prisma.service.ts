@@ -28,11 +28,15 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   private readonly logger = new Logger(PrismaService.name);
 
   constructor() {
-    // Determine Primary connection string
+    // Determine Primary connection string:
+    // Defaults to DATABASE_URL (Local Docker PostgreSQL during local development/testing).
+    // To explicitly route to Neon Cloud, set USE_NEON=true or set DATABASE_URL to a Neon connection string.
     const primaryUrl =
-      process.env.NEON_DATABASE_URL ||
-      process.env.DATABASE_URL ||
-      'postgresql://postgres:postgrespassword@localhost:5432/audioscape?schema=public';
+      process.env.USE_NEON === 'true'
+        ? process.env.NEON_DATABASE_URL || process.env.DATABASE_URL
+        : process.env.DATABASE_URL ||
+          process.env.LOCAL_DATABASE_URL ||
+          'postgresql://postgres:postgrespassword@localhost:5432/audioscape?schema=public';
 
     if (primaryUrl) {
       process.env.DATABASE_URL = primaryUrl;
@@ -54,9 +58,10 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   async onModuleInit() {
     try {
       await this.$connect();
-      this.logger.log(' Successfully connected to Primary PostgreSQL Database (Neon Cloud/Production)');
+      const isNeon = (process.env.DATABASE_URL || '').includes('neon.tech');
+      this.logger.log(` Successfully connected to Primary PostgreSQL Database (${isNeon ? 'Neon Cloud/Production' : 'Local Docker PostgreSQL'})`);
     } catch (primaryError: any) {
-      this.logger.warn(` Primary Cloud Database connection failed: ${primaryError.message}`);
+      this.logger.warn(` Primary Database connection failed: ${primaryError.message}`);
       this.logger.warn(' Attempting automated fallback connection to Local Docker PostgreSQL container...');
 
       try {

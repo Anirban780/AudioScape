@@ -305,6 +305,7 @@ const SearchBar = ({ onSelectTrack }) => {
       name: track.title,
       artist: track.channelTitle || "Unknown Artist",
       thumbnail: getValidThumbnailUrl(track.thumbNail) || placeholder,
+      source: "SEARCH",
     });
 
     setIsFocused(false);

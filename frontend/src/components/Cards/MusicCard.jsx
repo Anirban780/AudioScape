@@ -28,7 +28,7 @@ import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
  * - `variant`: `"default" | "featured" | "compact"` (defaults to `"default"`).
  * - `onClick(id)`: Invoked when clicking card body to select and play track.
  */
-const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) => {
+const MusicCard = ({ id, name, artist, image, onClick, variant = "default", badge = null, sourceKeyword = null }) => {
   const [isHovered, setIsHovered] = useState(false);
   const { openModal } = usePlaylistStore();
   const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
@@ -81,9 +81,16 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
 
           {/* Title & Artist */}
           <div className="min-w-0 flex-1">
-            <h4 className="font-bold text-sm text-[var(--color-on-surface)] truncate group-hover:text-[var(--color-primary)] transition-colors" title={cleanName}>
-              {cleanName}
-            </h4>
+            <div className="flex items-center gap-2">
+              <h4 className="font-bold text-sm text-[var(--color-on-surface)] truncate group-hover:text-[var(--color-primary)] transition-colors" title={cleanName}>
+                {cleanName}
+              </h4>
+              {(badge || sourceKeyword) && (
+                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-[var(--color-surface-overlay)] text-[var(--color-primary)] border border-[var(--color-border-default)] uppercase shrink-0">
+                  {String(badge || sourceKeyword).toLowerCase().includes("rediscover") ? "REDISCOVER" : badge || sourceKeyword}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-[var(--color-on-surface-variant)] truncate mt-0.5" title={artist}>
               {artist || "Unknown Artist"}
             </p>
@@ -251,6 +258,17 @@ const MusicCard = ({ id, name, artist, image, onClick, variant = "default" }) =>
                 <div className="p-3 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] shadow-lg transform transition-transform scale-100 group-hover:scale-110">
                   <Play size={24} className="fill-current ml-0.5" />
                 </div>
+              </div>
+            )}
+
+            {/* Attribution Badge (Rediscover, Artist, Genre, Search) */}
+            {(badge || sourceKeyword) && (
+              <div className="absolute bottom-2 left-2 z-20 max-w-[85%] truncate px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wider backdrop-blur-md shadow-xs border border-white/20 flex items-center gap-1 text-white bg-black/75">
+                {String(badge || sourceKeyword).toLowerCase().includes("rediscover") ? (
+                  <span className="text-amber-400 font-black">✦ REDISCOVER</span>
+                ) : (
+                  <span className="truncate">{badge || sourceKeyword}</span>
+                )}
               </div>
             )}
           </div>

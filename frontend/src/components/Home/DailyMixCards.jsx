@@ -4,6 +4,7 @@ import placeholder from "@/assets/placeholder.jpg";
 import usePlayerStore from "@/store/usePlayerStore";
 import { getValidThumbnailUrl, getHighResThumbnailUrl } from "@/utils/youtubeUtils";
 import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
+import toast from "react-hot-toast";
 
 /**
  * ============================================================================
@@ -12,16 +13,15 @@ import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
  * 
  * WHAT THIS FILE DOES:
  * Renders the 2–3 grouped "Daily Mix" cards in the 4-column right slot of the Home Hero grid:
- * 1. Keyword-Grouped Recommendation Buckets: Groups the flat TF-IDF recommendation payload
- *    by `sourceKeyword` (e.g., "Lo-fi", "Synthwave", "K-pop", "Ambient").
+ * 1. Multi-Signal Keyword Buckets: Groups the recommendation payload by Phase 3 sourceKeyword
+ *    (e.g., "Artist: Anirudh", "Genre: Synthwave", "Rediscover: Coldplay", "Search: Phonk").
  * 2. Distinct Mix Cards: Renders 2–3 stacked Daily Mix cards with custom accent colors,
  *    mix badges, track counts, and artist highlights.
  * 3. 1-Click Queue Streaming: Clicking "Play Mix" on any card immediately loads that mix's
- *    tracks into `usePlayerStore` queue and begins streaming.
+ *    tracks into `usePlayerStore` queue and begins continuous streaming.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * - Replaces static hero banners with intelligent, genre-seeded mix cards derived directly from
- *   the user's listening history and recommendation engine keywords.
+ * - Surfaces real artist and genre signals instead of static text categories.
  * - Occupies the exact `lg:col-span-4` hero slot (`h-[340px] sm:h-[370px]`) for a seamless layout.
  * 
  * HOW IT WORKS:
@@ -51,6 +51,33 @@ const MIX_THEMES = [
 const capitalize = (str) => {
   if (!str) return "Daily Mix";
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+};
+
+/**
+ * Formats multi-signal keywords into clean human-readable Mix titles.
+ */
+const formatMixTitle = (rawKw) => {
+  if (!rawKw) return "Daily Mix: Discoveries";
+  const str = String(rawKw).trim();
+  const lower = str.toLowerCase();
+
+  if (lower.startsWith("artist:")) {
+    const artist = str.slice(7).trim();
+    return `Mix: ${artist} & Similar`;
+  }
+  if (lower.startsWith("genre:")) {
+    const genre = str.slice(6).trim();
+    return `Mix: ${capitalize(genre)} Vibes`;
+  }
+  if (lower.startsWith("rediscover:")) {
+    const artist = str.slice(11).trim();
+    return `Mix: Rediscover ${artist}`;
+  }
+  if (lower.startsWith("search:")) {
+    const query = str.slice(7).trim();
+    return `Mix: ${capitalize(query)} Radio`;
+  }
+  return `Daily Mix: ${capitalize(str)}`;
 };
 
 const DailyMixCards = ({ recommendations = [] }) => {
@@ -83,7 +110,7 @@ const DailyMixCards = ({ recommendations = [] }) => {
     // Bucket by sourceKeyword
     const buckets = {};
     recommendations.forEach((track) => {
-      const kw = (track.sourceKeyword || "Discover").toLowerCase().trim();
+      const kw = (track.sourceKeyword || "Discover").trim();
       if (!buckets[kw]) {
         buckets[kw] = [];
       }
@@ -104,7 +131,7 @@ const DailyMixCards = ({ recommendations = [] }) => {
 
         return {
           id: `mix-${idx + 1}`,
-          title: `Daily Mix: ${capitalize(kw)}`,
+          title: formatMixTitle(kw),
           keyword: kw,
           tracks,
           coverUrl,
@@ -127,7 +154,7 @@ const DailyMixCards = ({ recommendations = [] }) => {
     return [
       {
         id: "mix-1",
-        title: `Daily Mix: ${capitalize(kw1)}`,
+        title: formatMixTitle(kw1),
         keyword: kw1,
         tracks: chunk1,
         coverUrl: getHighResThumbnailUrl(chunk1[0]?.thumbnail || chunk1[0]?.thumbNail, chunk1TrackId) || placeholder,
@@ -135,7 +162,7 @@ const DailyMixCards = ({ recommendations = [] }) => {
       },
       {
         id: "mix-2",
-        title: `Daily Mix: ${capitalize(kw2)}`,
+        title: formatMixTitle(kw2),
         keyword: kw2,
         tracks: chunk2,
         coverUrl: getHighResThumbnailUrl(chunk2[0]?.thumbnail || chunk2[0]?.thumbNail, chunk2TrackId) || placeholder,
@@ -147,10 +174,11 @@ const DailyMixCards = ({ recommendations = [] }) => {
   const handlePlayMix = (mix, e) => {
     e.stopPropagation();
     if (!mix.tracks || mix.tracks.length === 0) return;
-    setQueue(mix.tracks);
+    setQueue(mix.tracks, "RECOMMENDATION");
     setCurrentIndex(0);
-    setTrack(mix.tracks[0]);
+    setTrack(mix.tracks[0], "RECOMMENDATION");
     setIsPlaying(true);
+    toast.success(`Playing ${mix.title}`);
   };
 
   return (

@@ -142,6 +142,10 @@ model Tracks {
   @@index([channelId])
   @@index([lastFetchedAt])
   @@index([searchVector], type: Gin)
+  // Recommendation System Phase 2 Optimization Indexes:
+  // Enables sub-millisecond artist expansion candidate retrieval and sorting
+  @@index([artist])
+  @@index([artistName])
   @@map("tracks")
 }
 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Home, Compass, Library, Heart, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Home, Compass, Library, Heart, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import usePlayerStore from '@/store/usePlayerStore';
@@ -134,6 +134,7 @@ const Sidebar = ({
       {/* Navigation Links List */}
       <ul className={cn('space-y-1 flex-1', isCollapsed && 'flex flex-col items-center')}>
         <MenuItem icon={Home} text="Home" to="/home" />
+        <MenuItem icon={Sparkles} text="Discover" to="/recommendations" />
         <MenuItem icon={Compass} text="Explore" to="/explore" />
         <MenuItem icon={Heart} text="Favourites" to="/favourites" />
         <MenuItem icon={Library} text="Playlists" to="/playlists" />

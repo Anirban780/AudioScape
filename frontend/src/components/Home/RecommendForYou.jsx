@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from "react";
 import placeholder from "@/assets/placeholder.jpg";
-import { Sparkles, Play, ChevronLeft, ChevronRight, Heart, ListPlus } from "lucide-react";
+import { Sparkles, Play, ChevronLeft, ChevronRight, Heart, ListPlus, Music, Compass } from "lucide-react";
+import { Link } from "react-router-dom";
 import usePlayerStore from "@/store/usePlayerStore";
 import usePlaylistStore from "@/store/usePlaylistStore";
 import { useRefreshOn } from "@/store/useDataRefreshStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getRecommendations, fetchExploreFeed } from "@/utils/api";
-import { fetchYoutubeMusic } from "@/utils/youtube";
 import { getHighResThumbnailUrl, handleThumbnailLoad, handleThumbnailError, decodeHtmlEntities, getValidThumbnailUrl } from "@/utils/youtubeUtils";
 import MediaGrid from "@/components/Layout/MediaGrid";
 import SectionHeader from "@/components/Home/SectionHeader";
@@ -22,29 +22,14 @@ import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
  * Renders personalized AI music recommendations featuring:
  * 1. Branded Section Header (`SectionHeader.jsx`): Top gradient bar, subtitle tagline, AI Taste Engine badge.
  * 2. Integrated Auto-Rotating Daily Mix Banner: Full-bleed background artwork with vertical slow-pan & Add-to-Queue action.
- * 3. Container-Query Driven MediaGrid (`MediaGrid.jsx`): Responsive card grid driven 100% by container width.
- *    Collapsed view displays 10 recommended tracks; Expanded view ("SEE ALL") renders ALL 20 tracks!
+ * 3. Horizontal Scroll Vinyl Sleeve Carousel with Rediscovery & Attribution badges.
+ * 4. Zero YouTube API Quota: 100% queries indexed PostgreSQL catalog with graceful empty state.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
- * 1. Flash-Free Container Queries: MediaGrid uses CSS `@container` queries so grid columns react instantly
- *    to sidebar toggles and container dimension changes without JS latency or layout shifts.
- * 2. Theme Compliance: Employs Stitch surface variables (`var(--color-surface-raised)`, `var(--color-border-default)`).
+ * 1. Zero Quota Burn: Stripped fetchYoutubeMusic fallback (saves 100 quota units per cold-start visit).
+ * 2. Attribution Badges: Displays sourceKeyword badges (Rediscover, Artist, Genre, Search) on tracks.
+ * 3. Theme Compliance: Employs Stitch surface variables (`var(--color-surface-raised)`, `var(--color-border-default)`).
  */
-
-const FALLBACK_RECOMMENDATIONS = [
-  { id: "X4VbdwhkE10", videoId: "X4VbdwhkE10", title: "Lofi Hip Hop Radio - Beats to Relax/Study", name: "Lofi Hip Hop Radio - Beats to Relax/Study", artist: "Lofi Girl", channelTitle: "Lofi Girl", thumbnail: "https://img.youtube.com/vi/X4VbdwhkE10/maxresdefault.jpg" },
-  { id: "5qap5aO4i9A", videoId: "5qap5aO4i9A", title: "Lofi Study Beats - Chill Ambient Music", name: "Lofi Study Beats - Chill Ambient Music", artist: "Chillhop Music", channelTitle: "Chillhop Music", thumbnail: "https://img.youtube.com/vi/5qap5aO4i9A/maxresdefault.jpg" },
-  { id: "DWcJFNfaw9c", videoId: "DWcJFNfaw9c", title: "Midnight City Synthwave Beats", name: "Midnight City Synthwave Beats", artist: "M83 Soundscapes", channelTitle: "M83 Soundscapes", thumbnail: "https://img.youtube.com/vi/DWcJFNfaw9c/maxresdefault.jpg" },
-  { id: "jfKfPfyJRdk", videoId: "jfKfPfyJRdk", title: "Relaxing Jazz Music & Soft Rain", name: "Relaxing Jazz Music & Soft Rain", artist: "Relaxing Vibes", channelTitle: "Relaxing Vibes", thumbnail: "https://img.youtube.com/vi/jfKfPfyJRdk/maxresdefault.jpg" },
-  { id: "1fueZCTYkpA", videoId: "1fueZCTYkpA", title: "Deep Focus Flow Spatial Audio", name: "Deep Focus Flow Spatial Audio", artist: "AudioScape Beats", channelTitle: "AudioScape Beats", thumbnail: "https://img.youtube.com/vi/1fueZCTYkpA/maxresdefault.jpg" },
-  { id: "HuFYqnbVbzA", videoId: "HuFYqnbVbzA", title: "Synthwave Radio Beats", name: "Synthwave Radio Beats", artist: "Cyberpunk Audio", channelTitle: "Cyberpunk Audio", thumbnail: "https://img.youtube.com/vi/HuFYqnbVbzA/maxresdefault.jpg" },
-  { id: "lTRiuFIWV54", videoId: "lTRiuFIWV54", title: "Chill Lofi Beats To Sleep", name: "Chill Lofi Beats To Sleep", artist: "Lofi Sleep", channelTitle: "Lofi Sleep", thumbnail: "https://img.youtube.com/vi/lTRiuFIWV54/maxresdefault.jpg" },
-  { id: "fEvM-OUbaKs", videoId: "fEvM-OUbaKs", title: "Ambient Space Soundscapes", name: "Ambient Space Soundscapes", artist: "Cosmic Audio", channelTitle: "Cosmic Audio", thumbnail: "https://img.youtube.com/vi/fEvM-OUbaKs/maxresdefault.jpg" },
-  { id: "9SUMxTpLDAs", videoId: "9SUMxTpLDAs", title: "Acoustic Chill Acoustic Guitars", name: "Acoustic Chill Acoustic Guitars", artist: "Acoustic Sessions", channelTitle: "Acoustic Sessions", thumbnail: "https://img.youtube.com/vi/9SUMxTpLDAs/maxresdefault.jpg" },
-  { id: "2gliGobe99o", videoId: "2gliGobe99o", title: "Piano Peace Relaxation", name: "Piano Peace Relaxation", artist: "Piano Peace", channelTitle: "Piano Peace", thumbnail: "https://img.youtube.com/vi/2gliGobe99o/maxresdefault.jpg" },
-  { id: "4xDzrJKXOOY", videoId: "4xDzrJKXOOY", title: "Synthwave Sunset Drive", name: "Synthwave Sunset Drive", artist: "Retro Beats", channelTitle: "Retro Beats", thumbnail: "https://img.youtube.com/vi/4xDzrJKXOOY/maxresdefault.jpg" },
-  { id: "wA0C0u85y1y", videoId: "wA0C0u85y1y", title: "Deep Focus Ambient Rain", name: "Deep Focus Ambient Rain", artist: "Rainy Mood", channelTitle: "Rainy Mood", thumbnail: "https://img.youtube.com/vi/wA0C0u85y1y/maxresdefault.jpg" },
-];
 
 const CACHE_KEY = "audioscape_cached_recommendations";
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 mins
@@ -100,16 +85,10 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
       }
 
       if (!Array.isArray(songs) || songs.length === 0) {
+        // Fallback strictly to PostgreSQL explore feed (zero YouTube quota consumed)
         const exploreData = await fetchExploreFeed();
         if (exploreData && exploreData.length > 0 && exploreData[0].tracks) {
           songs = exploreData.flatMap((sec) => sec.tracks).slice(0, 20);
-        }
-      }
-
-      if (!Array.isArray(songs) || songs.length === 0) {
-        const ytSongs = await fetchYoutubeMusic("pop hits", 20);
-        if (Array.isArray(ytSongs) && ytSongs.length > 0) {
-          songs = ytSongs;
         }
       }
 
@@ -133,12 +112,13 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
           // Ignore quota errors
         }
       } else if (!recommendedSongs || recommendedSongs.length === 0) {
-        setRecommendedSongs(FALLBACK_RECOMMENDATIONS);
+        // Clean empty state — 0 YouTube quota burned
+        setRecommendedSongs([]);
       }
     } catch (err) {
-      console.error("Error loading recommendations, using fallback:", err);
+      console.error("Error loading recommendations:", err);
       if (!recommendedSongs || recommendedSongs.length === 0) {
-        setRecommendedSongs(FALLBACK_RECOMMENDATIONS);
+        setRecommendedSongs([]);
       }
     } finally {
       setLoading(false);
@@ -204,6 +184,7 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
       name: song.name || song.title,
       artist: song.artist || song.channelTitle,
       thumbnail: song.thumbnail || song.thumbNail,
+      source: "RECOMMENDATION",
     });
     usePlayerStore.getState().setIsPlaying(true);
     toast.success(`Playing: ${song.name || song.title}`);
@@ -216,6 +197,7 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
       name: cleanName,
       artist: song.artist || song.channelTitle || "Unknown Artist",
       thumbnail: song.thumbnail || song.thumbNail,
+      source: "RECOMMENDATION",
     });
     toast.success(`Added "${cleanName}" to queue`);
   };
@@ -233,7 +215,42 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
     );
   }
 
-  const activeFeaturedTrack = featuredTracks[bannerIndex] || featuredTracks[0] || FALLBACK_RECOMMENDATIONS[0];
+  if (!loading && (!recommendedSongs || recommendedSongs.length === 0)) {
+    return (
+      <section id="recommendations-section" className="mb-12">
+        <SectionHeader
+          icon={<Sparkles size={20} />}
+          title="Recommended For You"
+          subtitle="curated by your unique listening DNA & AI taste profile"
+          accentGradient="from-[var(--color-secondary)] via-purple-500 to-transparent"
+          iconBgColor="bg-[var(--color-secondary)]/15 text-[var(--color-secondary)] border-[var(--color-secondary)]/30"
+          titleGradient="from-pink-400 via-fuchsia-400 to-[var(--color-primary)]"
+          extraBadge="AI TASTE ENGINE"
+          seeAllHref="/explore"
+          seeAllLabel="EXPLORE"
+        />
+        <div className="w-full rounded-[28px] p-8 sm:p-12 bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] flex flex-col items-center justify-center text-center shadow-md">
+          <div className="w-14 h-14 rounded-2xl bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/30 flex items-center justify-center text-[var(--color-primary)] mb-4 shadow-sm">
+            <Sparkles size={28} />
+          </div>
+          <h3 className="text-lg sm:text-xl font-bold text-[var(--color-on-surface)] mb-2">
+            Start listening to build your personalized recommendations
+          </h3>
+          <p className="text-xs sm:text-sm text-[var(--color-on-surface-variant)] max-w-md mb-6 leading-relaxed">
+            As you stream tracks and explore genres across AudioScape, our multi-signal taste engine curates recommendations tailored to your favorite artists and moods.
+          </p>
+          <Link
+            to="/explore"
+            className="px-6 py-2.5 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] font-bold text-xs tracking-wider flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer"
+          >
+            <Compass size={16} /> EXPLORE MUSIC
+          </Link>
+        </div>
+      </section>
+    );
+  }
+
+  const activeFeaturedTrack = featuredTracks[bannerIndex] || featuredTracks[0] || null;
   const trackName = activeFeaturedTrack?.name || activeFeaturedTrack?.title || "Daily Discovery";
   const artistName = activeFeaturedTrack?.artist || activeFeaturedTrack?.channelTitle || "Featured Artist";
   const trackId = activeFeaturedTrack?.id || activeFeaturedTrack?.videoId;
@@ -258,6 +275,8 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
         extraBadge="AI TASTE ENGINE"
         isExpanded={isExpanded}
         onToggleExpand={() => setIsExpanded((prev) => !prev)}
+        seeAllHref="/recommendations"
+        seeAllLabel="VIEW ALL"
       />
 
       {/* Featured Auto-Rotating Daily Mix Banner */}
@@ -435,6 +454,17 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
                     <div className="absolute top-2 left-2 px-2 py-0.5 rounded-md bg-black/70 backdrop-blur-xs text-white text-[10px] font-extrabold tracking-wider border border-white/20">
                       #{index + 1}
                     </div>
+
+                    {/* Attribution / Rediscover Badge */}
+                    {song.sourceKeyword && (
+                      <div className="absolute bottom-2 left-2 z-20 max-w-[85%] truncate px-2 py-0.5 rounded-md text-[9px] font-extrabold uppercase tracking-wider backdrop-blur-md shadow-xs border border-white/20 flex items-center gap-1 text-white bg-black/75">
+                        {song.sourceKeyword.toLowerCase().includes("rediscover") ? (
+                          <span className="text-amber-400 font-black">✦ REDISCOVER</span>
+                        ) : (
+                          <span className="truncate">{song.sourceKeyword}</span>
+                        )}
+                      </div>
+                    )}
 
                     {/* Add to Playlist Button - Elevated to z-30 so it is never eclipsed */}
                     <button

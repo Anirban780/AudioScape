@@ -69,6 +69,8 @@ export class PlaylistsService {
 
   /**
    * Internal helper ensuring target track row exists in `Tracks` table before adding to playlist.
+   * Also fixes the "Already-Cached" trap by triggering asynchronous live enrichment
+   * whenever a track exists in PostgreSQL but lacks duration, tags, or statistics.
    */
   private async ensureTrackExists(videoId: string, title?: string, artist?: string, thumbnailUrl?: string) {
     try {
@@ -86,8 +88,26 @@ export class PlaylistsService {
               thumbnailUrl: thumbnailUrl || null,
             },
           });
+          // Asynchronously trigger live enrichment since stub lacks duration, tags, and stats
+          this.tracksService.getTrackDetails(videoId, true).catch((err) =>
+            this.logger.warn(`Background enrichment failed for newly stubbed playlist track ${videoId}: ${err.message}`),
+          );
         } else {
           await this.tracksService.getTrackDetails(videoId);
+        }
+      } else {
+        // Track exists in DB: check if it was cached without full enrichment
+        const isUnenriched =
+          !track.durationSeconds ||
+          !track.tags ||
+          track.tags.length === 0 ||
+          track.viewCount === null;
+
+        if (isUnenriched) {
+          // Non-blocking asynchronous enrichment to heal stale/empty metadata
+          this.tracksService.getTrackDetails(videoId, true).catch((err) =>
+            this.logger.warn(`Background enrichment failed for existing playlist track ${videoId}: ${err.message}`),
+          );
         }
       }
       return true;
