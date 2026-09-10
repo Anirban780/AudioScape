@@ -464,7 +464,7 @@ export async function fetchExploreFeed() {
         const headers = await getAuthHeader();
         const API_URL = await getBackendURL();
 
-        const response = await fetch(`${API_URL}/api/music/explore?limit=15`, {
+        const response = await fetch(`${API_URL}/api/music/explore?limit=20`, {
             method: "GET",
             headers: { ...headers },
         });
@@ -483,12 +483,12 @@ export async function fetchExploreFeed() {
             tracks: (section.tracks || []).map((t) => {
                 const thumb = getValidThumbnailUrl(t.thumbnail || t.thumbNail || "") || "";
                 return {
-                    id: t.id,
-                    videoId: t.id,
-                    title: t.name,
-                    name: t.name,
-                    artist: t.artist,
-                    channelTitle: t.artist,
+                    id: t.id || t.videoId,
+                    videoId: t.id || t.videoId,
+                    title: t.name || t.title || "Unknown Track",
+                    name: t.name || t.title || "Unknown Track",
+                    artist: t.artist || t.channelTitle || "Unknown Artist",
+                    channelTitle: t.artist || t.channelTitle || "Unknown Artist",
                     thumbnail: thumb,
                     thumbNail: thumb,
                 };

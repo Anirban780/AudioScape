@@ -555,5 +555,121 @@ describe('RecommendationsService QA Test Suite', () => {
         }),
       );
     });
+
+    it('TC-CAT-06: backfills remaining tracks up to limit when category has fewer direct matches than requested limit', async () => {
+      const directTrack = {
+        youtubeVideoId: 'direct_match_1',
+        title: 'Direct Category Track',
+        artist: 'Direct Artist',
+        isEmbeddable: true,
+        thumbnailUrl: 'https://i.ytimg.com/vi/direct/hqdefault.jpg',
+        likeCount: BigInt(50000),
+        listenHistory: [],
+      };
+      const fallbackTracks = Array.from({ length: 4 }, (_, i) => ({
+        youtubeVideoId: `fallback_${i}`,
+        title: `Fallback Track ${i}`,
+        artist: `Fallback Artist ${i}`,
+        isEmbeddable: true,
+        thumbnailUrl: `https://i.ytimg.com/vi/fb${i}/hqdefault.jpg`,
+        likeCount: BigInt(10000),
+        listenHistory: [],
+      }));
+
+      (mockPrismaService.tracks.findMany as jest.Mock)
+        .mockResolvedValueOnce([directTrack])
+        .mockResolvedValueOnce(fallbackTracks);
+      (mockPrismaService.searchQuery.upsert as jest.Mock).mockResolvedValue({});
+
+      const result = await service.getCategoryTracks('road trip music', 5);
+
+      expect(result.success).toBe(true);
+      expect(result.count).toBe(5);
+      expect(result.tracks.length).toBe(5);
+      expect(result.tracks[0].id).toBe('direct_match_1');
+    });
+  });
+
+  describe('getExploreFeed (Phase 4.2: 20 Tracks Per Section Feed)', () => {
+    it('TC-EXP-01: returns sections with up to 20 tracks per category delegating to getCategoryTracks', async () => {
+      // Mock getCategoryTracks spy
+      const mockCategoryTracks = Array.from({ length: 20 }, (_, i) => ({
+        id: `track_${i}`,
+        videoId: `track_${i}`,
+        name: `Track ${i}`,
+        artist: `Artist ${i}`,
+      }));
+
+      jest.spyOn(service, 'getCategoryTracks').mockResolvedValue({
+        success: true,
+        category: 'lofi music',
+        title: 'Lofi & Chill',
+        count: 20,
+        tracks: mockCategoryTracks as any,
+      });
+
+      const feed = await service.getExploreFeed(undefined, 20);
+
+      expect(feed).toBeDefined();
+      expect(Array.isArray(feed)).toBe(true);
+      expect(feed.length).toBeGreaterThan(0);
+      expect(service.getCategoryTracks).toHaveBeenCalledWith(expect.any(String), 20);
+      expect(feed[0].tracks.length).toBe(20);
+    });
+  });
+
+  describe('generateQueue (Phase 4.2: 20-Track Continuous Queue Guarantee)', () => {
+    it('TC-GENQ-01: guarantees exactly 20 tracks returned even when history has fewer than 7 tracks', async () => {
+      mockTracksService.getTrackDetails.mockResolvedValue({
+        videoId: 'curr_1',
+        title: 'Current Song',
+        channelTitle: 'Current Artist',
+        thumbNail: 'https://img.youtube.com/vi/curr_1/default.jpg',
+      });
+
+      mockTracksService.searchTracks.mockResolvedValue({
+        tracks: Array.from({ length: 10 }, (_, i) => ({
+          videoId: `rel_${i + 1}`,
+          title: `Related Song ${i + 1}`,
+          channelTitle: `Related Artist ${i + 1}`,
+          thumbNail: 'https://img.youtube.com/vi/thumb.jpg',
+        })),
+      });
+
+      // User has only 2 history tracks
+      (mockPrismaService.listenHistory.findMany as jest.Mock).mockResolvedValue([
+        {
+          track: {
+            youtubeVideoId: 'hist_1',
+            title: 'History Song 1',
+            artist: 'History Artist 1',
+            thumbnailUrl: 'https://img.youtube.com/vi/hist1.jpg',
+          },
+        },
+        {
+          track: {
+            youtubeVideoId: 'hist_2',
+            title: 'History Song 2',
+            artist: 'History Artist 2',
+            thumbnailUrl: 'https://img.youtube.com/vi/hist2.jpg',
+          },
+        },
+      ]);
+
+      // Fallbacks to backfill remaining 7 slots up to 20
+      const mockFallbacks = Array.from({ length: 7 }, (_, i) => ({
+        youtubeVideoId: `fallback_${i + 1}`,
+        title: `Fallback Song ${i + 1}`,
+        artist: `Fallback Artist ${i + 1}`,
+        thumbnailUrl: 'https://img.youtube.com/vi/fallback.jpg',
+      }));
+      (mockPrismaService.tracks.findMany as jest.Mock).mockResolvedValue(mockFallbacks);
+
+      const queue = await service.generateQueue('user-123', 'curr_1', 'rock');
+
+      expect(queue).toBeDefined();
+      expect(queue.length).toBe(20);
+      expect(queue[0].id).toBe('curr_1');
+    });
   });
 });

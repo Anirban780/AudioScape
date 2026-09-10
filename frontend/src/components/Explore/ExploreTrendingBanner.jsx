@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import placeholder from "@/assets/placeholder.jpg";
-import { Play, Flame, Sparkles, ChevronLeft, ChevronRight, Music } from "lucide-react";
+import { Play, Flame, Sparkles, ChevronLeft, ChevronRight, Music, Radio, Shuffle } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import toast from "react-hot-toast";
@@ -32,6 +32,7 @@ import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 const ExploreTrendingBanner = ({
   trendingTracks = [],
+  stationTracks = [],
   featuredTrack = null,
   activeCategory = "All",
   loading = false,
@@ -106,6 +107,20 @@ const ExploreTrendingBanner = ({
     toast.success(`Playing: ${trackName}`);
   };
 
+  const handlePlayStation = (e) => {
+    e.stopPropagation();
+    const tracksToPlay = (Array.isArray(stationTracks) && stationTracks.length > 0)
+      ? stationTracks
+      : trackList;
+    if (!tracksToPlay || tracksToPlay.length === 0) return;
+    const mixLabel = activeCategory !== "All" ? `${activeCategory} Mix` : "Spotlight Discovery Mix";
+    usePlayerStore.getState().playStation(tracksToPlay, {
+      shuffle: false,
+      stationName: mixLabel,
+      source: "EXPLORE",
+    });
+  };
+
   return (
     <div className="relative w-full h-[300px] sm:h-[350px] rounded-[32px] overflow-hidden border border-[var(--color-border-strong)] shadow-2xl mb-8 group bg-[var(--color-surface-raised)] flex items-center transition-all duration-500">
       
@@ -133,82 +148,91 @@ const ExploreTrendingBanner = ({
       <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-[var(--color-surface-raised)]/90 via-transparent to-transparent pointer-events-none z-0 md:hidden" />
 
       {/* 3. Hero Content Container */}
-      <div className="relative z-10 h-full w-full flex flex-col justify-between p-6 sm:p-10 max-w-2xl">
+      <div className="relative z-10 h-full w-full flex flex-col p-6 sm:p-10 max-w-2xl">
         
         {/* Top Badges */}
-        <div>
-          <div className="flex items-center gap-2.5 mb-3 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/20 text-amber-500 dark:text-amber-400 border border-amber-500/30 rounded-full font-bold text-[11px] tracking-wider uppercase shadow-xs">
-              <Flame size={13} /> TRENDING #{currentIndex + 1}
-            </span>
-            <span className="text-[11px] font-bold text-[var(--color-primary)] tracking-wider uppercase flex items-center gap-1 bg-[var(--color-primary)]/15 px-3 py-1 rounded-full border border-[var(--color-primary)]/30 backdrop-blur-xs">
-              <Sparkles size={12} /> {categoryTag !== "All" ? categoryTag : "SPOTLIGHT MIX"}
-            </span>
-          </div>
-
-          {/* Track Title & Artist */}
-          <h2 className="text-2xl sm:text-4xl font-extrabold text-[var(--color-on-surface)] leading-tight mb-2 line-clamp-1 tracking-tight drop-shadow-md">
-            {trackName}
-          </h2>
-          <p className="text-sm sm:text-base text-[var(--color-on-surface-variant)] line-clamp-1 font-medium max-w-lg drop-shadow-xs">
-            Immerse yourself in today's spotlight track by <span className="text-[var(--color-on-surface)] font-semibold">{artistName}</span>.
-          </p>
+        <div className="flex items-center gap-2.5 mb-2.5 flex-wrap">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/20 text-amber-500 dark:text-amber-400 border border-amber-500/30 rounded-full font-bold text-[11px] tracking-wider uppercase shadow-xs">
+            <Flame size={13} /> TRENDING #{currentIndex + 1}
+          </span>
+          <span className="text-[11px] font-bold text-[var(--color-primary)] tracking-wider uppercase flex items-center gap-1 bg-[var(--color-primary)]/15 px-3 py-2 rounded-full border border-[var(--color-primary)]/30 backdrop-blur-xs">
+            <Sparkles size={12} /> {categoryTag !== "All" ? categoryTag : "SPOTLIGHT MIX"}
+          </span>
         </div>
 
-        {/* Bottom CTA & Carousel Controls */}
-        <div className="flex items-center justify-between gap-4 flex-wrap mt-4">
-          
-          {/* CTA Play Button */}
+        {/* Track Title & Artist */}
+        <h2 className="text-2xl sm:text-4xl font-extrabold text-[var(--color-on-surface)] leading-tight mb-2 line-clamp-1 tracking-tight drop-shadow-md">
+          {trackName}
+        </h2>
+        <p className="text-sm sm:text-base text-[var(--color-on-surface-variant)] line-clamp-1 font-medium max-w-lg drop-shadow-xs mb-5">
+          Immerse yourself in today's spotlight track by <span className="text-[var(--color-on-surface)] font-semibold">{artistName}</span>.
+        </p>
+
+        {/* CTA Actions (Grouped Directly Near Text) */}
+        <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap pt-4">
+          {/* 1. Play Single Featured Track */}
           <button
             onClick={handlePlayTrack}
-            className="bg-[var(--color-primary)] text-[var(--color-text-on-primary)] px-7 py-3 rounded-full font-bold text-xs sm:text-sm tracking-wider hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center gap-2.5 cursor-pointer"
+            className="bg-[var(--color-primary)] text-[var(--color-text-on-primary)] px-5 sm:px-6 py-2.5 sm:py-3 rounded-full font-bold text-xs sm:text-sm tracking-wider hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center gap-2 cursor-pointer shrink-0"
           >
-            <Play size={17} fill="currentColor" className="ml-0.5" />
+            <Play size={16} fill="currentColor" className="ml-0.5" />
             <span>START LISTENING</span>
           </button>
 
-          {/* Carousel Navigation (Dots & Arrows) */}
+          {/* 2. Stream Full Mixed Station */}
           {trackList.length > 1 && (
-            <div className="flex items-center gap-3 bg-[var(--color-surface-overlay)]/90 backdrop-blur-md px-3 py-1.5 rounded-full border border-[var(--color-border-default)] shadow-md">
-              <button
-                onClick={handlePrev}
-                className="p-1 rounded-full hover:bg-[var(--color-state-hover)] text-[var(--color-on-surface)] transition-colors cursor-pointer"
-                title="Previous track"
-                aria-label="Previous track"
-              >
-                <ChevronLeft size={16} />
-              </button>
-
-              {/* Dots */}
-              <div className="flex items-center gap-1.5">
-                {trackList.map((_, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setCurrentIndex(idx)}
-                    className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
-                      idx === currentIndex
-                        ? "w-6 bg-[var(--color-primary)]"
-                        : "w-2 bg-[var(--color-on-surface-variant)]/40 hover:bg-[var(--color-on-surface-variant)]"
-                    }`}
-                    title={`Go to slide ${idx + 1}`}
-                    aria-label={`Go to slide ${idx + 1}`}
-                  />
-                ))}
-              </div>
-
-              <button
-                onClick={handleNext}
-                className="p-1 rounded-full hover:bg-[var(--color-state-hover)] text-[var(--color-on-surface)] transition-colors cursor-pointer"
-                title="Next track"
-                aria-label="Next track"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
+            <button
+              onClick={handlePlayStation}
+              className="bg-[var(--color-surface-overlay)]/90 backdrop-blur-md text-[var(--color-on-surface)] border border-[var(--color-border-default)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] px-4 sm:px-5 py-2.5 sm:py-3 rounded-full font-bold text-xs sm:text-sm tracking-wider hover:scale-105 active:scale-95 transition-all shadow-md flex items-center gap-2 cursor-pointer shrink-0"
+              title={activeCategory !== "All" ? `Play mixed ${activeCategory} station` : "Play mixed discovery spotlight across genres"}
+            >
+              <Shuffle size={15} />
+              <span>{activeCategory !== "All" ? `PLAY ${activeCategory.toUpperCase()} MIX` : "PLAY SPOTLIGHT MIX"}</span>
+            </button>
           )}
         </div>
 
       </div>
+
+      {/* 4. Middle-Bottom Carousel Slide Navigation Controls */}
+      {trackList.length > 1 && (
+        <div className="absolute bottom-3 sm:bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 sm:gap-3 bg-[var(--color-surface-overlay)]/85 backdrop-blur-md px-3 py-1.5 rounded-full border border-[var(--color-border-default)] shadow-lg">
+          <button
+            onClick={handlePrev}
+            className="p-1 rounded-full hover:bg-[var(--color-state-hover)] text-[var(--color-on-surface)] transition-colors cursor-pointer"
+            title="Previous slide"
+            aria-label="Previous slide"
+          >
+            <ChevronLeft size={16} />
+          </button>
+
+          {/* Dots */}
+          <div className="flex items-center gap-1.5">
+            {trackList.map((_, idx) => (
+              <button
+                key={idx}
+                onClick={() => setCurrentIndex(idx)}
+                className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                  idx === currentIndex
+                    ? "w-6 bg-[var(--color-primary)]"
+                    : "w-2 bg-[var(--color-on-surface-variant)]/40 hover:bg-[var(--color-on-surface-variant)]"
+                }`}
+                title={`Go to slide ${idx + 1}`}
+                aria-label={`Go to slide ${idx + 1}`}
+              />
+            ))}
+          </div>
+
+          <button
+            onClick={handleNext}
+            className="p-1 rounded-full hover:bg-[var(--color-state-hover)] text-[var(--color-on-surface)] transition-colors cursor-pointer"
+            title="Next slide"
+            aria-label="Next slide"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      )}
     </div>
   );
 };

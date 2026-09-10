@@ -150,6 +150,75 @@ const usePlayerStore = create((set, get) => ({
         }));
         set({ queue: taggedQueue, playbackSource: effectiveSource });
     },
+
+    /**
+     * Streams an entire genre section, playlist, or trending list with 1 click.
+     * Normalizes track schema, optionally shuffles via Fisher-Yates, sets queue & track, starts playback, and notifies user.
+     *
+     * @param {Array} tracks - Raw track items
+     * @param {Object} [options]
+     * @param {boolean} [options.shuffle=false] - Whether to randomize queue order via Fisher-Yates
+     * @param {string} [options.source='EXPLORE'] - Playback source tag
+     * @param {string} [options.stationName] - Station label for toast feedback
+     */
+    playStation: (tracks, { shuffle = false, source = 'EXPLORE', stationName = null } = {}) => {
+        if (!Array.isArray(tracks) || tracks.length === 0) {
+            toast.error("No tracks available to play in this station");
+            return;
+        }
+
+        // Deduplicate tracks by ID while maintaining order and ensuring valid video ID
+        const seenIds = new Set();
+        const uniqueTracks = [];
+        for (const t of tracks) {
+            const trackId = t?.id || t?.videoId;
+            if (trackId && !seenIds.has(trackId)) {
+                seenIds.add(trackId);
+                uniqueTracks.push(t);
+            }
+        }
+
+        const normalizedTracks = uniqueTracks.map((t) => ({
+            id: t.id || t.videoId,
+            videoId: t.id || t.videoId,
+            name: t.name || t.title || "Unknown Track",
+            title: t.name || t.title || "Unknown Track",
+            artist: t.artist || t.channelTitle || "Unknown Artist",
+            channelTitle: t.artist || t.channelTitle || "Unknown Artist",
+            thumbnail: t.thumbnail || t.thumbNail || "",
+            thumbNail: t.thumbnail || t.thumbNail || "",
+            genre: Array.isArray(t.genre) ? t.genre : t.genre ? [t.genre] : [],
+            source,
+        }));
+
+        let preparedQueue = [...normalizedTracks];
+
+        if (shuffle && preparedQueue.length > 1) {
+            // Unbiased Fisher-Yates shuffle
+            for (let i = preparedQueue.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [preparedQueue[i], preparedQueue[j]] = [preparedQueue[j], preparedQueue[i]];
+            }
+        }
+
+        const firstTrack = preparedQueue[0];
+
+        set({
+            queue: preparedQueue,
+            currentIndex: 0,
+            track: firstTrack,
+            isPlaying: true,
+            playbackSource: source,
+            playbackHistory: [],
+        });
+
+        const displayName = stationName || firstTrack.name;
+        if (shuffle) {
+            toast.success(`Shuffling Station: ${displayName} (${preparedQueue.length} tracks)`);
+        } else {
+            toast.success(`Playing Station: ${displayName} (${preparedQueue.length} tracks)`);
+        }
+    },
     setCurrentIndex: (index) => set({ currentIndex: index }),
     setAutoRefillEnabled: (isAutoRefillEnabled) => set({ isAutoRefillEnabled }),
 

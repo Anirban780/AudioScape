@@ -9,6 +9,7 @@ import { Compass } from "lucide-react";
 import ExploreTrendingBanner from "@/components/Explore/ExploreTrendingBanner";
 import ExploreFilterBar from "@/components/Explore/ExploreFilterBar";
 import ExploreSection from "@/components/Explore/ExploreSection";
+import { matchesCategory } from "@/constants/curatedCategories";
 
 /**
  * ============================================================================
@@ -19,7 +20,7 @@ import ExploreSection from "@/components/Explore/ExploreSection";
  * Assembles the primary Stitch Music Discovery & Search view.
  */
 
-const CACHE_KEY_PREFIX = "audioscape_cached_explore_feed";
+const CACHE_KEY_PREFIX = "audioscape_cached_explore_feed_v3";
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 mins
 
 /**
@@ -139,34 +140,11 @@ const ExplorePage = () => {
     }));
   };
 
-  /**
-   * Helper matching section against active category filter across title, keyword, slug, and distinctive tokens.
-   */
-  const isMatchingSection = (sec, filter) => {
-    if (!sec || !filter || filter === "All") return true;
-    const f = filter.toLowerCase().trim();
-    const title = (sec.title || "").toLowerCase().trim();
-    const category = (sec.category || "").toLowerCase().trim();
-    const keyword = (sec.keyword || "").toLowerCase().trim();
-
-    // Direct equality against title, category slug, or query keyword
-    if (title === f || category === f || keyword === f) return true;
-
-    // Substring containment
-    if (title.includes(f) || f.includes(title)) return true;
-    if (category && (category.includes(f) || f.includes(category))) return true;
-    if (keyword && (keyword.includes(f) || f.includes(keyword))) return true;
-
-    // Distinctive token / stem overlap (e.g. "study" in "study music" and "Study Focus")
-    const stopWords = new Set(["music", "song", "songs", "track", "tracks", "hits", "beats", "chill", "and", "&"]);
-    const filterTokens = f.split(/[\s&/_-]+/).filter((w) => w.length > 2 && !stopWords.has(w));
-    const titleTokens = title.split(/[\s&/_-]+/).filter((w) => w.length > 2);
-    const keywordTokens = keyword.split(/[\s&/_-]+/).filter((w) => w.length > 2 && !stopWords.has(w));
-
-    return (
-      filterTokens.some((t) => titleTokens.includes(t)) ||
-      filterTokens.some((t) => keywordTokens.includes(t))
-    );
+  const handleCollapse = (title) => {
+    setVisibleTracks((prev) => ({
+      ...prev,
+      [title]: 5,
+    }));
   };
 
   /**
@@ -178,8 +156,8 @@ const ExplorePage = () => {
 
     if (categoryQuery === "All") return;
 
-    // Check if section already exists in explore feed
-    const existingIndex = exploreFeed.findIndex((sec) => isMatchingSection(sec, categoryQuery));
+    // Check if section already exists in explore feed using canonical taxonomy matching
+    const existingIndex = exploreFeed.findIndex((sec) => matchesCategory(sec, categoryQuery));
 
     // If section already exists with tracks, ensure visible count is set and reuse it
     if (existingIndex !== -1 && exploreFeed[existingIndex]?.tracks?.length > 0) {
@@ -208,7 +186,7 @@ const ExplorePage = () => {
         // Prepend new section and remove any prior empty or duplicate section for this category
         setExploreFeed((prev) => [
           newSection,
-          ...prev.filter((sec) => !isMatchingSection(sec, categoryQuery)),
+          ...prev.filter((sec) => !matchesCategory(sec, categoryQuery)),
         ]);
 
         setVisibleTracks((prev) => ({
@@ -238,7 +216,7 @@ const ExplorePage = () => {
         .slice(0, 8);
     }
 
-    const matchingSec = exploreFeed.find((sec) => isMatchingSection(sec, activeFilter));
+    const matchingSec = exploreFeed.find((sec) => matchesCategory(sec, activeFilter));
 
     return (matchingSec?.tracks || []).slice(0, 5).map((t) => ({
       ...t,
@@ -247,12 +225,47 @@ const ExplorePage = () => {
   }, [exploreFeed, activeFilter]);
 
   /**
+   * Complete 20-track Station Playlist for Hero Spotlight Banner "Play Station" CTA:
+   * - Filtered mode: Full 20-track section of the active category
+   * - "All" mode: Round-robin across explore sections to guarantee exactly 20 unique tracks
+   */
+  const spotlightStationTracks = useMemo(() => {
+    if (activeFilter === "All") {
+      const allTracks = [];
+      let round = 0;
+      while (allTracks.length < 20 && round < 20) {
+        let addedThisRound = false;
+        for (const sec of exploreFeed || []) {
+          if (Array.isArray(sec.tracks) && sec.tracks[round]) {
+            const trk = sec.tracks[round];
+            const trkId = trk.id || trk.videoId;
+            if (trkId && !allTracks.some((t) => (t.id || t.videoId) === trkId)) {
+              allTracks.push({
+                ...trk,
+                categoryName: sec.title || "Explore Spotlight",
+              });
+              addedThisRound = true;
+              if (allTracks.length >= 20) break;
+            }
+          }
+        }
+        if (!addedThisRound) break;
+        round++;
+      }
+      return allTracks.slice(0, 20);
+    }
+
+    const matchingSec = exploreFeed.find((sec) => matchesCategory(sec, activeFilter));
+    return matchingSec?.tracks || [];
+  }, [exploreFeed, activeFilter]);
+
+  /**
    * Declarative Section Filtering (useMemo)
    */
   const displayedSections = useMemo(() => {
     if (activeFilter === "All") return exploreFeed;
 
-    return exploreFeed.filter((sec) => isMatchingSection(sec, activeFilter));
+    return exploreFeed.filter((sec) => matchesCategory(sec, activeFilter));
   }, [exploreFeed, activeFilter]);
 
   return (
@@ -285,6 +298,7 @@ const ExplorePage = () => {
         {/* 2. Trending Spotlight Hero Banner (Full-Width HD, Auto Slow-Pan & Carousel) */}
         <ExploreTrendingBanner
           trendingTracks={trendingTracks}
+          stationTracks={spotlightStationTracks}
           activeCategory={activeFilter}
           loading={loading}
           enablePanAnimation={true} // Enables automatic top-to-bottom slow pan vertical image animation
@@ -306,6 +320,7 @@ const ExplorePage = () => {
                   section={section}
                   visibleCount={visibleTracks[section.title] || 5}
                   onLoadMore={() => handleLoadMore(section.title)}
+                  onCollapse={() => handleCollapse(section.title)}
                 />
               </div>
             ))}

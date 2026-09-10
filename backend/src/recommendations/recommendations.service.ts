@@ -30,7 +30,7 @@ export class RecommendationsService {
   private readonly logger = new Logger(RecommendationsService.name);
 
   // In-memory cache mapping userId -> { tracks, expiresAt }
-  private readonly recCache = new Map<string, { tracks: RecommendedTrackResult[]; expiresAt: number }>();
+  private readonly recCache = new Map<string, { tracks: RecommendedTrackResult[]; expiresAt: number; isComplete?: boolean }>();
   // In-memory cache mapping userId -> { data: Map<string, number>, expiresAt: number }
   private readonly affinityCache = new Map<string, { data: Map<string, number>; expiresAt: number }>();
   // In-memory cache mapping `${userId || 'anonymous'}:${limitPerCategory}` -> { feed, expiresAt }
@@ -85,7 +85,7 @@ export class RecommendationsService {
 
     // STEP 1: Check In-Memory Cache (Layer 0)
     const cached = this.recCache.get(userId);
-    if (cached && cached.expiresAt > Date.now() && cached.tracks.length >= topN) {
+    if (cached && cached.expiresAt > Date.now() && (cached.tracks.length >= topN || cached.isComplete)) {
       this.logger.log(`In-memory cache HIT for user recommendations: ${userId}`);
       return {
         success: true,
@@ -437,6 +437,7 @@ export class RecommendationsService {
     this.recCache.set(userId, {
       tracks: finalRecommendations,
       expiresAt: Date.now() + this.CACHE_TTL_MS,
+      isComplete: finalRecommendations.length < topN,
     });
 
     return {
@@ -802,7 +803,7 @@ export class RecommendationsService {
    * @param limitPerCategory - Max tracks returned per section (default: 5)
    * @returns Array of explore feed categories with track items
    */
-  async getExploreFeed(userId?: string, limitPerCategory: number = 5) {
+  async getExploreFeed(userId?: string, limitPerCategory: number = 20) {
     // STEP 0: Check In-Memory Explore Feed Cache (Layer 0)
     const cacheKey = `${userId || 'anonymous'}:${limitPerCategory}`;
     const cached = this.exploreFeedCache.get(cacheKey);
@@ -909,28 +910,21 @@ export class RecommendationsService {
           // Step A: Ensure target count is populated in DB (DB-first, YouTube API backfill if needed)
           await this.tracksService.ensureCategoryPopulated(keyword, 50);
 
-          // Step B: Query tracks from DB only to guarantee sub-20ms latency
-          const searchResult = await this.tracksService.searchTracks(keyword, '', true);
-
-          const mappedTracks = (searchResult.tracks || [])
-            .map((t) => ({
-              id: t.videoId,
-              name: t.title,
-              artist: t.channelTitle || 'Unknown Artist',
-              thumbnail: getValidThumbnailUrl(t.thumbNail) || '',
-            }))
-            .slice(0, limitPerCategory);
+          // Step B: Query tracks from local PostgreSQL with 0-quota, shorts filtering, and dual-engagement ranking
+          const categoryResult = await this.getCategoryTracks(keyword, limitPerCategory);
 
           const categoryMeta = CURATED_CATEGORIES.find(
-            (c) => c.keyword.toLowerCase().trim() === keyword.toLowerCase().trim(),
+            (c) =>
+              c.keyword.toLowerCase().trim() === keyword.toLowerCase().trim() ||
+              c.slug.toLowerCase().trim() === keyword.toLowerCase().trim(),
           );
-          const sectionTitle = categoryMeta ? categoryMeta.label : keyword;
+          const sectionTitle = categoryResult.title || (categoryMeta ? categoryMeta.label : keyword);
 
           return {
             title: sectionTitle,
             keyword,
             category: categoryMeta?.slug || keyword,
-            tracks: mappedTracks,
+            tracks: categoryResult.tracks || [],
           };
         } catch (err: any) {
           this.logger.error(`Explore section processing failed for keyword '${keyword}': ${err.message}`);
@@ -1120,14 +1114,20 @@ export class RecommendationsService {
       this.logger.error(`PostgreSQL category track query failed for "${keyword}": ${err.message}`);
     }
 
-    // STEP 5: Fallback if candidate pool is empty
-    if (!candidateTracks || candidateTracks.length === 0) {
-      this.logger.warn(`No direct matches for category "${keyword}" in local DB. Serving high-quality catalog fallbacks.`);
+    // STEP 5: Fallback & Backfill if candidate pool has fewer tracks than target limit
+    if (!candidateTracks || candidateTracks.length < limit) {
+      const currentCount = candidateTracks?.length || 0;
+      this.logger.warn(
+        `Category "${keyword}" has ${currentCount} direct matches in local DB (< target ${limit}). Backfilling remaining slots with high-quality catalog tracks.`,
+      );
       try {
+        const existingVideoIds = new Set((candidateTracks || []).map((t) => t.youtubeVideoId));
+        const needed = limit - currentCount;
         const fallbacks = await this.prisma.tracks.findMany({
           where: {
             isEmbeddable: true,
             isAvailable: true,
+            youtubeVideoId: { notIn: Array.from(existingVideoIds) },
             NOT: [
               { title: { contains: '#shorts', mode: 'insensitive' } },
               { title: { contains: '#short', mode: 'insensitive' } },
@@ -1151,13 +1151,15 @@ export class RecommendationsService {
               },
             },
           },
-          take: limit * 2,
+          take: Math.max(50, needed * 4),
           orderBy: { likeCount: 'desc' },
         });
-        candidateTracks = fallbacks.filter((t) => !isShortTrack(t)).slice(0, limit);
+        const validFallbacks = fallbacks
+          .filter((t) => !existingVideoIds.has(t.youtubeVideoId) && !isShortTrack(t))
+          .slice(0, needed);
+        candidateTracks = [...(candidateTracks || []), ...validFallbacks];
       } catch (fallbackErr: any) {
-        this.logger.error(`Catalog fallback failed: ${fallbackErr.message}`);
-        candidateTracks = [];
+        this.logger.error(`Catalog fallback backfill failed: ${fallbackErr.message}`);
       }
     }
 
@@ -1405,6 +1407,41 @@ export class RecommendationsService {
         usedIds.add(track.id);
         finalQueue.push(track);
         if (finalQueue.length >= 20) break; // total queue length ~20
+      }
+    }
+
+    // STEP 5: Backfill remaining slots up to 20 tracks if recentTracks + relatedTracks was < 20
+    if (finalQueue.length < 20) {
+      const needed = 20 - finalQueue.length;
+      try {
+        const fallbacks = await this.prisma.tracks.findMany({
+          where: {
+            isEmbeddable: true,
+            isAvailable: true,
+            youtubeVideoId: { notIn: Array.from(usedIds) },
+            NOT: [
+              { title: { contains: '#shorts', mode: 'insensitive' } },
+              { title: { contains: '#short', mode: 'insensitive' } },
+            ],
+          },
+          take: Math.max(50, needed * 3),
+          orderBy: { likeCount: 'desc' },
+        });
+
+        for (const track of fallbacks) {
+          if (!usedIds.has(track.youtubeVideoId)) {
+            usedIds.add(track.youtubeVideoId);
+            finalQueue.push({
+              id: track.youtubeVideoId,
+              name: track.title,
+              artist: track.artist || track.artistName || 'Unknown Artist',
+              thumbnail: getValidThumbnailUrl(track.thumbnailUrl) || '',
+            });
+            if (finalQueue.length >= 20) break;
+          }
+        }
+      } catch (err: any) {
+        this.logger.warn(`generateQueue backfill query failed: ${err.message}`);
       }
     }
 

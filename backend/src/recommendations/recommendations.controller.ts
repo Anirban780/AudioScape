@@ -114,7 +114,7 @@ export class RecommendationsController {
     @GetUser('id') userId: string,
     @Query('limit') limit?: string,
   ) {
-    const limitPerCategory = limit ? parseInt(limit, 10) : 5;
+    const limitPerCategory = limit ? parseInt(limit, 10) : 20;
     return this.recommendationsService.getExploreFeed(userId, limitPerCategory);
   }
 
