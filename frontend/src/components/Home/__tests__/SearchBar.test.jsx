@@ -248,6 +248,7 @@ describe('SearchBar Component — QA Test Suite', () => {
       name: 'Lofi Song Two',
       artist: 'Artist B',
       thumbnail: 't2.jpg',
+      source: 'SEARCH',
     });
   });
 
@@ -280,6 +281,7 @@ describe('SearchBar Component — QA Test Suite', () => {
       name: 'Lofi Song One',
       artist: 'Artist A',
       thumbnail: 't1.jpg',
+      source: 'SEARCH',
     });
   });
 
