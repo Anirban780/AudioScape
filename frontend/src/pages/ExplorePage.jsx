@@ -134,17 +134,32 @@ const ExplorePage = () => {
     };
   }, [userId]);
 
-  const handleLoadMore = (title) => {
+  /**
+   * Phase 4.5: Rhythmic Cadence Layout Mode Assignment (Zone 4 Multi-Layout Engine)
+   * When viewing "All" categories, assigns alternating layout modes across sections:
+   * - Section 0 (Top Affinity Genre): 'carousel' (horizontal edge-to-edge scroll)
+   * - Section 1 (High Energy / Charts): 'compact-list' (2-column compact ranked rows)
+   * - Section 2 (Deep Cuts & Discovery): 'grid' (standard container-query MediaGrid)
+   * - Cadence rhythm: ['carousel', 'compact-list', 'grid', 'compact-list', 'carousel', 'grid']
+   * When filtered by a specific category, defaults to 'grid' for deep exploration.
+   */
+  const getSectionLayoutMode = (index) => {
+    if (activeFilter !== "All") return "grid";
+    const rhythm = ["carousel", "compact-list", "grid", "compact-list", "carousel", "grid"];
+    return rhythm[index % rhythm.length];
+  };
+
+  const handleLoadMore = (title, step = 5) => {
     setVisibleTracks((prev) => ({
       ...prev,
-      [title]: (prev[title] || 5) + 5,
+      [title]: (prev[title] || (step === 6 ? 8 : 5)) + step,
     }));
   };
 
-  const handleCollapse = (title) => {
+  const handleCollapse = (title, initialCount = 5) => {
     setVisibleTracks((prev) => ({
       ...prev,
-      [title]: 5,
+      [title]: initialCount,
     }));
   };
 
@@ -389,16 +404,24 @@ const ExplorePage = () => {
           </div>
         ) : (
           <div className="space-y-6">
-            {displayedSections.map((section, index) => (
-              <div key={`${section.title}-${index}`} id={`explore-sec-${index}`}>
-                <ExploreSection
-                  section={section}
-                  visibleCount={visibleTracks[section.title] || 5}
-                  onLoadMore={() => handleLoadMore(section.title)}
-                  onCollapse={() => handleCollapse(section.title)}
-                />
-              </div>
-            ))}
+            {displayedSections.map((section, index) => {
+              const sectionLayout = getSectionLayoutMode(index);
+              const initialCount = sectionLayout === "compact-list" ? 8 : 5;
+              const currentVisible = Math.max(visibleTracks[section.title] || 0, initialCount);
+              const step = sectionLayout === "compact-list" ? 6 : 5;
+
+              return (
+                <div key={`${section.title}-${index}`} id={`explore-sec-${index}`}>
+                  <ExploreSection
+                    section={section}
+                    layoutMode={sectionLayout}
+                    visibleCount={currentVisible}
+                    onLoadMore={() => handleLoadMore(section.title, step)}
+                    onCollapse={() => handleCollapse(section.title, initialCount)}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
