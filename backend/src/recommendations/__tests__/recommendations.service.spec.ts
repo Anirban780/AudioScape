@@ -30,6 +30,7 @@ describe('RecommendationsService QA Test Suite', () => {
     searchQuery: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
+      findUnique: jest.fn(),
       upsert: jest.fn(),
     },
     queryTrackResult: {
