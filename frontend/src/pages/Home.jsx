@@ -3,6 +3,7 @@ import AppLayout from "@/components/Layout/AppLayout";
 import HeroSection from "@/components/Home/HeroSection";
 import RecentlyPlayed from "@/components/Home/RecentlyPlayed";
 import RecommendForYou from "@/components/Home/RecommendForYou";
+import GenreCategorySlider from "@/components/Home/GenreCategorySlider";
 import FavoriteSongs from "@/components/Home/FavoriteSongs";
 import useAuthStore from "@/store/useAuthStore";
 import { getRecommendations } from "@/utils/api";
@@ -14,6 +15,14 @@ import { getRecommendations } from "@/utils/api";
  * 
  * WHAT THIS FILE DOES:
  * Primary Stitch Dashboard view for AudioScape users.
+ * 
+ * MODULE HIERARCHY:
+ * 1. HeroSection: Stitch Visual Platform Hero Spotlight & Daily Mix Cards
+ * 2. RecentlyPlayed: Recent listening history (Hero Spotlight + Compact List)
+ * 3. RecommendForYou: Personalized AI recommendations & daily mix
+ * 4. GenreCategorySlider: 10 curated music realms sliding carousel with HD artwork
+ * 5. FavoriteSongs: Personal liked songs collection with vinyl record hover
+ * ============================================================================
  */
 
 const HomePage = () => {
@@ -66,7 +75,10 @@ const HomePage = () => {
         {/* 3. Featured Daily Mix & AI Recommendations (reusing shared recommendations to prevent duplicate fetches) */}
         <RecommendForYou userId={userId} sharedRecommendations={recommendations} />
 
-        {/* 4. Favorite Songs Carousel (At the bottom) */}
+        {/* 4. Browse Categories Horizontal Sliding Showcase */}
+        <GenreCategorySlider />
+
+        {/* 5. Favorite Songs Carousel (At the bottom) */}
         <FavoriteSongs userId={userId} />
       </div>
     </AppLayout>

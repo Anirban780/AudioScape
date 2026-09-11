@@ -45,17 +45,40 @@ export function getValidThumbnailUrl(originalUrl?: string | null): string | null
   return originalUrl;
 }
 
+export function isValidYouTubeId(id?: string | null): boolean {
+  return typeof id === 'string' && /^[a-zA-Z0-9_-]{11}$/.test(id.trim());
+}
+
+/**
+ * Extract an 11-character YouTube video ID from a URL or string.
+ */
+export function extractYouTubeId(url?: string | null): string | null {
+  if (!url || typeof url !== 'string') return null;
+  const match = url.match(/(?:vi\/|v=|vi=|\/embed\/|youtu\.be\/|\/v\/)([a-zA-Z0-9_-]{11})/);
+  return match ? match[1] : null;
+}
+
 /**
  * Transforms any YouTube thumbnail URL into its HIGHEST available Ultra HD resolution tier (maxresdefault.jpg).
+ * Uses extracted 11-character videoId or replaces standard resolution suffixes.
+ *
+ * @param originalUrl - Raw YouTube thumbnail URL string or null/undefined
+ * @param videoId - Optional YouTube Video ID fallback
+ * @returns Ultra HD sanitized thumbnail URL string or original input if inapplicable
  */
-export function getHighResThumbnailUrl(originalUrl?: string | null): string | null | undefined {
+export function getHighResThumbnailUrl(originalUrl?: string | null, videoId?: string | null): string | null | undefined {
   if (!originalUrl || typeof originalUrl !== 'string') {
     return originalUrl;
   }
 
+  const id = videoId || extractYouTubeId(originalUrl);
+  if (id && isValidYouTubeId(id)) {
+    return `https://${TARGET_YOUTUBE_THUMBNAIL_DOMAIN}/vi/${id}/maxresdefault.jpg`;
+  }
+
   let target = originalUrl;
   if (target.includes('ytimg.com') || target.includes('youtube.com')) {
-    target = target.replace(/\/default\.jpg|\/mqdefault\.jpg|\/hqdefault\.jpg|\/sddefault\.jpg/, '/maxresdefault.jpg');
+    target = target.replace(/\/default\.jpg|\/mqdefault\.jpg|\/hqdefault\.jpg|\/sddefault\.jpg|\/hq720\.jpg/, '/maxresdefault.jpg');
   }
 
   return getValidThumbnailUrl(target);

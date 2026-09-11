@@ -17,6 +17,7 @@ import PlaylistsPage from "@/pages/PlaylistsPage";
 import PlaylistDetailPage from "@/pages/PlaylistDetailPage";
 import HistoryPage from "@/pages/HistoryPage";
 import RecommendationsPage from "@/pages/RecommendationsPage";
+import CategoryPage from "@/pages/CategoryPage";
 import { getBackendURL } from "@/utils/api";
 
 /**
@@ -105,6 +106,7 @@ function AppContent() {
         <Route path="/favourites" element={user ? <FavoritesPage /> : <Navigate to="/" replace />} />
         <Route path="/playlists" element={user ? <PlaylistsPage /> : <Navigate to="/" replace />} />
         <Route path="/playlists/:id" element={user ? <PlaylistDetailPage /> : <Navigate to="/" replace />} />
+        <Route path="/category/:slug" element={user ? <CategoryPage /> : <Navigate to="/" replace />} />
         <Route path="/history" element={user ? <HistoryPage /> : <Navigate to="/" replace />} />
         <Route path="/help" element={<HelpFeedback />} />
         {/* Profile fallback route */}

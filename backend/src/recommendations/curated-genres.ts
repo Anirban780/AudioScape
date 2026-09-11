@@ -347,7 +347,189 @@ export const CURATED_CATEGORIES: CuratedCategory[] = [
     gradient: 'from-violet-950 via-purple-900 to-slate-900',
     cluster: 'throwback',
   },
+  {
+    slug: 'synthwave',
+    keyword: 'synthwave',
+    label: 'Synthwave',
+    icon: '⚡',
+    gradient: 'from-fuchsia-800 via-purple-700 to-indigo-900',
+    cluster: 'electronic',
+  },
+  {
+    slug: 'rock-classics',
+    keyword: 'rock classics',
+    label: 'Rock Classics',
+    icon: '🎸',
+    gradient: 'from-amber-800 via-orange-900 to-stone-900',
+    cluster: 'rock-alt',
+  },
 ];
 
 // Derive the legacy string array format to preserve backward compatibility for other modules
 export const CURATED_GENRES: string[] = CURATED_CATEGORIES.map((cat) => cat.keyword);
+
+/**
+ * ============================================================================
+ * SHOWCASE CATEGORIES DEFINITIONS (Home Page Sliding Carousel)
+ * ============================================================================
+ * 
+ * WHAT:
+ * The curated core categories featured on the Home page horizontal sliding carousel.
+ * 
+ * WHY:
+ * Replaces the repetitive Explore page multi-section layout with a focused, high-impact
+ * discovery showcase directly on the Home dashboard.
+ * 
+ * HOW:
+ * - Each item defines a slug, search keyword, display name, curated tagline, and fallback artwork.
+ * - Used by RecommendationsService.getCategorySummaries() to resolve top tracks and artwork.
+ * ============================================================================
+ */
+export interface ShowcaseCategoryDefinition {
+  slug: string;
+  keyword: string;
+  name: string;
+  tagline: string;
+  fallbackThumbnail: string;
+}
+
+export const CATEGORY_TAGLINES: Record<string, string> = {
+  'chill-lofi': 'Beats to relax, study, and unwind',
+  'mood-vibe': 'Atmospheric soundscapes tailored to every feeling',
+  'pop': 'Chart-topping hooks & modern anthems',
+  'rock-alt': 'Raw guitars, authentic riffs & indie vibes',
+  'hiphop-urban': 'Boom-bap beats, heavy bass & lyrical flows',
+  'electronic': 'Futuristic synths, driving rhythms & club energy',
+  'jazz-soul': 'Timeless brass, smooth chords & soulful swing',
+  'classical-inst': 'Timeless orchestral masterpieces & delicate piano',
+  'regional': 'Vibrant cultural rhythms & global sounds',
+  'viral-trends': 'Trending audio sensations & streaming hits',
+  'gaming-anime': 'Epic battle scores & soundtrack themes',
+  'throwback': 'Millennium anthems & vintage radio gold',
+};
+
+export const SHOWCASE_CATEGORIES: ShowcaseCategoryDefinition[] = [
+  {
+    slug: 'lofi-chill',
+    keyword: 'lofi music',
+    name: 'Lo-Fi & Chill',
+    tagline: 'Beats to relax, study, and unwind',
+    fallbackThumbnail: '',
+  },
+  {
+    slug: 'synthwave',
+    keyword: 'synthwave',
+    name: 'Synthwave',
+    tagline: 'Retrofuturistic neon & analog synthscapes',
+    fallbackThumbnail: '',
+  },
+  {
+    slug: 'phonk',
+    keyword: 'phonk music',
+    name: 'Phonk',
+    tagline: 'High-octane drift beats & distorted 808s',
+    fallbackThumbnail: '',
+  },
+  {
+    slug: 'pop-hits',
+    keyword: 'pop hits',
+    name: 'Pop Hits',
+    tagline: 'Chart-topping hooks & modern anthems',
+    fallbackThumbnail: '',
+  },
+  {
+    slug: 'chill-beats',
+    keyword: 'chill beats',
+    name: 'Chill Beats',
+    tagline: 'Low-tempo grooves & laid-back rhythms',
+    fallbackThumbnail: '',
+  },
+  {
+    slug: 'indie-rock',
+    keyword: 'indie rock',
+    name: 'Indie Rock',
+    tagline: 'Raw guitars, authentic riffs & indie vibes',
+    fallbackThumbnail: '',
+  },
+  {
+    slug: 'workout-energy',
+    keyword: 'workout music',
+    name: 'Workout Energy',
+    tagline: 'Maximum adrenaline & high BPM power',
+    fallbackThumbnail: '',
+  },
+  {
+    slug: 'jazz-soul',
+    keyword: 'jazz chill',
+    name: 'Jazz & Soul',
+    tagline: 'Timeless brass, smooth chords & soulful swing',
+    fallbackThumbnail: '',
+  },
+  {
+    slug: 'ambient-focus',
+    keyword: 'ambient music',
+    name: 'Focus & Ambient',
+    tagline: 'Atmospheric soundscapes for deep flow',
+    fallbackThumbnail: '',
+  },
+  {
+    slug: 'rock-classics',
+    keyword: 'rock classics',
+    name: 'Rock Classics',
+    tagline: 'Legendary anthems & vintage riffs',
+    fallbackThumbnail: '',
+  },
+];
+
+/**
+ * Resolves standard category metadata (name, slug, keyword, tagline)
+ * for any given category slug, keyword, or user genre.
+ */
+export function getCategoryMetadata(slugOrKeyword: string): ShowcaseCategoryDefinition {
+  const normalized = slugOrKeyword.toLowerCase().trim();
+
+  // 1. Direct showcase categories lookup
+  const showcase = SHOWCASE_CATEGORIES.find(
+    (c) =>
+      c.slug.toLowerCase().trim() === normalized ||
+      c.keyword.toLowerCase().trim() === normalized ||
+      c.name.toLowerCase().trim() === normalized,
+  );
+  if (showcase) {
+    return showcase;
+  }
+
+  // 2. Search in CURATED_CATEGORIES by slug, keyword, or label
+  const found = CURATED_CATEGORIES.find(
+    (c) =>
+      c.slug.toLowerCase().trim() === normalized ||
+      c.keyword.toLowerCase().trim() === normalized ||
+      c.label.toLowerCase().trim() === normalized,
+  );
+
+  if (found) {
+    return {
+      slug: found.slug,
+      keyword: found.keyword,
+      name: found.label,
+      tagline: CATEGORY_TAGLINES[found.cluster] || 'Curated soundscapes and essential tracks',
+      fallbackThumbnail: '',
+    };
+  }
+
+  // 3. Dynamic user genre or tag metadata generation
+  const sanitizedSlug = normalized.replace(/[^\w\s-]/g, '').replace(/\s+/g, '-');
+  const capitalizedName = slugOrKeyword
+    .split(/[\s-]+/)
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+    .join(' ');
+
+  return {
+    slug: sanitizedSlug,
+    keyword: `${normalized} music`,
+    name: capitalizedName,
+    tagline: 'Personalized selection from your listening history',
+    fallbackThumbnail: '',
+  };
+}
+

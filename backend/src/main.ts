@@ -117,8 +117,8 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
 
   const port = process.env.PORT || 5000;
-  await app.listen(port);
-  logger.log(`🚀 NestJS AudioScape Backend operational and listening on port ${port}`);
+  await app.listen(port, '0.0.0.0');
+  logger.log(`🚀 NestJS AudioScape Backend operational and listening on port ${port} (0.0.0.0)`);
 }
 
 bootstrap();

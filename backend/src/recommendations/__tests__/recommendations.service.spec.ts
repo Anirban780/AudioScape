@@ -24,14 +24,17 @@ describe('RecommendationsService QA Test Suite', () => {
     },
     tracks: {
       findMany: jest.fn(),
+      count: jest.fn(),
       upsert: jest.fn(),
     },
     searchQuery: {
       findMany: jest.fn(),
+      findFirst: jest.fn(),
       upsert: jest.fn(),
     },
     queryTrackResult: {
       findMany: jest.fn(),
+      count: jest.fn(),
       upsert: jest.fn(),
     },
   };
@@ -397,4 +400,348 @@ describe('RecommendationsService QA Test Suite', () => {
       expect(p1ShuffledFresh.length).toBe(16);
     });
   });
+
+  describe('getCategorySummaries (Home Page Showcase Carousel)', () => {
+    it('TC-CAT-SUM-01: should return exactly 10 curated showcase categories with valid metadata', async () => {
+      mockTracksService.searchTracks.mockResolvedValue({
+        tracks: [
+          { videoId: 'mock-1', title: 'Song 1', thumbNail: 'https://i.ytimg.com/vi/mock-1/hqdefault.jpg' },
+        ],
+      });
+      mockPrismaService.searchQuery.findFirst.mockResolvedValue(null);
+      mockPrismaService.tracks.findMany.mockResolvedValue([]);
+      mockPrismaService.tracks.count.mockResolvedValue(0);
+
+      service.clearCategorySummariesCache();
+      const summaries = await service.getCategorySummaries();
+
+      expect(summaries).toBeDefined();
+      expect(summaries.length).toBe(10);
+
+      for (const cat of summaries) {
+        expect(cat.slug).toBeDefined();
+        expect(cat.name).toBeDefined();
+        expect(cat.tagline).toBeDefined();
+        expect(cat.thumbnail).toMatch(/^https?:\/\//);
+        expect(typeof cat.trackCount).toBe('number');
+        expect(cat.trackCount).toBeGreaterThan(0);
+      }
+    });
+
+    it('TC-CAT-SUM-02: should populate first track thumbnail and trackCount from category tracks', async () => {
+      mockTracksService.searchTracks.mockImplementation((keyword: string) => {
+        if (keyword.includes('lofi')) {
+          return Promise.resolve({
+            tracks: [
+              {
+                videoId: 'mock-lofi',
+                title: 'Lofi Study Beats',
+                thumbNail: 'https://i.ytimg.com/vi/mock-lofi/maxresdefault.jpg',
+              },
+            ],
+          });
+        }
+        return Promise.resolve({ tracks: [] });
+      });
+
+      service.clearCategorySummariesCache();
+      const summaries = await service.getCategorySummaries();
+
+      const lofi = summaries.find((s) => s.slug === 'lofi-chill');
+      expect(lofi).toBeDefined();
+      expect(lofi?.thumbnail).toContain('mock-lofi');
+      expect(lofi?.trackCount).toBeGreaterThan(0);
+    });
+
+    it('TC-CAT-SUM-03: should serve cached summaries on subsequent calls (0 DB queries)', async () => {
+      mockPrismaService.searchQuery.findFirst.mockClear();
+      const firstCall = await service.getCategorySummaries('cached-user');
+      const secondCall = await service.getCategorySummaries('cached-user');
+
+      expect(secondCall).toBe(firstCall);
+      expect(mockPrismaService.searchQuery.findFirst).not.toHaveBeenCalled();
+    });
+
+    it('TC-CAT-SUM-04: should return 60/40 exploit/explore blend for personalized user with genre/tag history', async () => {
+      service.clearCategorySummariesCache();
+      mockPrismaService.listenHistory.count.mockResolvedValue(10);
+      mockPrismaService.searchQuery.findMany.mockResolvedValue([
+        { rawQuery: 'pop hits' },
+        { rawQuery: 'indie rock' },
+        { rawQuery: 'workout music' },
+        { rawQuery: 'classical music' },
+      ]);
+      mockPrismaService.searchQuery.findFirst.mockResolvedValue(null);
+      mockPrismaService.tracks.findMany.mockResolvedValue([]);
+      mockPrismaService.tracks.count.mockResolvedValue(0);
+      mockTracksService.searchTracks.mockResolvedValue({
+        tracks: [{ videoId: 't1', title: 'Track', thumbNail: 'https://i.ytimg.com/vi/t1/hqdefault.jpg' }],
+      });
+
+      // User listened to hip hop and phonk tracks
+      const userHistory = [
+        {
+          id: 'hist_hiphop_1',
+          userId: 'user-personalized-6040',
+          trackId: 'track_hh1',
+          playCount: 15,
+          liked: true,
+          lastPlayedAt: new Date(),
+          track: {
+            youtubeVideoId: 'track_hh1',
+            title: 'Hip Hop Track',
+            genre: ['hip hop'],
+            tags: ['hip hop', 'boom bap'],
+            queryResults: [],
+          },
+        },
+        {
+          id: 'hist_phonk_1',
+          userId: 'user-personalized-6040',
+          trackId: 'track_ph1',
+          playCount: 12,
+          liked: true,
+          lastPlayedAt: new Date(),
+          track: {
+            youtubeVideoId: 'track_ph1',
+            title: 'Phonk Drift',
+            genre: ['phonk music'],
+            tags: ['phonk', 'drift'],
+            queryResults: [],
+          },
+        },
+        {
+          id: 'hist_kpop_1',
+          userId: 'user-personalized-6040',
+          trackId: 'track_kp1',
+          playCount: 8,
+          liked: false,
+          lastPlayedAt: new Date(),
+          track: {
+            youtubeVideoId: 'track_kp1',
+            title: 'K-Pop Anthem',
+            genre: ['k-pop'],
+            tags: ['k-pop hits'],
+            queryResults: [],
+          },
+        },
+      ];
+
+      mockPrismaService.listenHistory.findMany.mockResolvedValue(userHistory);
+
+      const summaries = await service.getCategorySummaries('user-personalized-6040');
+
+      expect(summaries).toBeDefined();
+      expect(summaries.length).toBe(10);
+
+      // Verify that user's high-affinity categories (hip-hop, phonk, k-pop) are included in the results
+      const slugs = summaries.map((s) => s.slug);
+      expect(slugs).toContain('hip-hop');
+      expect(slugs).toContain('phonk');
+      expect(slugs).toContain('k-pop');
+    });
+
+    it('TC-CAT-SUM-05: getCategoryAffinity correctly accumulates weights from track.genre and track.tags', async () => {
+      const historyWithGenresAndTags = [
+        {
+          id: 'hist_synth_1',
+          userId: 'user-affinity-test',
+          trackId: 'track_synth',
+          playCount: 5,
+          liked: true,
+          lastPlayedAt: new Date(),
+          track: {
+            youtubeVideoId: 'track_synth',
+            title: 'Retro Neon',
+            genre: ['synthwave'],
+            tags: ['electronic music'],
+            queryResults: [],
+          },
+        },
+      ];
+
+      mockPrismaService.listenHistory.findMany.mockResolvedValue(historyWithGenresAndTags);
+
+      const affinity = await service.getCategoryAffinity('user-affinity-test');
+
+      expect(affinity.has('synthwave')).toBe(true);
+      expect(affinity.get('synthwave')!).toBeGreaterThan(0);
+      expect(affinity.has('electronic music')).toBe(true);
+      expect(affinity.get('electronic music')!).toBeGreaterThan(0);
+    });
+
+    it('TC-CAT-SUM-06: should fallback to cold-start showcase categories when user has < 3 history items', async () => {
+      service.clearCategorySummariesCache();
+      mockPrismaService.listenHistory.count.mockResolvedValue(1);
+      mockPrismaService.searchQuery.findFirst.mockResolvedValue(null);
+      mockPrismaService.tracks.findMany.mockResolvedValue([]);
+      mockPrismaService.tracks.count.mockResolvedValue(0);
+      mockTracksService.searchTracks.mockResolvedValue({
+        tracks: [{ videoId: 't1', title: 'Track', thumbNail: 'https://i.ytimg.com/vi/t1/hqdefault.jpg' }],
+      });
+
+      const summaries = await service.getCategorySummaries('user-cold-start');
+
+      expect(summaries.length).toBe(10);
+      const slugs = summaries.map((s) => s.slug);
+      expect(slugs).toContain('lofi-chill');
+      expect(slugs).toContain('synthwave');
+    });
+
+    it('TC-CAT-SUM-07: isolates category summaries cache across different user IDs', async () => {
+      service.clearCategorySummariesCache();
+      mockPrismaService.listenHistory.count.mockResolvedValue(0);
+      mockPrismaService.searchQuery.findFirst.mockResolvedValue(null);
+      mockPrismaService.tracks.findMany.mockResolvedValue([]);
+      mockPrismaService.tracks.count.mockResolvedValue(0);
+      mockTracksService.searchTracks.mockResolvedValue({
+        tracks: [{ videoId: 't1', title: 'Track', thumbNail: 'https://i.ytimg.com/vi/t1/hqdefault.jpg' }],
+      });
+
+      const summariesUserA = await service.getCategorySummaries('user-alpha');
+      const summariesUserB = await service.getCategorySummaries('user-beta');
+
+      expect(summariesUserA).toBeDefined();
+      expect(summariesUserB).toBeDefined();
+
+      // Invalidate user-alpha should not purge user-beta
+      service.invalidateUserCache('user-alpha');
+      mockPrismaService.listenHistory.count.mockClear();
+
+      const userBSecondCall = await service.getCategorySummaries('user-beta');
+      expect(userBSecondCall).toBe(summariesUserB);
+      expect(mockPrismaService.listenHistory.count).not.toHaveBeenCalled();
+    });
+
+    it('TC-CAT-SUM-08: upgrades low-res thumbnails to Ultra HD maxresdefault and sanitizes domain', async () => {
+      service.clearCategorySummariesCache();
+      mockPrismaService.listenHistory.count.mockResolvedValue(0);
+      mockPrismaService.searchQuery.findFirst.mockResolvedValue(null);
+      mockPrismaService.tracks.findMany.mockResolvedValue([]);
+      mockPrismaService.tracks.count.mockResolvedValue(0);
+      mockTracksService.searchTracks.mockResolvedValue({
+        tracks: [
+          {
+            videoId: 'dQw4w9WgXcQ',
+            title: 'Pop Hit',
+            thumbNail: 'https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg',
+          },
+        ],
+      });
+
+      const summaries = await service.getCategorySummaries('user-hd-thumb-test');
+
+      expect(summaries.length).toBe(10);
+      for (const summary of summaries) {
+        if (summary.thumbnail) {
+          expect(summary.thumbnail).toContain('img.youtube.com');
+          expect(summary.thumbnail).toContain('maxresdefault.jpg');
+          expect(summary.thumbnail).not.toContain('i.ytimg.com');
+          expect(summary.thumbnail).not.toContain('hqdefault.jpg');
+        }
+      }
+    });
+  });
+
+  describe('getCategoryDetail', () => {
+    it('TC-CAT-DET-01: resolves category details and tracks for a valid category slug', async () => {
+      mockPrismaService.searchQuery.findUnique.mockResolvedValue({
+        id: 'query-lofi-1',
+        normalizedQuery: 'lofi music',
+      });
+      mockPrismaService.queryTrackResult.findMany.mockResolvedValue([
+        {
+          rankPosition: 1,
+          track: {
+            youtubeVideoId: 'lofi_vid_1',
+            title: 'Chill Study Beats',
+            artistName: 'ChilledCow',
+            thumbnailUrl: 'https://i.ytimg.com/vi/lofi_vid_1/hqdefault.jpg',
+            duration: 'PT3M30S',
+            genre: ['lofi-chill'],
+          },
+        },
+        {
+          rankPosition: 2,
+          track: {
+            youtubeVideoId: 'lofi_vid_2',
+            title: 'Coffee Shop Lofi',
+            artistName: 'Lofi Girl',
+            thumbnailUrl: 'https://i.ytimg.com/vi/lofi_vid_2/hqdefault.jpg',
+            duration: 'PT2M45S',
+            genre: ['lofi-chill'],
+          },
+        },
+      ]);
+      mockPrismaService.queryTrackResult.count.mockResolvedValue(2);
+
+      const result = await service.getCategoryDetail('lofi-chill', 20, 0);
+
+      expect(result).toBeDefined();
+      expect(result.category.slug).toBe('lofi-chill');
+      expect(result.category.name).toBe('Lo-Fi & Chill');
+      expect(result.category.tagline).toBeDefined();
+      expect(result.tracks.length).toBe(2);
+      expect(result.tracks[0].id).toBe('lofi_vid_1');
+      expect(result.tracks[0].thumbnail).toContain('maxresdefault.jpg');
+      expect(result.tracks[0].thumbnail).toContain('img.youtube.com');
+      expect(result.total).toBe(2);
+      expect(result.hasMore).toBe(false);
+    });
+
+    it('TC-CAT-DET-02: handles pagination slicing with limit and offset', async () => {
+      mockPrismaService.searchQuery.findUnique.mockResolvedValue({
+        id: 'query-synth-1',
+        normalizedQuery: 'synthwave',
+      });
+      mockPrismaService.queryTrackResult.findMany.mockResolvedValue([
+        {
+          rankPosition: 21,
+          track: {
+            youtubeVideoId: 'synth_vid_21',
+            title: 'Neon Drive 21',
+            artistName: 'Kavinsky',
+            thumbnailUrl: 'https://i.ytimg.com/vi/synth_vid_21/hqdefault.jpg',
+            genre: ['synthwave'],
+          },
+        },
+      ]);
+      mockPrismaService.queryTrackResult.count.mockResolvedValue(50);
+
+      const result = await service.getCategoryDetail('synthwave', 20, 20);
+
+      expect(result.tracks.length).toBe(1);
+      expect(result.total).toBe(50);
+      expect(result.hasMore).toBe(true);
+      expect(result.offset).toBe(20);
+      expect(result.limit).toBe(20);
+      expect(result.tracks[0].rankPosition).toBe(21);
+    });
+
+    it('TC-CAT-DET-03: throws BadRequestException when slug is empty', async () => {
+      await expect(service.getCategoryDetail('')).rejects.toThrow();
+    });
+
+    it('TC-CAT-DET-04: upgrades all track thumbnails to Ultra HD maxresdefault', async () => {
+      mockPrismaService.searchQuery.findUnique.mockResolvedValue(null);
+      mockTracksService.searchTracks.mockResolvedValue({
+        tracks: [
+          {
+            videoId: 'phonk_vid_1',
+            title: 'Drift Phonk',
+            channelTitle: 'Kordhell',
+            thumbNail: 'https://i.ytimg.com/vi/phonk_vid_1/hqdefault.jpg',
+          },
+        ],
+      });
+
+      const result = await service.getCategoryDetail('phonk', 10, 0);
+
+      expect(result.tracks.length).toBe(1);
+      expect(result.tracks[0].thumbnail).toContain('maxresdefault.jpg');
+      expect(result.tracks[0].thumbnail).toContain('img.youtube.com');
+      expect(result.category.thumbnail).toContain('maxresdefault.jpg');
+    });
+  });
 });
+

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Query, Param, UseGuards } from '@nestjs/common';
 import { RecommendationsService } from './recommendations.service';
 import { GetRecommendationsDto } from './dto/get-recommendations.dto';
 import { PaginatedRecommendationsDto } from './dto/paginated-recommendations.dto';
@@ -119,6 +119,17 @@ export class RecommendationsController {
   }
 
   /**
+   * Retrieves 60/40 personalized summary metadata (thumbnail, track count, tagline) for categories.
+   * Feeds the Home page horizontal sliding carousel with zero YouTube API quota consumption.
+   * @route GET `/api/music/categories/summary`
+   * @header Authorization Bearer <google_id_token>
+   */
+  @Get('categories/summary')
+  async getCategorySummaries(@GetUser('id') userId?: string) {
+    return this.recommendationsService.getCategorySummaries(userId);
+  }
+
+  /**
    * Retrieves the authoritative taxonomy of explore categories with frontend rendering metadata.
    * @route GET `/api/music/categories`
    * @header Authorization Bearer <google_id_token>
@@ -126,6 +137,22 @@ export class RecommendationsController {
   @Get('categories')
   async getCategories() {
     return this.recommendationsService.getCategories();
+  }
+
+  /**
+   * Retrieves full category metadata and paginated tracks for a dedicated category detail view.
+   * @route GET `/api/music/categories/:slug?limit=20&offset=0`
+   * @header Authorization Bearer <google_id_token>
+   */
+  @Get('categories/:slug')
+  async getCategoryDetail(
+    @Param('slug') slug: string,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+  ) {
+    const take = limit ? parseInt(limit, 10) : 20;
+    const skip = offset ? parseInt(offset, 10) : 0;
+    return this.recommendationsService.getCategoryDetail(slug, take, skip);
   }
 
   /**
