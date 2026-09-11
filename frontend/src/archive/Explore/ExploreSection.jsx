@@ -7,22 +7,9 @@ import toast from "react-hot-toast";
 
 /**
  * ============================================================================
- * EXPLORE TRACK SECTION (ExploreSection.jsx)
+ * ARCHIVED: EXPLORE TRACK SECTION (ExploreSection.jsx)
  * ============================================================================
- * 
- * WHAT THIS FILE DOES:
- * Renders an individual music section (e.g. "Lofi Music", "Pop Hits") featuring
- * a container-query driven album card grid of tracks and a "More" pagination button.
- * 
- * WHY IT WAS DESIGNED THIS WAY:
- * 1. Stitch Token Surface: Wraps section in `bg-[var(--color-surface-raised)]`
- *    with `border-[var(--color-border-default)]` for unified Light and Dark theme styling.
- * 2. MediaGrid Container Queries: Uses `MediaGrid` (`@container`) so track grid columns
- *    react instantly to sidebar toggles and container dimension changes without JS latency.
- * 
- * HOW IT WORKS:
- * - Accepts `section` object (`title`, `tracks`), `visibleCount`, and `onLoadMore` handler.
- * - Clicking any track card invokes `handlePlayTrack` to start playback with "EXPLORE" source.
+ * Archived during Phase 3 of Explore-to-Home migration.
  */
 
 const ExploreSection = ({ section, visibleCount = 5, onLoadMore }) => {

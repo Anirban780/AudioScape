@@ -11,7 +11,7 @@ import { Moon, Zap, Dumbbell, PartyPopper, Bed, Flame, Compass } from "lucide-re
  * Renders a horizontal scrollable row of interactive mood and activity chips:
  * 1. Predefined Vibe Chips: Chill (Lofi), Focus (Ambient), Workout (Fitness),
  *    Party (Dance), Sleep (Calm), Trending (Pop).
- * 2. Instant Navigation: Tapping any chip immediately routes the user to `/explore?genre=<keyword>`
+ * 2. Instant Navigation: Tapping any chip immediately routes the user to `/category/:slug`
  *    to trigger matching audio discovery feeds.
  * 
  * WHY IT WAS DESIGNED THIS WAY:
@@ -29,42 +29,42 @@ const MOOD_ITEMS = [
     id: "chill",
     label: "Chill & Lo-Fi",
     icon: Moon,
-    genre: "lofi",
+    slug: "lofi-chill",
     color: "from-purple-500/20 to-indigo-500/20 border-purple-500/30 text-purple-300",
   },
   {
     id: "focus",
     label: "Deep Focus",
     icon: Zap,
-    genre: "ambient",
+    slug: "study-focus",
     color: "from-blue-500/20 to-cyan-500/20 border-blue-500/30 text-blue-300",
   },
   {
     id: "workout",
     label: "Workout & Energy",
     icon: Dumbbell,
-    genre: "workout",
+    slug: "workout-motivation",
     color: "from-pink-500/20 to-rose-500/20 border-pink-500/30 text-pink-300",
   },
   {
     id: "party",
     label: "Party Beats",
     icon: PartyPopper,
-    genre: "dance",
+    slug: "party-dance",
     color: "from-amber-500/20 to-orange-500/20 border-amber-500/30 text-amber-300",
   },
   {
     id: "sleep",
     label: "Sleep & Calm",
     icon: Bed,
-    genre: "sleep",
+    slug: "sleep-ambient",
     color: "from-teal-500/20 to-emerald-500/20 border-teal-500/30 text-teal-300",
   },
   {
     id: "trending",
     label: "Trending Hits",
     icon: Flame,
-    genre: "pop",
+    slug: "pop-hits",
     color: "from-red-500/20 to-pink-500/20 border-red-500/30 text-red-300",
   },
 ];
@@ -72,8 +72,8 @@ const MOOD_ITEMS = [
 const MoodPicker = () => {
   const navigate = useNavigate();
 
-  const handleMoodClick = (genre) => {
-    navigate(`/explore?genre=${encodeURIComponent(genre)}`);
+  const handleMoodClick = (slug) => {
+    navigate(`/category/${encodeURIComponent(slug)}`);
   };
 
   return (
@@ -94,7 +94,7 @@ const MoodPicker = () => {
           return (
             <button
               key={item.id}
-              onClick={() => handleMoodClick(item.genre)}
+              onClick={() => handleMoodClick(item.slug)}
               className={`snap-start flex-shrink-0 flex items-center gap-2.5 px-4 py-2.5 rounded-full border bg-gradient-to-r ${item.color} bg-[var(--color-surface-raised)] border-[var(--color-border-strong)] hover:border-[var(--color-primary)] text-xs font-bold tracking-wide transition-all duration-200 hover:scale-105 active:scale-95 shadow-sm cursor-pointer`}
             >
               <IconComponent size={16} />

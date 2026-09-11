@@ -33,8 +33,14 @@ export async function getBackendURL() {
             return cachedBackendURL;
         }
     } catch {
-        // Local backend not running
+        // Local backend restarting or temporarily unavailable
     }
+
+    // On localhost, always prefer local development backend and avoid poisoning memory cache with obsolete cloud URL
+    if (isLocalhost) {
+        return LOCAL_API_URL;
+    }
+
     cachedBackendURL = PROD_API_URL || LOCAL_API_URL;
     return cachedBackendURL;
 }
@@ -523,6 +529,105 @@ export async function fetchExploreCategories() {
 }
 
 /**
+ * ============================================================================
+ * FETCH CATEGORY SUMMARIES (fetchCategorySummaries)
+ * ============================================================================
+ * 
+ * WHAT:
+ * Retrieves summary metadata (slug, display name, curated tagline, HD thumbnail,
+ * and track count) for the 10 showcase categories rendered on the Home page slider.
+ * 
+ * WHY:
+ * Feeds the Home page horizontal sliding carousel with zero YouTube API quota
+ * consumption. Replaces repetitive multi-section Explore feed with a fast,
+ * high-impact discovery entry point directly on the Home dashboard.
+ * 
+ * HOW:
+ * - Checks localStorage SWR cache (30m TTL) for instant layout rendering without flash.
+ * - Calls GET /api/music/categories/summary with Authorization Bearer header.
+ * - Normalizes and verifies thumbnail URLs via getValidThumbnailUrl.
+ * - Updates localStorage cache on successful responses.
+ * 
+ * @returns {Promise<Array<{ slug: string, name: string, keyword: string, tagline: string, thumbnail: string, trackCount: number }>>}
+ * ============================================================================
+ */
+export async function fetchCategorySummaries() {
+    const user = useAuthStore.getState()?.user;
+    const userIdKey = user?.id || user?.googleId || "anonymous";
+    const CACHE_KEY = `audioscape_cached_category_summaries_v2_${userIdKey}`;
+    const CACHE_TTL_MS = 30 * 60 * 1000;
+
+    // Check SWR cache first (ensure no legacy unsplash thumbnails exist)
+    try {
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            const hasUnsplash = Array.isArray(parsed.data) && parsed.data.some((d) => d.thumbnail && d.thumbnail.includes("unsplash.com"));
+            if (!hasUnsplash && Date.now() - parsed.timestamp < CACHE_TTL_MS && Array.isArray(parsed.data) && parsed.data.length > 0) {
+                fetchFreshCategorySummaries(CACHE_KEY).catch(() => {});
+                return parsed.data;
+            }
+        }
+    } catch {}
+
+    return await fetchFreshCategorySummaries(CACHE_KEY);
+}
+
+async function fetchFreshCategorySummaries(cacheKey) {
+    const CACHE_KEY = cacheKey || "audioscape_cached_category_summaries_v2_anonymous";
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
+
+        const response = await fetch(`${API_URL}/api/music/categories/summary`, {
+            method: "GET",
+            headers: { ...headers },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch category summaries: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        if (Array.isArray(data) && data.length > 0) {
+            const formatted = data.map((item) => {
+                const rawThumb = item.thumbnail && !item.thumbnail.includes("unsplash.com") ? item.thumbnail : "";
+                return {
+                    slug: item.slug,
+                    name: item.name,
+                    keyword: item.keyword,
+                    tagline: item.tagline || "",
+                    thumbnail: getValidThumbnailUrl(rawThumb) || rawThumb || "",
+                    trackCount: typeof item.trackCount === "number" ? item.trackCount : 20,
+                };
+            });
+
+            try {
+                localStorage.setItem(
+                    CACHE_KEY,
+                    JSON.stringify({ timestamp: Date.now(), data: formatted })
+                );
+            } catch {}
+
+            return formatted;
+        }
+        return [];
+    } catch (err) {
+        console.error("fetchCategorySummaries error:", err);
+        try {
+            const raw = localStorage.getItem(CACHE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed.data)) {
+                    return parsed.data.filter((d) => !d.thumbnail || !d.thumbnail.includes("unsplash.com"));
+                }
+            }
+        } catch {}
+        return [];
+    }
+}
+
+/**
  * Generates an initial play queue from NestJS backend (`POST /api/music/generate-queue`).
  * @param {string} currentTrackId - Active YouTube video ID.
  * @param {string} [keyword] - Optional context genre/keyword.
@@ -617,6 +722,142 @@ export async function extendQueueFromBackend(existingTrackIds, keyword) {
     } catch (error) {
         console.error("Error extending queue from backend:", error);
         return [];
+    }
+}
+
+/**
+ * ============================================================================
+ * FETCH CATEGORY DETAIL (fetchCategoryDetail)
+ * ============================================================================
+ * 
+ * WHAT:
+ * Retrieves category metadata and a paginated list of tracks from NestJS backend
+ * (`GET /api/music/categories/:slug?limit=20&offset=0`).
+ * 
+ * WHY:
+ * Powers the dedicated category discovery page (/category/:slug) with deep catalog
+ * exploration, 0 YouTube API quota consumption, and Ultra HD artwork.
+ * 
+ * HOW:
+ * - Checks localStorage SWR cache on page 1 (offset=0) for instant render without flash.
+ * - Revalidates in the background and saves fresh state.
+ * - Normalizes track objects (clean titles, artists, and high-res thumbnails).
+ * 
+ * @param {string} slug - Category slug (e.g. 'lofi-chill', 'synthwave')
+ * @param {number} [limit=20] - Number of tracks to retrieve
+ * @param {number} [offset=0] - Starting offset index
+ * @returns {Promise<{ category: object, tracks: Array, total: number, hasMore: boolean, offset: number, limit: number }>}
+ * ============================================================================
+ */
+export async function fetchCategoryDetail(slug, limit = 20, offset = 0) {
+    if (!slug) return { category: null, tracks: [], total: 0, hasMore: false, offset: 0, limit };
+
+    const CACHE_KEY = `audioscape_cached_cat_${slug}`;
+    const CACHE_TTL_MS = 30 * 60 * 1000;
+
+    // Check SWR cache for page 1 only
+    if (offset === 0) {
+        try {
+            const raw = localStorage.getItem(CACHE_KEY);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Date.now() - parsed.timestamp < CACHE_TTL_MS && parsed.data?.category && Array.isArray(parsed.data?.tracks)) {
+                    // Trigger silent background revalidation
+                    fetchFreshCategoryDetail(slug, limit, offset, CACHE_KEY).catch(() => {});
+                    return parsed.data;
+                }
+            }
+        } catch {}
+    }
+
+    return await fetchFreshCategoryDetail(slug, limit, offset, offset === 0 ? CACHE_KEY : null);
+}
+
+async function fetchFreshCategoryDetail(slug, limit, offset, cacheKey) {
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
+
+        const response = await fetch(
+            `${API_URL}/api/music/categories/${encodeURIComponent(slug)}?limit=${limit}&offset=${offset}`,
+            {
+                method: "GET",
+                headers: { ...headers },
+            }
+        );
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch category details: ${response.status} ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const rawTracks = Array.isArray(data.tracks) ? data.tracks : [];
+
+        const normalizedTracks = rawTracks.map((t, idx) => {
+            const trackId = t.id || t.videoId;
+            const thumb = getValidThumbnailUrl(t.thumbnail || t.thumbNail || t.thumbnailUrl || "") || "";
+            return {
+                id: trackId,
+                videoId: trackId,
+                title: t.name || t.title || "Unknown Title",
+                name: t.name || t.title || "Unknown Title",
+                artist: t.artist || t.channelTitle || "Unknown Artist",
+                channelTitle: t.artist || t.channelTitle || "Unknown Artist",
+                thumbnail: thumb,
+                thumbNail: thumb,
+                duration: t.duration || null,
+                durationSeconds: t.durationSeconds || null,
+                genre: t.genre || [],
+                rankPosition: t.rankPosition || offset + idx + 1,
+            };
+        });
+
+        const categoryHeroThumb = getValidThumbnailUrl(data.category?.thumbnail || "") || "";
+        const formatted = {
+            category: {
+                slug: data.category?.slug || slug,
+                name: data.category?.name || slug,
+                keyword: data.category?.keyword || slug,
+                tagline: data.category?.tagline || "",
+                thumbnail: categoryHeroThumb,
+                totalTracks: typeof data.category?.totalTracks === "number" ? data.category.totalTracks : normalizedTracks.length,
+            },
+            tracks: normalizedTracks,
+            total: typeof data.total === "number" ? data.total : normalizedTracks.length,
+            hasMore: Boolean(data.hasMore),
+            offset: typeof data.offset === "number" ? data.offset : offset,
+            limit: typeof data.limit === "number" ? data.limit : limit,
+        };
+
+        if (cacheKey && offset === 0) {
+            try {
+                localStorage.setItem(
+                    cacheKey,
+                    JSON.stringify({ timestamp: Date.now(), data: formatted })
+                );
+            } catch {}
+        }
+
+        return formatted;
+    } catch (err) {
+        console.error(`fetchCategoryDetail error for slug "${slug}":`, err);
+        if (cacheKey) {
+            try {
+                const raw = localStorage.getItem(cacheKey);
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    if (parsed.data) return parsed.data;
+                }
+            } catch {}
+        }
+        return {
+            category: { slug, name: slug, keyword: slug, tagline: "", thumbnail: "", totalTracks: 0 },
+            tracks: [],
+            total: 0,
+            hasMore: false,
+            offset,
+            limit,
+        };
     }
 }
 

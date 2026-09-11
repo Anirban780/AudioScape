@@ -7,6 +7,7 @@ import { YouTubeKeyManager } from './youtube-key-manager';
 import { SearchRateLimiterService } from './search-rate-limiter.service';
 import { getValidThumbnailUrl } from '../utils/youtubeUtils';
 import { parseTrackTitle } from './utils/title-parser.util';
+import { CURATED_GENRES } from '../recommendations/curated-genres';
 
 /**
  * ============================================================================
@@ -23,11 +24,13 @@ import { parseTrackTitle } from './utils/title-parser.util';
  * ============================================================================
  */
 /**
- * Configurable Cache TTL in days for curated explore categories.
- * Modify this variable to adjust how long category search results remain fresh in PostgreSQL before re-fetching.
- * Default: 7 days.
+ * Differentiated Cache TTL in days:
+ * - Default / Curated Categories: 15 days
+ * - User Songs / Dynamic Category Searches: 7 days
  */
-export const CURATED_CATEGORY_CACHE_TTL_DAYS = 7;
+export const CURATED_DEFAULT_CACHE_TTL_DAYS = 15;
+export const USER_CATEGORY_CACHE_TTL_DAYS = 7;
+export const CURATED_CATEGORY_CACHE_TTL_DAYS = 15; // backward-compatibility alias
 
 @Injectable()
 export class TracksService {
@@ -767,8 +770,14 @@ export class TracksService {
       }
     }
 
-    // 4. Update SearchQuery record with configurable TTL (default: 7 days) and CURATED_KEYWORD queryType
-    const categoryTtlMs = CURATED_CATEGORY_CACHE_TTL_DAYS * 24 * 60 * 60 * 1000;
+    // 4. Update SearchQuery record with differentiated TTL:
+    // - 15 days for default curated categories
+    // - 7 days for user songs / dynamic category searches
+    const isDefaultCurated = CURATED_GENRES.some(
+      (g) => g.toLowerCase().trim() === keyword.toLowerCase().trim(),
+    );
+    const ttlDays = isDefaultCurated ? CURATED_DEFAULT_CACHE_TTL_DAYS : USER_CATEGORY_CACHE_TTL_DAYS;
+    const categoryTtlMs = ttlDays * 24 * 60 * 60 * 1000;
     const expiresAt = new Date(Date.now() + categoryTtlMs);
 
     await this.prisma.searchQuery.update({
@@ -782,7 +791,7 @@ export class TracksService {
     });
 
     this.logger.log(
-      `Successfully populated category "${keyword}": ${totalStored} tracks stored across ${pagesFetched} page fetch(es). ${CURATED_CATEGORY_CACHE_TTL_DAYS}-day TTL set to ${expiresAt.toISOString()}`,
+      `Successfully populated category "${keyword}" (${isDefaultCurated ? 'Default Curated' : 'User/Dynamic'}): ${totalStored} tracks stored across ${pagesFetched} page fetch(es). ${ttlDays}-day TTL set to ${expiresAt.toISOString()}`,
     );
 
     return { trackCount: totalStored, fromCache: false };

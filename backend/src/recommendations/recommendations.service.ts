@@ -1,12 +1,50 @@
-import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
+import { Injectable, Logger, HttpException, HttpStatus, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { TracksService } from '../tracks/tracks.service';
 import { TfIdfEngine, UserHistoryItem, CandidateQueryGroup, RecommendedTrackResult } from './tfidf-engine';
 import { TrackItemDto } from './dto/cache-related-tracks.dto';
-import { CURATED_GENRES, CURATED_CATEGORIES } from './curated-genres';
+import { CURATED_GENRES, CURATED_CATEGORIES, SHOWCASE_CATEGORIES, getCategoryMetadata } from './curated-genres';
 import { QueryType } from '@prisma/client';
 import { calculateTasteWeight, calculateQualityScore } from './taste-weight.util';
-import { getValidThumbnailUrl } from '../utils/youtubeUtils';
+import { getHighResThumbnailUrl, getValidThumbnailUrl } from '../utils/youtubeUtils';
+
+export interface CategorySummaryDto {
+  slug: string;
+  name: string;
+  keyword: string;
+  tagline: string;
+  thumbnail: string;
+  trackCount: number;
+}
+
+export interface CategoryDetailDto {
+  category: {
+    slug: string;
+    name: string;
+    keyword: string;
+    tagline: string;
+    thumbnail: string;
+    totalTracks: number;
+  };
+  tracks: Array<{
+    id: string;
+    videoId: string;
+    title: string;
+    name: string;
+    artist: string;
+    channelTitle: string;
+    thumbnail: string;
+    thumbNail: string;
+    duration?: string | null;
+    durationSeconds?: number | null;
+    genre: string[];
+    rankPosition: number;
+  }>;
+  total: number;
+  hasMore: boolean;
+  offset: number;
+  limit: number;
+}
 
 /**
  * ============================================================================
@@ -35,8 +73,11 @@ export class RecommendationsService {
   private readonly affinityCache = new Map<string, { data: Map<string, number>; expiresAt: number }>();
   // In-memory cache mapping `${userId || 'anonymous'}:${limitPerCategory}` -> { feed, expiresAt }
   private readonly exploreFeedCache = new Map<string, { feed: any[]; expiresAt: number }>();
+  // In-memory cache for Home page category showcase summaries per user (30m TTL)
+  private readonly categorySummariesCache = new Map<string, { data: CategorySummaryDto[]; expiresAt: number }>();
   private readonly CACHE_TTL_MS = 60 * 60 * 1000; // 1 Hour
   private readonly EXPLORE_CACHE_TTL_MS = 15 * 60 * 1000; // 15 Minutes
+  private readonly CATEGORY_SUMMARIES_CACHE_TTL_MS = 30 * 60 * 1000; // 30 Minutes
 
   constructor(
     private readonly prisma: PrismaService,
@@ -52,6 +93,10 @@ export class RecommendationsService {
     if (this.affinityCache.has(userId)) {
       this.logger.log(`Invalidated category affinity cache for user: ${userId}`);
       this.affinityCache.delete(userId);
+    }
+    if (this.categorySummariesCache.has(userId)) {
+      this.logger.log(`Invalidated category summaries cache for user: ${userId}`);
+      this.categorySummariesCache.delete(userId);
     }
     // Invalidate explore feed cache for this user
     for (const key of this.exploreFeedCache.keys()) {
@@ -695,22 +740,83 @@ export class RecommendationsService {
         playCount: h.playCount,
       }, nowLocalDate);
 
-      for (const qr of h.track.queryResults) {
-        if (qr.query.queryType === QueryType.CURATED_KEYWORD) {
-          const key = qr.query.rawQuery.toLowerCase().trim();
-          affinity.set(key, (affinity.get(key) || 0) + weight);
-        } else if (qr.query.queryType === QueryType.USER_SEARCH) {
-          // Tokenize user search query and match against CURATED_CATEGORIES
-          const searchStems = this.extractStemTokens(qr.query.rawQuery);
+      // 1. Evaluate QueryTrackResults (Curated keywords & User search queries)
+      if (Array.isArray(h.track?.queryResults)) {
+        for (const qr of h.track.queryResults) {
+          if (qr.query?.queryType === QueryType.CURATED_KEYWORD && qr.query.rawQuery) {
+            const key = qr.query.rawQuery.toLowerCase().trim();
+            affinity.set(key, (affinity.get(key) || 0) + weight);
+          } else if (qr.query?.queryType === QueryType.USER_SEARCH && qr.query.rawQuery) {
+            // Tokenize user search query and match against CURATED_CATEGORIES
+            const searchStems = this.extractStemTokens(qr.query.rawQuery);
+            for (const category of CURATED_CATEGORIES) {
+              const catStems = this.extractStemTokens(category.keyword);
+              const matches = searchStems.some(
+                (s) => catStems.includes(s) || category.keyword.toLowerCase().includes(s),
+              );
+              if (matches) {
+                const catKey = category.keyword.toLowerCase().trim();
+                // User search adds 0.75x weight toward matching curated explore category
+                affinity.set(catKey, (affinity.get(catKey) || 0) + weight * 0.75);
+              }
+            }
+          }
+        }
+      }
+
+      // 2. Evaluate Track-Level Curated Genres (h.track.genre: string[])
+      if (Array.isArray(h.track?.genre) && h.track.genre.length > 0) {
+        for (const rawGenre of h.track.genre) {
+          if (!rawGenre || typeof rawGenre !== 'string') continue;
+          const genreLower = rawGenre.toLowerCase().trim();
+          const genreStems = this.extractStemTokens(genreLower);
+
           for (const category of CURATED_CATEGORIES) {
+            const catKeyword = category.keyword.toLowerCase().trim();
+            const catSlug = category.slug.toLowerCase().trim();
+            const catLabel = category.label.toLowerCase().trim();
             const catStems = this.extractStemTokens(category.keyword);
-            const matches = searchStems.some(
-              (s) => catStems.includes(s) || category.keyword.toLowerCase().includes(s),
-            );
-            if (matches) {
-              const catKey = category.keyword.toLowerCase().trim();
-              // User search adds 0.75x weight toward matching curated explore category
-              affinity.set(catKey, (affinity.get(catKey) || 0) + weight * 0.75);
+
+            // Direct exact match to keyword, slug, or label -> high intent (1.5x weight)
+            if (genreLower === catKeyword || genreLower === catSlug || genreLower === catLabel) {
+              affinity.set(catKeyword, (affinity.get(catKeyword) || 0) + weight * 1.5);
+            } else if (genreStems.length > 0) {
+              // Stem or substring match -> strong intent (1.0x weight)
+              const matches = genreStems.some(
+                (s) => catStems.includes(s) || catKeyword.includes(s) || catLabel.includes(s),
+              );
+              if (matches) {
+                affinity.set(catKeyword, (affinity.get(catKeyword) || 0) + weight * 1.0);
+              }
+            }
+          }
+        }
+      }
+
+      // 3. Evaluate Track-Level YouTube Tags (h.track.tags: string[])
+      if (Array.isArray(h.track?.tags) && h.track.tags.length > 0) {
+        for (const rawTag of h.track.tags) {
+          if (!rawTag || typeof rawTag !== 'string') continue;
+          const tagLower = rawTag.toLowerCase().trim();
+          const tagStems = this.extractStemTokens(tagLower);
+
+          for (const category of CURATED_CATEGORIES) {
+            const catKeyword = category.keyword.toLowerCase().trim();
+            const catSlug = category.slug.toLowerCase().trim();
+            const catLabel = category.label.toLowerCase().trim();
+            const catStems = this.extractStemTokens(category.keyword);
+
+            // Exact match -> 1.2x weight
+            if (tagLower === catKeyword || tagLower === catSlug || tagLower === catLabel) {
+              affinity.set(catKeyword, (affinity.get(catKeyword) || 0) + weight * 1.2);
+            } else if (tagStems.length > 0) {
+              // Stem match -> 0.6x weight
+              const matches = tagStems.some(
+                (s) => catStems.includes(s) || catKeyword.includes(s),
+              );
+              if (matches) {
+                affinity.set(catKeyword, (affinity.get(catKeyword) || 0) + weight * 0.6);
+              }
             }
           }
         }
@@ -1101,6 +1207,395 @@ export class RecommendationsService {
   async getCategories() {
     return CURATED_CATEGORIES;
   }
+
+  /**
+   * ============================================================================
+   * CATEGORY SUMMARIES METADATA RESOLVER (Home Page Sliding Carousel)
+   * ============================================================================
+   * 
+   * WHAT:
+   * Returns a 60/40 personalized exploit/explore blend of 10 category summaries:
+   * - 60% (up to 6 categories): Personalized categories matching user's listened genres/tags.
+   * - 40% (4 categories): Globally popular discovery categories from remaining curated pool.
+   * - Cold Start / Anonymous: 10 showcase curated categories.
+   * 
+   * WHY:
+   * Feeds the Home page horizontal sliding carousel directly with rich, user-aligned category cards,
+   * completely replacing the repetitive standalone Explore feed.
+   * 
+   * HOW:
+   * - Checks Layer 0 in-memory cache per user ID (30m TTL).
+   * - Computes user category affinity from ListenHistory (evaluating track genres, tags, and queries).
+   * - Enforces Strategy A & C deduplication (stem overlap prevention & max 1 per cluster).
+   * - For each selected category, resolves top track thumbnail and track count from PostgreSQL.
+   * - 100% database-backed with 0 YouTube API quota units consumed.
+   * ============================================================================
+   */
+  async getCategorySummaries(userId?: string): Promise<CategorySummaryDto[]> {
+    const now = Date.now();
+    const cacheKey = userId || 'anonymous';
+    const cached = this.categorySummariesCache.get(cacheKey);
+    if (cached && cached.expiresAt > now) {
+      return cached.data;
+    }
+
+    let selectedKeywords: string[] = [];
+    let hasPersonalization = false;
+    let affinityMap = new Map<string, number>();
+
+    if (userId) {
+      try {
+        const historyCount = await this.prisma.listenHistory.count({ where: { userId } });
+        if (historyCount >= 3) {
+          affinityMap = await this.getCategoryAffinity(userId);
+          hasPersonalization = affinityMap.size > 0;
+        }
+      } catch (err: any) {
+        this.logger.warn(`Failed to retrieve category affinity for summaries: ${err.message}`);
+      }
+    }
+
+    if (!hasPersonalization) {
+      // Cold-start fallback: Serve 10 showcase curated categories
+      this.logger.log(`Cold start or anonymous category summaries. Serving showcase curated categories.`);
+      selectedKeywords = SHOWCASE_CATEGORIES.map((c) => c.keyword);
+    } else {
+      // 60/40 Exploit/Explore ratio (6 personalized + 4 discovery)
+      const sortedAffinity = [...affinityMap.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([key]) => key);
+
+      // 1. Take up to 6 personalized categories (exploit), filtering duplicates via Strategy A & C
+      const personalizedKeywords: string[] = [];
+      for (const key of sortedAffinity) {
+        if (!this.isDuplicateOrOverlappingCategory(key, personalizedKeywords)) {
+          personalizedKeywords.push(key);
+        }
+        if (personalizedKeywords.length >= 6) break;
+      }
+
+      // 2. Load global popularity (hitCount) of curated categories
+      let popularKeywords: string[] = [];
+      try {
+        const popularQueries = await this.prisma.searchQuery.findMany({
+          where: { queryType: QueryType.CURATED_KEYWORD },
+          orderBy: { hitCount: 'desc' },
+          select: { rawQuery: true },
+          take: 50,
+        });
+        popularKeywords = popularQueries.map((q) => q.rawQuery.toLowerCase().trim());
+      } catch (err: any) {
+        this.logger.warn(`Failed to fetch popular categories for summaries explore sorting: ${err.message}`);
+      }
+
+      // Filter remaining curated categories not in exploit list
+      const remainingCurated = CURATED_GENRES.filter((c) => !personalizedKeywords.includes(c));
+
+      // Sort remaining curated by global popularity index
+      const remainingSorted = [...remainingCurated].sort((a, b) => {
+        const indexA = popularKeywords.indexOf(a.toLowerCase().trim());
+        const indexB = popularKeywords.indexOf(b.toLowerCase().trim());
+        const scoreA = indexA === -1 ? 999 : indexA;
+        const scoreB = indexB === -1 ? 999 : indexB;
+        return scoreA - scoreB;
+      });
+
+      // 3. Take discovery categories (explore) to reach 10 total categories, avoiding cluster overlap
+      const discoveryKeywords: string[] = [];
+      for (const candidate of remainingSorted) {
+        if (personalizedKeywords.length + discoveryKeywords.length >= 10) break;
+        if (!this.isDuplicateOrOverlappingCategory(candidate, [...personalizedKeywords, ...discoveryKeywords])) {
+          discoveryKeywords.push(candidate);
+        }
+      }
+
+      // If still fewer than 10, backfill from remaining without strict cluster restriction
+      if (personalizedKeywords.length + discoveryKeywords.length < 10) {
+        for (const candidate of remainingSorted) {
+          if (personalizedKeywords.length + discoveryKeywords.length >= 10) break;
+          if (
+            !personalizedKeywords.includes(candidate) &&
+            !discoveryKeywords.includes(candidate)
+          ) {
+            discoveryKeywords.push(candidate);
+          }
+        }
+      }
+
+      selectedKeywords = [...personalizedKeywords, ...discoveryKeywords];
+      this.logger.log(
+        `Category summaries 60/40 blend: exploit=${personalizedKeywords.length}, explore=${discoveryKeywords.length} for user=${userId}`,
+      );
+    }
+
+    const summaries: CategorySummaryDto[] = await Promise.all(
+      selectedKeywords.map(async (keyword) => {
+        const meta = getCategoryMetadata(keyword);
+        try {
+          let thumbnail = '';
+          let trackCount = 0;
+
+          // 1. Try finding existing tracks from PostgreSQL search page cache or FTS
+          let searchResult = await this.tracksService.searchTracks(meta.keyword, '', true);
+          let tracks = searchResult.tracks || [];
+
+          // 2. If no tracks in local cache, populate first page (up to 20 tracks) into PostgreSQL
+          if (tracks.length === 0) {
+            try {
+              await this.tracksService.ensureCategoryPopulated(meta.keyword, 20, 1);
+              searchResult = await this.tracksService.searchTracks(meta.keyword, '', true);
+              tracks = searchResult.tracks || [];
+            } catch (popErr: any) {
+              this.logger.warn(`Could not populate category '${meta.keyword}': ${popErr.message}`);
+            }
+          }
+
+          trackCount = tracks.length;
+
+          // 3. Extract the FIRST song's valid high-resolution Ultra HD thumbnail image
+          for (const t of tracks) {
+            if (t.thumbNail) {
+              const highRes = getHighResThumbnailUrl(t.thumbNail, t.videoId);
+              const validThumb = highRes || getValidThumbnailUrl(t.thumbNail);
+              if (validThumb && !validThumb.includes('unsplash.com')) {
+                thumbnail = validThumb;
+                break;
+              }
+            }
+          }
+
+          // 4. Fallback to direct tracks table by genre/tag/title if search cache was empty
+          if (!thumbnail) {
+            const directTracks = await this.prisma.tracks.findMany({
+              where: {
+                OR: [
+                  { genre: { has: meta.keyword } },
+                  { tags: { has: meta.keyword } },
+                  { title: { contains: meta.name, mode: 'insensitive' } },
+                ],
+              },
+              orderBy: { fetchCount: 'desc' },
+              take: 5,
+            });
+
+            if (directTracks.length > 0) {
+              if (trackCount === 0) trackCount = directTracks.length;
+              for (const dt of directTracks) {
+                if (dt.thumbnailUrl) {
+                  const highRes = getHighResThumbnailUrl(dt.thumbnailUrl, dt.youtubeVideoId);
+                  const validThumb = highRes || getValidThumbnailUrl(dt.thumbnailUrl);
+                  if (validThumb && !validThumb.includes('unsplash.com')) {
+                    thumbnail = validThumb;
+                    break;
+                  }
+                }
+              }
+            }
+          }
+
+          // 5. If still no thumbnail, pick the first track available in the tracks database
+          if (!thumbnail) {
+            const anyTrack = await this.prisma.tracks.findFirst({
+              where: { thumbnailUrl: { not: null } },
+              orderBy: { viewCount: 'desc' },
+            });
+            if (anyTrack?.thumbnailUrl) {
+              const highRes = getHighResThumbnailUrl(anyTrack.thumbnailUrl, anyTrack.youtubeVideoId);
+              const validThumb = highRes || getValidThumbnailUrl(anyTrack.thumbnailUrl);
+              if (validThumb && !validThumb.includes('unsplash.com')) {
+                thumbnail = validThumb;
+              }
+            }
+          }
+
+          if (trackCount === 0) {
+            trackCount = 20;
+          }
+
+          return {
+            slug: meta.slug,
+            name: meta.name,
+            keyword: meta.keyword,
+            tagline: meta.tagline,
+            thumbnail,
+            trackCount,
+          };
+        } catch (err: any) {
+          this.logger.warn(`Failed to resolve category summary for ${meta.slug}: ${err.message}`);
+          return {
+            slug: meta.slug,
+            name: meta.name,
+            keyword: meta.keyword,
+            tagline: meta.tagline,
+            thumbnail: '',
+            trackCount: 20,
+          };
+        }
+      }),
+    );
+
+    // Limit cache size to prevent memory leaks (max 200 users)
+    if (this.categorySummariesCache.size > 200) {
+      const oldestKey = this.categorySummariesCache.keys().next().value;
+      if (oldestKey) this.categorySummariesCache.delete(oldestKey);
+    }
+
+    this.categorySummariesCache.set(cacheKey, {
+      data: summaries,
+      expiresAt: now + this.CATEGORY_SUMMARIES_CACHE_TTL_MS,
+    });
+
+    return summaries;
+  }
+
+  /**
+   * Clears the in-memory category summaries cache (used in testing and invalidation routines).
+   */
+  clearCategorySummariesCache(userId?: string): void {
+    if (userId) {
+      this.categorySummariesCache.delete(userId);
+    } else {
+      this.categorySummariesCache.clear();
+    }
+  }
+
+  /**
+   * ============================================================================
+   * GET CATEGORY DETAIL WITH PAGINATED TRACKS (getCategoryDetail)
+   * ============================================================================
+   * 
+   * WHAT:
+   * Retrieves full category metadata (name, slug, tagline, hero HD thumbnail)
+   * and a paginated array of tracks for a dedicated category detail page (/category/:slug).
+   * 
+   * WHY:
+   * Provides deep discovery experience directly linked from the Home category slider,
+   * completely replacing the repetitive Explore page.
+   * 
+   * HOW:
+   * - Resolves category metadata from `getCategoryMetadata(slug)`.
+   * - Ensures PostgreSQL cache is populated via `ensureCategoryPopulated(keyword, 50, 2)`.
+   * - Queries `QueryTrackResult` / `SearchQuery` in PostgreSQL ordered by `rankPosition asc`.
+   * - Slices result tracks by `offset` and `limit`.
+   * - Upgrades all track thumbnails to Ultra HD (`maxresdefault.jpg`) with domain sanitization.
+   * - 100% database-backed once populated, consuming 0 YouTube API quota.
+   * ============================================================================
+   */
+  async getCategoryDetail(
+    slug: string,
+    limit: number = 20,
+    offset: number = 0,
+  ): Promise<CategoryDetailDto> {
+    if (!slug || !slug.trim()) {
+      throw new BadRequestException('Category slug is required');
+    }
+
+    const cleanSlug = slug.toLowerCase().trim();
+    const meta = getCategoryMetadata(cleanSlug);
+
+    if (!meta || !meta.keyword) {
+      throw new NotFoundException(`Category '${slug}' not found`);
+    }
+
+    const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
+    const safeOffset = Math.max(Number(offset) || 0, 0);
+
+    // 1. Ensure category is populated in PostgreSQL (up to 50 tracks, 15-day TTL for curated, 7-day for user)
+    try {
+      await this.tracksService.ensureCategoryPopulated(meta.keyword, 50, 2);
+    } catch (popErr: any) {
+      this.logger.warn(`Could not ensure category populated for '${meta.keyword}': ${popErr.message}`);
+    }
+
+    // 2. Query SearchQuery record by normalized query
+    const normalizedQuery = meta.keyword.toLowerCase().trim().replace(/\s+/g, ' ').replace(/[^\w\s]/g, '');
+    let tracks: any[] = [];
+    let totalCount = 0;
+
+    const queryRecord = await this.prisma.searchQuery.findUnique({
+      where: { normalizedQuery },
+    });
+
+    if (queryRecord) {
+      const [results, total] = await Promise.all([
+        this.prisma.queryTrackResult.findMany({
+          where: { queryId: queryRecord.id },
+          orderBy: { rankPosition: 'asc' },
+          skip: safeOffset,
+          take: safeLimit,
+          include: {
+            track: true,
+          },
+        }),
+        this.prisma.queryTrackResult.count({
+          where: { queryId: queryRecord.id },
+        }),
+      ]);
+
+      totalCount = total;
+      tracks = results.map((r) => r.track).filter(Boolean);
+    }
+
+    // 3. Fallback to searchTracks if queryRecord had no results
+    if (tracks.length === 0) {
+      try {
+        const searchResult = await this.tracksService.searchTracks(meta.keyword, '', true);
+        const allTracks = searchResult.tracks || [];
+        totalCount = allTracks.length;
+        tracks = allTracks.slice(safeOffset, safeOffset + safeLimit);
+      } catch (searchErr: any) {
+        this.logger.warn(`searchTracks fallback failed for '${meta.keyword}': ${searchErr.message}`);
+      }
+    }
+
+    // 4. Map tracks with Ultra HD thumbnails and clean metadata
+    const mappedTracks = tracks.map((t, idx) => {
+      const videoId = t.youtubeVideoId || t.videoId || t.id || '';
+      const rawThumb = t.thumbnailUrl || t.thumbNail || t.thumbnail || '';
+      const highResThumb = getHighResThumbnailUrl(rawThumb, videoId) || getValidThumbnailUrl(rawThumb) || '';
+      const cleanTitle = t.title || t.name || 'Unknown Track';
+      const cleanArtist = t.artistName || t.artist || t.channelTitle || 'Unknown Artist';
+
+      return {
+        id: videoId,
+        videoId,
+        title: cleanTitle,
+        name: cleanTitle,
+        artist: cleanArtist,
+        channelTitle: cleanArtist,
+        thumbnail: highResThumb,
+        thumbNail: highResThumb,
+        duration: t.duration || null,
+        durationSeconds: t.durationSeconds || null,
+        genre: t.genre || [meta.slug],
+        rankPosition: safeOffset + idx + 1,
+      };
+    });
+
+    // 5. Derive category hero artwork from the first available high-res track thumbnail
+    let categoryHeroThumb = mappedTracks[0]?.thumbnail || '';
+    if (!categoryHeroThumb && tracks.length > 0) {
+      const firstRaw = tracks[0].thumbnailUrl || tracks[0].thumbNail || '';
+      categoryHeroThumb = getHighResThumbnailUrl(firstRaw) || getValidThumbnailUrl(firstRaw) || '';
+    }
+
+    return {
+      category: {
+        slug: meta.slug,
+        name: meta.name,
+        keyword: meta.keyword,
+        tagline: meta.tagline,
+        thumbnail: categoryHeroThumb,
+        totalTracks: totalCount,
+      },
+      tracks: mappedTracks,
+      total: totalCount,
+      hasMore: safeOffset + mappedTracks.length < totalCount,
+      offset: safeOffset,
+      limit: safeLimit,
+    };
+  }
+
 
   /**
    * Background Pre-Warming Routine: Pre-fills PostgreSQL page cache for popular & baseline explore categories.

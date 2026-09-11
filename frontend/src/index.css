@@ -199,6 +199,39 @@ html {
   will-change: object-position, transform;
 }
 
+.animate-pan-horizontal {
+  animation: heroPanLeftRight 12s ease-in-out infinite alternate;
+  will-change: object-position, transform;
+}
+
+/* Category Card Pan on Hover/Focus Only */
+.animate-pan-horizontal-hover {
+  animation: heroPanLeftRight 10s ease-in-out infinite alternate;
+  animation-play-state: paused;
+  will-change: object-position, transform;
+}
+
+.group:hover .animate-pan-horizontal-hover,
+.group:focus-within .animate-pan-horizontal-hover,
+.group:focus .animate-pan-horizontal-hover {
+  animation-play-state: running;
+}
+
+@keyframes heroPanLeftRight {
+  0% {
+    object-position: 5% center;
+    transform: scale(1.05);
+  }
+  50% {
+    object-position: 95% center;
+    transform: scale(1.08);
+  }
+  100% {
+    object-position: 5% center;
+    transform: scale(1.05);
+  }
+}
+
 /* Cinematic Zoom-In Animation for Hero Banner Background Artwork */
 @keyframes heroZoomIn {
   0% {

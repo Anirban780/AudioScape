@@ -4,23 +4,9 @@ import { Sparkles, Music, Headphones, Mic, Guitar, Zap, Flame, Radio, Smile } fr
 
 /**
  * ============================================================================
- * EXPLORE FILTER BAR COMPONENT (ExploreFilterBar.jsx)
+ * ARCHIVED: EXPLORE FILTER BAR COMPONENT (ExploreFilterBar.jsx)
  * ============================================================================
- * 
- * WHAT THIS FILE DOES:
- * Displays a compact, horizontally scrollable row of genre filter pills.
- * Enables quick category switching without taking up excessive vertical screen space.
- * 
- * WHY IT WAS DESIGNED THIS WAY:
- * 1. Compact Layout: Replaced bulky 4-column category grid with a single-row pill bar.
- * 2. Instant Contextual Filtering: Selecting a pill filters the main feed and updates
- *    the Hero Banner carousel tracks instantly.
- * 3. Lucide Icon Integration: Uses clean vector Lucide icons for maximum visual clarity across light & dark themes.
- * 
- * HOW IT WORKS:
- * - Fetches category taxonomy via `fetchExploreCategories()`.
- * - Renders an "All" pill plus each category pill.
- * - Invokes `onSelectCategory(query)` when a pill is clicked.
+ * Archived during Phase 3 of Explore-to-Home migration.
  */
 
 // Lucide icon resolver map for categories

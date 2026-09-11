@@ -5,25 +5,9 @@ import MediaGrid from "@/components/Layout/MediaGrid";
 
 /**
  * ============================================================================
- * EXPLORE BROWSE CATEGORIES GRID (ExploreCategoryGrid.jsx)
+ * ARCHIVED: EXPLORE BROWSE CATEGORIES GRID (ExploreCategoryGrid.jsx)
  * ============================================================================
- * 
- * WHAT THIS FILE DOES:
- * Displays a 4-column grid of genre discovery cards featuring vibrant gradient
- * backgrounds, genre titles, icons, and interactive hover zoom scale.
- * 
- * WHY IT WAS DESIGNED THIS WAY:
- * 1. Stitch Browse Categories Grid: Directly implements the genre category tile grid
- *    from Stitch Explore screens (`6aaba54d100944a28329f65c95eb684f` & `e8bef34ec53d4382bba063b4a4d375d1`).
- * 2. Instant Category Search: Clicking any genre tile immediately invokes `onCategoryClick(genre)`
- *    to fetch and scroll to category search results.
- * 3. Curated Palette Gradients: Uses curated gradients (purple, pink, blue, emerald, amber)
- *    ensuring visual richness without violating the zero-green rule.
- * 
- * HOW IT WORKS:
- * - Fetches category configuration dynamically from `/api/music/categories`.
- * - Maps over category list and falls back to local static array if backend is unavailable.
- * - Clicking a card invokes `onCategoryClick(category.query)` callback.
+ * Archived during Phase 3 of Explore-to-Home migration.
  */
 
 const FALLBACK_CATEGORIES = [
@@ -96,7 +80,7 @@ const ExploreCategoryGrid = ({ onCategoryClick }) => {
             </div>
           </div>
         ))}
-      </div>
+      </MediaGrid>
     </section>
   );
 };

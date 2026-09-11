@@ -43,7 +43,7 @@ const JumpBackIn = ({ lastPlayedTrack }) => {
   };
 
   const handleExploreClick = () => {
-    navigate("/explore");
+    navigate("/recommendations");
   };
 
   const trackId = lastPlayedTrack?.id || lastPlayedTrack?.videoId;
@@ -145,7 +145,7 @@ const JumpBackIn = ({ lastPlayedTrack }) => {
               onClick={handleExploreClick}
               className="w-full bg-[var(--color-surface-overlay)] hover:bg-[var(--color-state-hover)] text-[var(--color-on-surface)] border border-[var(--color-border-strong)] py-3 px-5 rounded-full font-bold text-xs tracking-wider flex items-center justify-center gap-2.5 shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all cursor-pointer"
             >
-              <Compass size={16} /> EXPLORE MUSIC NOW
+              <Sparkles size={16} className="text-[var(--color-primary)]" /> DISCOVER MUSIC NOW
             </button>
           )}
         </div>
