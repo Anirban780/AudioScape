@@ -21,23 +21,31 @@ import { GetUser } from './decorators/get-user.decorator';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  private isSecureContext(): boolean {
+    return (
+      process.env.NODE_ENV === 'production' ||
+      process.env.NODE_ENV === 'staging' ||
+      process.env.RENDER === 'true'
+    );
+  }
+
   private setRefreshCookie(res: Response, refreshToken: string) {
-    const isProd = process.env.NODE_ENV === 'production';
+    const isSecure = this.isSecureContext();
     res.cookie('audioscape_refresh_token', refreshToken, {
       httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
       path: '/api/auth',
     });
   }
 
   private clearRefreshCookie(res: Response) {
-    const isProd = process.env.NODE_ENV === 'production';
+    const isSecure = this.isSecureContext();
     res.clearCookie('audioscape_refresh_token', {
       httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax',
+      secure: isSecure,
+      sameSite: isSecure ? 'none' : 'lax',
       path: '/api/auth',
     });
   }
