@@ -497,17 +497,17 @@ describe('RecommendationsService QA Test Suite', () => {
           },
         },
         {
-          id: 'hist_phonk_1',
+          id: 'hist_synth_1',
           userId: 'user-personalized-6040',
-          trackId: 'track_ph1',
+          trackId: 'track_syn1',
           playCount: 12,
           liked: true,
           lastPlayedAt: new Date(),
           track: {
-            youtubeVideoId: 'track_ph1',
-            title: 'Phonk Drift',
-            genre: ['phonk music'],
-            tags: ['phonk', 'drift'],
+            youtubeVideoId: 'track_syn1',
+            title: 'Synthwave Night',
+            genre: ['synthwave'],
+            tags: ['synthwave', 'retrowave'],
             queryResults: [],
           },
         },
@@ -535,10 +535,10 @@ describe('RecommendationsService QA Test Suite', () => {
       expect(summaries).toBeDefined();
       expect(summaries.length).toBe(10);
 
-      // Verify that user's high-affinity categories (hip-hop, phonk, k-pop) are included in the results
+      // Verify that user's high-affinity categories (hip-hop, synthwave, k-pop) are included in the results
       const slugs = summaries.map((s) => s.slug);
       expect(slugs).toContain('hip-hop');
-      expect(slugs).toContain('phonk');
+      expect(slugs).toContain('synthwave');
       expect(slugs).toContain('k-pop');
     });
 
