@@ -60,8 +60,8 @@ describe('AuthService & Database Resilience Unit Tests', () => {
 
     it('rejects unreachable docker-internal hostnames (@postgres:5432) in cloud environments (Render)', () => {
       process.env.RENDER = 'true';
-      process.env.DATABASE_URL = 'postgresql://postgres:postgrespassword@postgres:5432/audioscape?schema=public';
-      process.env.NEON_DATABASE_URL = 'postgresql://neondb_owner:password@ep-test-pooler.c-4.neon.tech/neondb?sslmode=require';
+      process.env.DATABASE_URL = 'postgresql://mock_user:mock_pass@postgres:5432/audioscape?schema=public';
+      process.env.NEON_DATABASE_URL = 'postgresql://mock_user:mock_pass@ep-mock-pooler.c-4.neon.tech/neondb?sslmode=require';
 
       const result = resolveDatabaseUrl();
       expect(result.isCloud).toBe(true);
@@ -70,24 +70,24 @@ describe('AuthService & Database Resilience Unit Tests', () => {
       expect(result.isNeon).toBe(true);
     });
 
-    it('falls back to default Neon staging database when no valid cloud URL is provided on Render', () => {
+    it('falls back to NEON_STAGING_POOLED_URL when DATABASE_URL is docker-internal on Render', () => {
       process.env.RENDER = 'true';
-      process.env.DATABASE_URL = 'postgresql://postgres:postgrespassword@postgres:5432/audioscape?schema=public';
+      process.env.DATABASE_URL = 'postgresql://mock_user:mock_pass@postgres:5432/audioscape?schema=public';
       delete process.env.NEON_DATABASE_URL;
-      delete process.env.NEON_STAGING_POOLED_URL;
+      process.env.NEON_STAGING_POOLED_URL = 'postgresql://mock_user:mock_pass@ep-staging-pooler.neon.tech/neondb?sslmode=require';
       delete process.env.NEON_PROD_POOLED_URL;
 
       const result = resolveDatabaseUrl();
       expect(result.isCloud).toBe(true);
-      expect(result.connectionString).toContain('aws.neon.tech');
+      expect(result.connectionString).toContain('neon.tech');
       expect(result.isNeon).toBe(true);
     });
 
-    it('uses local docker postgresql in local development environment', () => {
+    it('uses local postgresql in local development environment', () => {
       delete process.env.RENDER;
       process.env.NODE_ENV = 'development';
       delete process.env.USE_NEON;
-      process.env.DATABASE_URL = 'postgresql://postgres:postgrespassword@localhost:5432/audioscape?schema=public';
+      process.env.DATABASE_URL = 'postgresql://mock_user:mock_pass@localhost:5432/audioscape?schema=public';
 
       const result = resolveDatabaseUrl();
       expect(result.isCloud).toBe(false);

@@ -23,9 +23,6 @@ import { Pool } from 'pg';
  *   `this.prisma.tracks` or `this.prisma.listenHistory` seamlessly.
  * ============================================================================
  */
-const NEON_DEFAULT_FALLBACK_URL =
-  'postgresql://neondb_owner:npg_PFnGj7Qe0YhT@ep-raspy-cake-b3pkg41o-pooler.c-4.ap-southeast-1.aws.neon.tech/neondb?sslmode=require';
-
 /**
  * Validates whether a connection string is usable in cloud environments.
  * Disqualifies docker-internal hostnames (@postgres:) and localhost that fail to resolve on cloud hosts.
@@ -50,8 +47,8 @@ function isValidCloudPostgresUrl(url?: string): boolean {
 /**
  * Resolves the appropriate PostgreSQL connection URL based on runtime environment:
  * - Cloud/Staging/Production: Filters out unreachable Docker hostnames (@postgres:5432) and
- *   prioritizes valid Neon pooled endpoints, falling back to the configured Neon Staging instance.
- * - Local Development: Uses DATABASE_URL or local docker container.
+ *   prioritizes valid Neon pooled endpoints configured in environment variables.
+ * - Local Development: Uses DATABASE_URL or LOCAL_DATABASE_URL from environment.
  */
 export function resolveDatabaseUrl(): { connectionString: string; isNeon: boolean; isCloud: boolean } {
   const isCloud =
@@ -60,7 +57,7 @@ export function resolveDatabaseUrl(): { connectionString: string; isNeon: boolea
     process.env.NODE_ENV === 'staging' ||
     process.env.USE_NEON === 'true';
 
-  let connectionString: string;
+  let connectionString = '';
 
   if (isCloud) {
     if (isValidCloudPostgresUrl(process.env.DATABASE_URL)) {
@@ -77,13 +74,13 @@ export function resolveDatabaseUrl(): { connectionString: string; isNeon: boolea
     } else if (isValidCloudPostgresUrl(process.env.NEON_PROD_POOLED_URL)) {
       connectionString = process.env.NEON_PROD_POOLED_URL!;
     } else {
-      connectionString = NEON_DEFAULT_FALLBACK_URL;
+      connectionString = process.env.DATABASE_URL || '';
     }
   } else {
     connectionString =
       process.env.DATABASE_URL ||
       process.env.LOCAL_DATABASE_URL ||
-      'postgresql://postgres:postgrespassword@localhost:5432/audioscape?schema=public';
+      '';
   }
 
   const isNeon = connectionString.includes('neon.tech');
