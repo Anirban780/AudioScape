@@ -116,15 +116,17 @@ const RecommendationsPage = () => {
   };
 
   const handlePlayTrack = (track) => {
+    const cleanTitle = decodeHtmlEntities(track.name || track.title || "Track");
+    const cleanArtist = decodeHtmlEntities(track.artist || track.channelTitle || "Unknown Artist");
     setTrack({
       id: track.id || track.videoId,
-      name: track.name || track.title,
-      artist: track.artist || track.channelTitle,
+      name: cleanTitle,
+      artist: cleanArtist,
       thumbnail: track.thumbnail || track.thumbNail,
       source: "RECOMMENDATION",
     }, "RECOMMENDATION");
     setIsPlaying(true);
-    toast.success(`Playing: ${track.name || track.title}`);
+    toast.success(`Playing: ${cleanTitle}`);
   };
 
   const handlePlayAll = () => {
@@ -133,8 +135,8 @@ const RecommendationsPage = () => {
 
     const normalizedQueue = targetList.map((t) => ({
       id: t.id || t.videoId,
-      name: t.name || t.title,
-      artist: t.artist || t.channelTitle,
+      name: decodeHtmlEntities(t.name || t.title),
+      artist: decodeHtmlEntities(t.artist || t.channelTitle),
       thumbnail: t.thumbnail || t.thumbNail,
       source: "RECOMMENDATION",
     }));
@@ -217,8 +219,8 @@ const RecommendationsPage = () => {
 
   // Active Featured Banner Track
   const activeFeaturedTrack = featuredTracks[bannerIndex] || featuredTracks[0] || null;
-  const bannerTrackName = activeFeaturedTrack?.name || activeFeaturedTrack?.title || "Featured Recommendation";
-  const bannerArtistName = activeFeaturedTrack?.artist || activeFeaturedTrack?.channelTitle || "Top Artist";
+  const bannerTrackName = decodeHtmlEntities(activeFeaturedTrack?.name || activeFeaturedTrack?.title || "Featured Recommendation");
+  const bannerArtistName = decodeHtmlEntities(activeFeaturedTrack?.artist || activeFeaturedTrack?.channelTitle || "Top Artist");
   const bannerTrackId = activeFeaturedTrack?.id || activeFeaturedTrack?.videoId;
   const bannerRawArtwork = activeFeaturedTrack?.thumbnail || activeFeaturedTrack?.thumbNail;
   const bannerArtwork = getHighResThumbnailUrl(bannerRawArtwork, bannerTrackId) || placeholder;
@@ -472,6 +474,7 @@ const RecommendationsPage = () => {
               const songId = song.id || song.videoId;
               const validImage = getHighResThumbnailUrl(song.thumbnail || song.coverUrl, songId) || getValidThumbnailUrl(song.thumbnail) || placeholder;
               const cleanTitle = decodeHtmlEntities(song.name || song.title || "Untitled Track");
+              const cleanArtist = decodeHtmlEntities(song.artist || song.channelTitle || "Unknown Artist");
               const rankIndex = (page - 1) * 20 + index + 1;
 
               return (
@@ -569,8 +572,8 @@ const RecommendationsPage = () => {
                     <h4 className="font-bold text-sm text-[var(--color-on-surface)] truncate group-hover:text-[var(--color-primary)] transition-colors" title={cleanTitle}>
                       {cleanTitle}
                     </h4>
-                    <p className="text-xs text-[var(--color-on-surface-variant)] truncate mt-0.5" title={song.artist || song.channelTitle}>
-                      {song.artist || song.channelTitle || "Unknown Artist"}
+                    <p className="text-xs text-[var(--color-on-surface-variant)] truncate mt-0.5" title={cleanArtist}>
+                      {cleanArtist}
                     </p>
                   </div>
                 </div>

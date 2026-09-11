@@ -179,23 +179,26 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
   };
 
   const handlePlayTrack = (song) => {
+    const cleanTitle = decodeHtmlEntities(song.name || song.title || "Track");
+    const cleanArtist = decodeHtmlEntities(song.artist || song.channelTitle || "Unknown Artist");
     usePlayerStore.getState().setTrack({
       id: song.id || song.videoId,
-      name: song.name || song.title,
-      artist: song.artist || song.channelTitle,
+      name: cleanTitle,
+      artist: cleanArtist,
       thumbnail: song.thumbnail || song.thumbNail,
       source: "RECOMMENDATION",
     });
     usePlayerStore.getState().setIsPlaying(true);
-    toast.success(`Playing: ${song.name || song.title}`);
+    toast.success(`Playing: ${cleanTitle}`);
   };
 
   const handleAddToQueue = (song) => {
-    const cleanName = song.name || song.title || "Track";
+    const cleanName = decodeHtmlEntities(song.name || song.title || "Track");
+    const cleanArtist = decodeHtmlEntities(song.artist || song.channelTitle || "Unknown Artist");
     usePlayerStore.getState().addToQueue({
       id: song.id || song.videoId,
       name: cleanName,
-      artist: song.artist || song.channelTitle || "Unknown Artist",
+      artist: cleanArtist,
       thumbnail: song.thumbnail || song.thumbNail,
       source: "RECOMMENDATION",
     });
@@ -251,8 +254,8 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
   }
 
   const activeFeaturedTrack = featuredTracks[bannerIndex] || featuredTracks[0] || null;
-  const trackName = activeFeaturedTrack?.name || activeFeaturedTrack?.title || "Daily Discovery";
-  const artistName = activeFeaturedTrack?.artist || activeFeaturedTrack?.channelTitle || "Featured Artist";
+  const trackName = decodeHtmlEntities(activeFeaturedTrack?.name || activeFeaturedTrack?.title || "Daily Discovery");
+  const artistName = decodeHtmlEntities(activeFeaturedTrack?.artist || activeFeaturedTrack?.channelTitle || "Featured Artist");
   const trackId = activeFeaturedTrack?.id || activeFeaturedTrack?.videoId;
 
   const rawArtwork = activeFeaturedTrack?.thumbnail || activeFeaturedTrack?.thumbNail;
@@ -411,6 +414,7 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
             const songId = song.id || song.videoId;
             const validImage = getHighResThumbnailUrl(song.thumbnail || song.coverUrl, songId) || getValidThumbnailUrl(song.thumbnail) || placeholder;
             const cleanTitle = decodeHtmlEntities(song.name || song.title || "Untitled Track");
+            const cleanArtist = decodeHtmlEntities(song.artist || song.channelTitle || "Unknown Artist");
             return (
               <div
                 key={`${songId}-${index}`}
@@ -475,7 +479,7 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
                         openModal({
                           id: songId,
                           name: cleanTitle,
-                          artist: song.artist || song.channelTitle,
+                          artist: cleanArtist,
                           thumbnail: validImage,
                         });
                       }}
@@ -507,8 +511,8 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
                   <h4 className="font-bold text-sm text-[var(--color-on-surface)] truncate group-hover:text-[var(--color-primary)] transition-colors" title={cleanTitle}>
                     {cleanTitle}
                   </h4>
-                  <p className="text-xs text-[var(--color-on-surface-variant)] truncate mt-0.5" title={song.artist || song.channelTitle}>
-                    {song.artist || song.channelTitle || "Unknown Artist"}
+                  <p className="text-xs text-[var(--color-on-surface-variant)] truncate mt-0.5" title={cleanArtist}>
+                    {cleanArtist}
                   </p>
                 </div>
               </div>
