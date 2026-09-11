@@ -226,8 +226,8 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
           iconBgColor="bg-[var(--color-secondary)]/15 text-[var(--color-secondary)] border-[var(--color-secondary)]/30"
           titleGradient="from-pink-400 via-fuchsia-400 to-[var(--color-primary)]"
           extraBadge="AI TASTE ENGINE"
-          seeAllHref="/explore"
-          seeAllLabel="EXPLORE"
+          seeAllHref="/recommendations"
+          seeAllLabel="DISCOVER"
         />
         <div className="w-full rounded-[28px] p-8 sm:p-12 bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] flex flex-col items-center justify-center text-center shadow-md">
           <div className="w-14 h-14 rounded-2xl bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/30 flex items-center justify-center text-[var(--color-primary)] mb-4 shadow-sm">
@@ -240,10 +240,10 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
             As you stream tracks and explore genres across AudioScape, our multi-signal taste engine curates recommendations tailored to your favorite artists and moods.
           </p>
           <Link
-            to="/explore"
+            to="/recommendations"
             className="px-6 py-2.5 rounded-full bg-[var(--color-primary)] text-[var(--color-text-on-primary)] font-bold text-xs tracking-wider flex items-center gap-2 hover:scale-105 active:scale-95 transition-all shadow-md cursor-pointer"
           >
-            <Compass size={16} /> EXPLORE MUSIC
+            <Sparkles size={16} /> DISCOVER MUSIC
           </Link>
         </div>
       </section>

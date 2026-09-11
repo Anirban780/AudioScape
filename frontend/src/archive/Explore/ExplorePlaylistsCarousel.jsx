@@ -6,22 +6,9 @@ import { useNavigate } from "react-router-dom";
 
 /**
  * ============================================================================
- * EXPLORE USER PLAYLISTS CAROUSEL (ExplorePlaylistsCarousel.jsx)
+ * ARCHIVED: EXPLORE USER PLAYLISTS CAROUSEL (ExplorePlaylistsCarousel.jsx)
  * ============================================================================
- * 
- * WHAT THIS FILE DOES:
- * Displays a horizontal scroll-snap carousel of user's saved playlists
- * fetched from backend via Zustand `usePlaylistStore` & `getPlaylists`.
- * 
- * WHY IT WAS DESIGNED THIS WAY:
- * 1. Stitch Curated Playlists Carousel: Directly matches the playlist section from
- *    Stitch Explore screens (`6aaba54d100944a28329f65c95eb684f` & `3c52c41b3d7e40b89b4e98157e63aaae`).
- * 2. Integrated Playlist Store: Uses existing REST API synchronization from `usePlaylistStore`.
- * 3. Quick Navigation: Clicking a playlist card navigates to `/playlists`.
- * 
- * HOW IT WORKS:
- * - Fetches user playlists via `getPlaylists(userId)` on mount.
- * - Renders horizontal scroll container of playlist cards.
+ * Archived during Phase 3 of Explore-to-Home migration.
  */
 
 const ExplorePlaylistsCarousel = ({ userId }) => {

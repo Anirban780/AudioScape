@@ -9,25 +9,9 @@ import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
  * ============================================================================
- * EXPLORE TRENDING SPOTLIGHT HERO BANNER (ExploreTrendingBanner.jsx)
+ * ARCHIVED: EXPLORE TRENDING SPOTLIGHT HERO BANNER (ExploreTrendingBanner.jsx)
  * ============================================================================
- * 
- * WHAT THIS FILE DOES:
- * Displays a full-width high-definition spotlight hero banner with a multi-track
- * carousel, smooth vertical slow-pan image animation, gradient overlays, badges, and CTA.
- * 
- * WHY IT WAS DESIGNED THIS WAY:
- * 1. Automatic Vertical Slow-Pan Animation (`animate-pan-vertical`):
- *    When a banner slide displays, the background image automatically pans smoothly
- *    from top to bottom (`center 5%` -> `center 95%`) over 12 seconds.
- * 2. Full Thumbnail Failsafe Stepdown: Automatically steps down resolution tiers
- *    and detects YouTube 120x90 grey placeholders gracefully.
- * 3. Remounting Animation Key: `key={`${trackId}-${currentIndex}`}` restarts the slow-pan
- *    animation seamlessly every time the banner transitions to the next track.
- * 
- * HOW IT WORKS:
- * - `enablePanAnimation`: Enables automatic top-to-bottom slow pan animation (default `true`).
- * - Auto-rotates active slide index every 6 seconds.
+ * Archived during Phase 3 of Explore-to-Home migration.
  */
 
 const ExploreTrendingBanner = ({
@@ -35,7 +19,7 @@ const ExploreTrendingBanner = ({
   featuredTrack = null,
   activeCategory = "All",
   loading = false,
-  enablePanAnimation = true, // Enables smooth vertical top-to-bottom pan animation
+  enablePanAnimation = true,
   imageObjectPosition = "center center",
 }) => {
   const [currentIndex, setCurrentIndex] = useState(0);

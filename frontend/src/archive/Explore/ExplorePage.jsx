@@ -7,26 +7,21 @@ import Loader from "@/components/Home/Loader";
 import toast from "react-hot-toast";
 import { Compass } from "lucide-react";
 
-import ExploreTrendingBanner from "@/components/Explore/ExploreTrendingBanner";
-import ExploreFilterBar from "@/components/Explore/ExploreFilterBar";
-import ExploreSection from "@/components/Explore/ExploreSection";
+import ExploreTrendingBanner from "./ExploreTrendingBanner";
+import ExploreFilterBar from "./ExploreFilterBar";
+import ExploreSection from "./ExploreSection";
 
 /**
  * ============================================================================
- * EXPLORE MUSIC PAGE (ExplorePage.jsx) - V2 Filtered Discovery Architecture
+ * ARCHIVED: EXPLORE MUSIC PAGE (ExplorePage.jsx)
  * ============================================================================
- * 
- * WHAT THIS FILE DOES:
- * Assembles the primary Stitch Music Discovery & Search view.
+ * Archived during Phase 3 of Explore-to-Home migration.
+ * Superseded by Home GenreCategorySlider and CategoryPage (/category/:slug).
  */
 
 const CACHE_KEY_PREFIX = "audioscape_cached_explore_feed";
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 mins
 
-/**
- * Safely reads cached explore feed sections from localStorage for instant, zero-latency initial render on page refresh or navigation.
- * Adheres to Stale-While-Revalidate (SWR): renders cached sections and hero spotlight instantly, then revalidates in the background.
- */
 const getInitialCachedExploreFeed = (uid) => {
   try {
     const key = uid ? `${CACHE_KEY_PREFIX}_${uid}` : CACHE_KEY_PREFIX;
@@ -60,7 +55,6 @@ const ExplorePage = () => {
   const [loading, setLoading] = useState(!cachedInitial || cachedInitial.length === 0);
   const [activeFilter, setActiveFilter] = useState("All");
 
-  // Sync cache if userId updates after mount
   useEffect(() => {
     if (userId) {
       const userCached = getInitialCachedExploreFeed(userId);
@@ -82,7 +76,6 @@ const ExplorePage = () => {
     let isMounted = true;
 
     const fetchExploreSections = async () => {
-      // SWR: Only display full screen loader if no cached explore feed data is currently rendered
       if (!exploreFeed || exploreFeed.length === 0) {
         setLoading(true);
       }
@@ -105,7 +98,6 @@ const ExplorePage = () => {
             return nextVisible;
           });
 
-          // Update SWR cache in localStorage for instant render on subsequent visits
           try {
             const key = userId ? `${CACHE_KEY_PREFIX}_${userId}` : CACHE_KEY_PREFIX;
             localStorage.setItem(
@@ -140,16 +132,12 @@ const ExplorePage = () => {
     }));
   };
 
-  /**
-   * Category Filter Selection Handler
-   */
   const handleSelectCategory = async (categoryQuery) => {
     if (!categoryQuery) return;
     setActiveFilter(categoryQuery);
 
     if (categoryQuery === "All") return;
 
-    // Check if section already exists in explore feed
     const existingIndex = exploreFeed.findIndex(
       (sec) => sec.title.toLowerCase().includes(categoryQuery.toLowerCase()) ||
                categoryQuery.toLowerCase().includes(sec.title.toLowerCase())
@@ -157,7 +145,6 @@ const ExplorePage = () => {
 
     if (existingIndex !== -1) return;
 
-    // Otherwise fetch fresh music section for this category
     toast.loading(`Loading ${categoryQuery}...`, { id: "explore-genre" });
     try {
       const tracks = await fetchYoutubeMusic(categoryQuery, 15);
@@ -169,11 +156,6 @@ const ExplorePage = () => {
     }
   };
 
-  /**
-   * Declarative Trending Tracks Derivation (useMemo):
-   * - "All" mode: Top 1 song from each category section (up to 8 tracks)
-   * - Filtered mode: Top 5 songs from the selected category section
-   */
   const trendingTracks = useMemo(() => {
     if (activeFilter === "All") {
       return exploreFeed
@@ -193,9 +175,6 @@ const ExplorePage = () => {
     }));
   }, [exploreFeed, activeFilter]);
 
-  /**
-   * Declarative Section Filtering (useMemo)
-   */
   const displayedSections = useMemo(() => {
     if (activeFilter === "All") return exploreFeed;
 
@@ -208,8 +187,6 @@ const ExplorePage = () => {
   return (
     <AppLayout>
       <div className="w-full mx-auto py-2 animate-in fade-in duration-300">
-        
-        {/* Page Title Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-2xl bg-[var(--color-primary)]/15 border border-[var(--color-primary)]/30 flex items-center justify-center shadow-md shadow-[var(--color-primary)]/10 backdrop-blur-md shrink-0">
@@ -226,22 +203,19 @@ const ExplorePage = () => {
           </div>
         </div>
 
-        {/* 1. Category Filter Boxes (Compact Pill Bar) */}
         <ExploreFilterBar
           activeCategory={activeFilter}
           onSelectCategory={handleSelectCategory}
         />
 
-        {/* 2. Trending Spotlight Hero Banner (Full-Width HD, Auto Slow-Pan & Carousel) */}
         <ExploreTrendingBanner
           trendingTracks={trendingTracks}
           activeCategory={activeFilter}
           loading={loading}
-          enablePanAnimation={true} // Enables automatic top-to-bottom slow pan vertical image animation
+          enablePanAnimation={true}
           imageObjectPosition="center center"
         />
 
-        {/* 3. Categorized Music Track Sections */}
         {loading ? (
           <Loader message="Curating Explore Discovery Feed..." />
         ) : displayedSections.length === 0 ? (

@@ -172,9 +172,6 @@ const GenreCategorySlider = () => {
 
       {/* ── Sliding Track Container ────────────────────────────────────── */}
       <div className="relative group/track">
-        {/* Left & Right Gradient Fade Overlays for seamless edge transition */}
-        <div className="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-[var(--color-surface-base)] to-transparent z-10 pointer-events-none opacity-0 group-hover/track:opacity-100 transition-opacity duration-300" />
-        <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-[var(--color-surface-base)] to-transparent z-10 pointer-events-none opacity-0 group-hover/track:opacity-100 transition-opacity duration-300" />
 
         {/* Loading Skeletons */}
         {loading && (
@@ -220,11 +217,11 @@ const GenreCategorySlider = () => {
                     loading="lazy"
                     onLoad={handleThumbnailLoad}
                     onError={(e) => handleThumbnailError(e, videoId)}
-                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out animate-pan-horizontal"
+                    className="absolute inset-0 w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 ease-out animate-pan-horizontal-hover"
                   />
 
-                  {/* Multi-tier gradient overlay to ensure text legibility */}
-                  <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-surface-base)] via-[var(--color-surface-base)]/55 to-black/25 pointer-events-none" />
+                  {/* Multi-tier dark gradient overlay ensuring vibrant artwork and crisp white text in both light & dark themes */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent pointer-events-none group-hover:from-black/95 transition-colors" />
 
                   {/* Top Glass Badge Row: Track count */}
                   <div className="relative z-10 flex items-center justify-between">

@@ -83,8 +83,8 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <Link to="/explore" className="hover:text-[var(--color-primary)] transition-colors">
-                  Explore Music
+                <Link to="/recommendations" className="hover:text-[var(--color-primary)] transition-colors">
+                  Discover Music
                 </Link>
               </li>
               <li>

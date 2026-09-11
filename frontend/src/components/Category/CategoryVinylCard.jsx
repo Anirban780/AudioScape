@@ -1,11 +1,8 @@
 import React from 'react';
-import { Play, ListPlus, Heart, Music } from 'lucide-react';
+import { Play, ListPlus, Music } from 'lucide-react';
 import { getHighResThumbnailUrl } from '@/utils/youtubeUtils';
 import placeholder from '@/assets/placeholder.jpg';
 import useThumbnailFailsafe from '@/hooks/useThumbnailFailsafe';
-import useAuthStore from '@/store/useAuthStore';
-import { saveLikeSong } from '@/utils/api';
-import toast from 'react-hot-toast';
 
 /**
  * ============================================================================
@@ -19,10 +16,9 @@ import toast from 'react-hot-toast';
  * FEATURES:
  * - Album sleeve + spinning vinyl disc animation on hover
  * - Blue color theme replacing pink
- * - Zero rank badges or duration texts for a cleaner look
+ * - Zero rank badges or duration texts for a clean aesthetic
  * - Play overlay button
- * - Add to playlist button
- * - Add to favorites (Heart) button
+ * - Add to playlist button (Heart/Like removed for category exploration)
  */
 const CategoryVinylCard = ({ 
   song, 
@@ -31,8 +27,6 @@ const CategoryVinylCard = ({
 }) => {
   const { isImageDead, handleImgLoad, handleImgError } = useThumbnailFailsafe();
   const trackId = song.id || song.videoId;
-  const user = useAuthStore((s) => s.user);
-  const userId = user?.id || user?.uid || "";
   
   // Clean up title (remove parentheticals, etc)
   const formatTitle = (title) => {
@@ -46,25 +40,6 @@ const CategoryVinylCard = ({
   // Image handling with failsafe pipeline
   const rawThumbnail = song.thumbnail || song.thumbNail;
   const imgUrl = getHighResThumbnailUrl(rawThumbnail, trackId) || rawThumbnail || placeholder;
-
-  const handleLike = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (!userId) {
-      toast.error('Please login to like songs');
-      return;
-    }
-    try {
-      const success = await saveLikeSong(userId, song, true);
-      if (success !== false) {
-        toast.success('Added to favourites', { icon: '💙' });
-      } else {
-        throw new Error("Failed to add");
-      }
-    } catch (error) {
-      toast.error('Failed to add to favourites');
-    }
-  };
 
   return (
     <div className="relative group cursor-pointer w-full flex justify-center mb-10 pb-4">
@@ -139,17 +114,6 @@ const CategoryVinylCard = ({
             aria-label="Add to playlist"
           >
             <ListPlus size={14} className="sm:w-4 sm:h-4" />
-          </button>
-          
-          {/* Add to Favorites (Heart) */}
-          <button
-            type="button"
-            onClick={handleLike}
-            className="p-1.5 sm:p-2 bg-black/60 backdrop-blur-md rounded-full text-white/70 hover:text-blue-500 hover:bg-black/80 hover:scale-110 transition-all border border-white/20 opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 cursor-pointer shadow-lg"
-            title="Add to favorites"
-            aria-label="Add to favorites"
-          >
-            <Heart size={14} className="sm:w-4 sm:h-4" />
           </button>
         </div>
 

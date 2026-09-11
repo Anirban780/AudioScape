@@ -204,6 +204,19 @@ html {
   will-change: object-position, transform;
 }
 
+/* Category Card Pan on Hover/Focus Only */
+.animate-pan-horizontal-hover {
+  animation: heroPanLeftRight 10s ease-in-out infinite alternate;
+  animation-play-state: paused;
+  will-change: object-position, transform;
+}
+
+.group:hover .animate-pan-horizontal-hover,
+.group:focus-within .animate-pan-horizontal-hover,
+.group:focus .animate-pan-horizontal-hover {
+  animation-play-state: running;
+}
+
 @keyframes heroPanLeftRight {
   0% {
     object-position: 5% center;

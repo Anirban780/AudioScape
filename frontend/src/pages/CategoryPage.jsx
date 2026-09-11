@@ -18,6 +18,7 @@ import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 import CategoryVinylCard from "@/components/Category/CategoryVinylCard";
 import {
   ChevronLeft,
+  ChevronRight,
   Play,
   Pause,
   Shuffle,
@@ -208,32 +209,73 @@ const CategoryPage = () => {
     toast.success(`Shuffled ${category?.name || "Category"} (${shuffled.length} tracks)`);
   };
 
-  // Hero artwork
+  // Top 5 tracks for the banner carousel
+  const [bannerIndex, setBannerIndex] = useState(0);
+  const top5Tracks = useMemo(() => (Array.isArray(tracks) ? tracks.slice(0, 5) : []), [tracks]);
+
+  // Reset carousel index when category changes
+  useEffect(() => {
+    setBannerIndex(0);
+  }, [slug]);
+
+  // Auto-rotate top 5 songs in banner every 6 seconds
+  useEffect(() => {
+    if (top5Tracks.length <= 1) return;
+    const interval = setInterval(() => {
+      setBannerIndex((prev) => (prev + 1) % top5Tracks.length);
+    }, 6000);
+    return () => clearInterval(interval);
+  }, [top5Tracks.length]);
+
+  const activeBannerTrack = top5Tracks[bannerIndex] || top5Tracks[0] || null;
+
+  // Hero artwork dynamically sourced from active banner track
   const heroImage = useMemo(() => {
-    const raw = category?.thumbnail || tracks[0]?.thumbnail || "";
-    const videoId = extractYouTubeId(raw);
+    const raw = activeBannerTrack?.thumbnail || activeBannerTrack?.thumbNail || category?.thumbnail || tracks[0]?.thumbnail || "";
+    const videoId = activeBannerTrack?.id || activeBannerTrack?.videoId || extractYouTubeId(raw);
     return getHighResThumbnailUrl(raw, videoId) || getValidThumbnailUrl(raw) || placeholder;
-  }, [category, tracks]);
+  }, [activeBannerTrack, category, tracks]);
 
   const activeTrackId = currentPlayingTrack?.id || currentPlayingTrack?.videoId;
 
   return (
     <AppLayout>
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24">
-        {/* ── Breadcrumb / Back Navigation Bar ─────────────────────────────── */}
-        <div className="mb-6 flex items-center justify-between">
+        {/* ── Top Bar: Back Navigation & Category Page Title (Top Right) ── */}
+        <div className="mb-6 flex items-center justify-between gap-3">
           <button
-            onClick={() => navigate("/home")}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] text-[var(--color-on-surface)] text-xs font-semibold hover:border-[var(--color-primary)] hover:text-[var(--color-primary)] transition-all cursor-pointer shadow-xs"
-            aria-label="Back to Home"
+            onClick={() => navigate(-1)}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[var(--color-surface-raised)] border-2 border-[var(--color-border-default)] text-[var(--color-on-surface)] text-sm font-bold hover:border-[var(--color-primary)] hover:bg-[var(--color-primary)]/5 hover:text-[var(--color-primary)] transition-all cursor-pointer shadow-md"
+            aria-label="Go Back"
           >
-            <ChevronLeft size={16} />
-            <span>Back to Home</span>
+            <ChevronLeft size={20} strokeWidth={2.5} />
+            <span>Back</span>
           </button>
 
-          <span className="text-xs text-[var(--color-on-surface-variant)] font-medium">
-            Music Realms • Discovery
-          </span>
+          {category && (
+            /* ── Category Title Badge (Top Right) ── */
+            /* Prominent glassmorphic pill with enlarged gradient-text name and accent bar */
+            <div className="inline-flex items-center gap-3.5 sm:gap-4 px-5 sm:px-6 py-3 sm:py-3.5 rounded-2xl bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] shadow-md backdrop-blur-md overflow-hidden min-w-[220px] sm:min-w-[280px]">
+              {/* Left gradient accent bar */}
+              <div className="w-[3.5px] sm:w-[4px] h-10 sm:h-12 rounded-full bg-gradient-to-b from-[var(--color-primary)] to-[var(--color-secondary)] shrink-0" />
+              <div className="flex flex-col min-w-0 flex-1">
+                {/* Sub-label */}
+                <span className="text-[10px] sm:text-[11px] font-extrabold tracking-[0.2em] uppercase text-[var(--color-on-surface-variant)] leading-none mb-1">
+                  Browsing Realm
+                </span>
+                {/* Category name — enlarged gradient bold text */}
+                <span
+                  className="font-display font-black text-lg sm:text-xl md:text-2xl leading-tight bg-gradient-to-r from-[var(--color-primary)] to-[var(--color-secondary)] bg-clip-text text-transparent truncate max-w-[200px] sm:max-w-[280px] md:max-w-[340px]"
+                  style={{ WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}
+                  title={category.name}
+                >
+                  {category.name}
+                </span>
+              </div>
+              {/* Icon accent */}
+              <Music2 size={22} className="text-[var(--color-primary)] opacity-80 shrink-0 ml-1" />
+            </div>
+          )}
         </div>
 
         {/* ── Loading Skeleton Header ─────────────────────────────────────── */}
@@ -254,61 +296,132 @@ const CategoryPage = () => {
           </div>
         )}
 
-        {/* ── Hero Header Banner ──────────────────────────────────────────── */}
+        {/* ── Hero Header Banner (Centered Spotlight Sliding Songs) ────────── */}
         {!loading && category && (
-          <div className="relative w-full h-[300px] sm:h-[350px] rounded-[32px] overflow-hidden border border-[var(--color-border-strong)] shadow-2xl mb-8 group bg-[var(--color-surface-raised)] flex items-center transition-all duration-500">
+          <div className="relative w-full min-h-[340px] sm:min-h-[380px] rounded-[32px] overflow-hidden border border-black/10 dark:border-[var(--color-border-strong)] shadow-xl dark:shadow-2xl mb-8 group bg-slate-900/70 dark:bg-black flex items-center transition-all duration-500">
             {/* 1. Full-Width HD Background Artwork Image with Automatic Vertical Slow-Pan */}
             {heroImage && (
               <img
+                key={`${activeBannerTrack?.id || activeBannerTrack?.videoId || slug}-${bannerIndex}`}
                 src={heroImage}
-                alt={category.name}
+                alt={activeBannerTrack?.title || category.name}
                 loading="eager"
                 onLoad={handleThumbnailLoad}
                 onError={(e) => handleThumbnailError(e)}
-                className="absolute inset-0 w-full h-full object-cover opacity-95 dark:opacity-90 transition-all duration-700 pointer-events-none animate-pan-vertical"
+                className="absolute inset-0 w-full h-full object-cover opacity-95 dark:opacity-80 transition-all duration-700 pointer-events-none animate-pan-vertical"
               />
             )}
 
-            {/* 2. Left-Side Gradient Mask for Text Legibility */}
-            <div className="absolute inset-y-0 left-0 w-full md:w-3/5 bg-gradient-to-r from-[var(--color-surface-raised)] via-[var(--color-surface-raised)]/85 to-transparent pointer-events-none z-0" />
-            <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-[var(--color-surface-raised)]/90 via-transparent to-transparent pointer-events-none z-0 md:hidden" />
+            {/* 2. Balanced Ambient Dark Vignette Veil (Soft in Light Theme, Deep in Dark Theme) */}
+            <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/35 to-transparent dark:from-black/90 dark:via-black/70 dark:to-transparent pointer-events-none z-0" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent dark:from-black/80 dark:via-transparent dark:to-black/30 pointer-events-none z-0" />
 
-            {/* 3. Hero Content Container */}
-            <div className="relative z-10 h-full w-full flex flex-col justify-between p-6 sm:p-10 max-w-2xl">
-              <div>
-                {/* Category Title */}
-                <h1 className="text-3xl sm:text-5xl font-extrabold text-[var(--color-on-surface)] leading-tight mb-2 tracking-tight drop-shadow-md">
-                  {category.name}
-                </h1>
-                
-                {/* Category Tagline */}
-                {category.tagline && (
-                  <p className="text-sm sm:text-base text-[var(--color-on-surface-variant)] line-clamp-2 font-medium max-w-lg drop-shadow-xs mt-2">
-                    {category.tagline}
-                  </p>
+            {/* 3. Hero Content Container (Left-aligned, Max-Width 60%) */}
+            <div className="relative z-10 w-full max-w-[70%] sm:max-w-[60%] flex flex-col items-start justify-center text-left p-6 sm:p-10">
+              {/* Spotlight Song Badge */}
+              {top5Tracks.length > 0 && (
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-[11px] font-extrabold px-3.5 py-1 rounded-full bg-[var(--color-primary)]/25 text-[var(--color-primary)] border border-[var(--color-primary)]/40 backdrop-blur-md uppercase tracking-wider shadow-xs">
+                    SPOTLIGHT #{bannerIndex + 1} OF {top5Tracks.length}
+                  </span>
+                </div>
+              )}
+
+              {/* Redacted Song Title */}
+              <h1 className="text-2xl sm:text-4xl lg:text-5xl font-extrabold text-white leading-tight mb-2.5 tracking-tight drop-shadow-[0_2px_12px_rgba(0,0,0,0.8)] line-clamp-2">
+                {decodeHtmlEntities(activeBannerTrack?.title || activeBannerTrack?.name || category.name)}
+              </h1>
+
+              {/* Redacted Artist Attribution */}
+              <p className="text-sm sm:text-base text-white/85 font-medium drop-shadow-md mb-6 truncate w-full">
+                {activeBannerTrack?.artist || activeBannerTrack?.channelTitle ? (
+                  <>Track by <span className="text-white font-bold">{activeBannerTrack.artist || activeBannerTrack.channelTitle}</span></>
+                ) : (
+                  category.tagline
                 )}
-              </div>
+              </p>
 
-              {/* Action Buttons: Play All & Shuffle */}
-              <div className="flex items-center gap-4 flex-wrap mt-4">
+              {/* Action Buttons: Left-aligned */}
+              <div className="flex items-center justify-start gap-2.5 sm:gap-3.5 flex-wrap">
+                {/* Play Active Spotlight Song */}
                 <button
-                  onClick={handlePlayAll}
-                  disabled={tracks.length === 0}
-                  className="bg-[var(--color-primary)] text-[var(--color-text-on-primary)] px-7 py-3 rounded-full font-bold text-xs sm:text-sm tracking-wider hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center gap-2.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => activeBannerTrack ? handlePlayTrack(activeBannerTrack) : handlePlayAll()}
+                  className="bg-[var(--color-primary)] text-[var(--color-text-on-primary)] px-6 py-3 rounded-full font-bold text-xs sm:text-sm tracking-wider hover:scale-105 active:scale-95 transition-all shadow-lg flex items-center gap-2 cursor-pointer"
+                  title="Play spotlight track"
                 >
-                  <Play size={17} fill="currentColor" className="ml-0.5" />
-                  <span>PLAY ALL</span>
+                  <Play size={16} fill="currentColor" className="ml-0.5" />
+                  <span>PLAY TRACK</span>
                 </button>
+
+                {/* Add Active Track to Playlist */}
+                {activeBannerTrack && (
+                  <button
+                    onClick={() => openModal({
+                      id: activeBannerTrack.id || activeBannerTrack.videoId,
+                      name: activeBannerTrack.title || activeBannerTrack.name,
+                      artist: activeBannerTrack.artist || activeBannerTrack.channelTitle,
+                      thumbnail: getHighResThumbnailUrl(activeBannerTrack.thumbnail || activeBannerTrack.thumbNail, activeBannerTrack.id || activeBannerTrack.videoId) || placeholder,
+                    })}
+                    className="bg-white/15 hover:bg-white/25 text-white border border-white/25 p-3 rounded-full hover:scale-105 active:scale-95 transition-all backdrop-blur-md shadow-md cursor-pointer flex items-center justify-center"
+                    title="Add spotlight track to playlist"
+                    aria-label="Add spotlight track to playlist"
+                  >
+                    <ListPlus size={16} />
+                  </button>
+                )}
+
+                {/* Shuffle All Tracks in Category */}
                 <button
                   onClick={handleShuffle}
                   disabled={tracks.length === 0}
-                  className="bg-white/10 hover:bg-white/15 text-white border border-white/20 px-7 py-3 rounded-full font-bold text-xs sm:text-sm tracking-wider hover:scale-105 active:scale-95 transition-all shadow-md flex items-center gap-2.5 backdrop-blur-md cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="bg-white/10 hover:bg-white/20 text-white border border-white/20 px-5 py-3 rounded-full font-bold text-xs sm:text-sm tracking-wider hover:scale-105 active:scale-95 transition-all backdrop-blur-md shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Shuffle category tracks"
                 >
-                  <Shuffle size={16} />
+                  <Shuffle size={15} />
                   <span>SHUFFLE</span>
                 </button>
               </div>
             </div>
+
+            {/* 4. Carousel Navigation (Dots & Arrows) - Centered at the bottom */}
+            {top5Tracks.length > 1 && (
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center justify-center gap-2 bg-black/35 dark:bg-black/50 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 shadow-md z-20">
+                <button
+                  onClick={() => setBannerIndex((prev) => (prev - 1 + top5Tracks.length) % top5Tracks.length)}
+                  className="p-1 rounded-full hover:bg-white/10 text-white transition-colors cursor-pointer"
+                  title="Previous spotlight track"
+                  aria-label="Previous spotlight track"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+
+                {/* Indicator Dots */}
+                <div className="flex items-center gap-1.5">
+                  {top5Tracks.map((_, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => setBannerIndex(idx)}
+                      className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
+                        idx === bannerIndex
+                          ? "w-6 bg-[var(--color-primary)]"
+                          : "w-2 bg-white/35 hover:bg-white/65"
+                      }`}
+                      title={`Go to track ${idx + 1}`}
+                      aria-label={`Go to track ${idx + 1}`}
+                    />
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => setBannerIndex((prev) => (prev + 1) % top5Tracks.length)}
+                  className="p-1 rounded-full hover:bg-white/10 text-white transition-colors cursor-pointer"
+                  title="Next spotlight track"
+                  aria-label="Next spotlight track"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            )}
           </div>
         )}
 

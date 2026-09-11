@@ -125,16 +125,17 @@ describe("CategoryPage QA Suite", () => {
     fetchCategoryDetail.mockResolvedValue(mockCategoryData);
   });
 
-  it("TC-CP-01: renders hero header with category title, tagline, and track badge", async () => {
+  it("TC-CP-01: renders hero header with category title and top spotlight track", async () => {
     render(<CategoryPage />);
 
     await waitFor(() => {
       expect(screen.getByText("Lo-Fi & Chill")).toBeInTheDocument();
     });
 
-    expect(screen.getByText("Beats to relax, study, and unwind")).toBeInTheDocument();
-    expect(screen.getByText("42 Tracks Indexed")).toBeInTheDocument();
-    expect(screen.getByText("Curated Realm")).toBeInTheDocument();
+    expect(screen.getAllByText("Rainy Afternoon Lofi").length).toBeGreaterThan(0);
+    expect(screen.getByText("PLAY TRACK")).toBeInTheDocument();
+    expect(screen.getByText("PLAY ALL")).toBeInTheDocument();
+    expect(screen.getByText("SHUFFLE")).toBeInTheDocument();
   });
 
   it("TC-CP-02: defaults to Grid view mode per user requirement", async () => {

@@ -6,7 +6,6 @@ import Home from "@/pages/Home";
 import LandingPage from "@/pages/LandingPage";
 import NotFound from "@/pages/NotFound";
 import { ThemeProvider } from "@/ThemeProvider";
-import ExplorePage from "@/pages/ExplorePage";
 import { Toaster } from "react-hot-toast";
 import FavoritesPage from "@/pages/FavoritesPage";
 import PlayerContainer from "@/components/Player/PlayerContainer";
@@ -37,7 +36,7 @@ import { getBackendURL } from "@/utils/api";
  *    root router level (outside individual page route switches) so audio playback
  *    is never interrupted when navigating between pages.
  * 3. Protected Routes: Unauthenticated users attempting to access protected routes
- *    (/home, /explore, /favourites, /playlists, /history) are redirected to LandingPage ("/").
+ *    (/home, /recommendations, /favourites, /playlists, /category/:slug, /history) are redirected to LandingPage ("/").
  * ============================================================================
  */
 
@@ -102,7 +101,7 @@ function AppContent() {
         <Route path="/" element={user ? <Navigate to="/home" replace /> : <LandingPage />} />
         <Route path="/home" element={user ? <Home /> : <Navigate to="/" replace />} />
         <Route path="/recommendations" element={user ? <RecommendationsPage /> : <Navigate to="/" replace />} />
-        <Route path="/explore" element={user ? <ExplorePage /> : <Navigate to="/" replace />} />
+        <Route path="/explore" element={<Navigate to="/home" replace />} />
         <Route path="/favourites" element={user ? <FavoritesPage /> : <Navigate to="/" replace />} />
         <Route path="/playlists" element={user ? <PlaylistsPage /> : <Navigate to="/" replace />} />
         <Route path="/playlists/:id" element={user ? <PlaylistDetailPage /> : <Navigate to="/" replace />} />
