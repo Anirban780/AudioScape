@@ -3,6 +3,7 @@ import {
   ExecutionContext,
   Injectable,
   UnauthorizedException,
+  ServiceUnavailableException,
   Logger,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
@@ -63,20 +64,36 @@ export class GoogleAuthGuard implements CanActivate {
     }
 
     // 1. First attempt verifying as a Server-Issued JWT Access Token (Fastest & Stateless)
+    let isJwtValid = false;
+    let decodedSub: string | null = null;
     try {
       const decoded = jwt.verify(token, this.getJwtSecret()) as any;
       if (decoded && decoded.sub) {
+        isJwtValid = true;
+        decodedSub = decoded.sub;
+      }
+    } catch {
+      // Token is not a valid server-issued JWT; fallback to Google OAuth verification below
+    }
+
+    if (isJwtValid && decodedSub) {
+      try {
         const dbUser = await this.prisma.user.findUnique({
-          where: { id: decoded.sub },
+          where: { id: decodedSub },
         });
 
         if (dbUser) {
           request.user = dbUser;
           return true;
         }
+        throw new UnauthorizedException('Unauthorized: User associated with token no longer exists');
+      } catch (dbErr: any) {
+        if (dbErr instanceof UnauthorizedException) {
+          throw dbErr;
+        }
+        this.logger.error(`Database query failed during JWT user lookup: ${dbErr.message}`);
+        throw new ServiceUnavailableException('Database temporarily unavailable. Please try again later.');
       }
-    } catch {
-      // Token is not a valid server-issued JWT; fallback to Google OAuth verification below
     }
 
     // 2. Fallback: Cryptographically verify direct Google OAuth 2.0 ID token or Access Token
@@ -126,6 +143,9 @@ export class GoogleAuthGuard implements CanActivate {
       }
     } catch (googleErr: any) {
       this.logger.error(`Google token verification failed in guard: ${googleErr.message}`);
+      if (googleErr instanceof UnauthorizedException) {
+        throw googleErr;
+      }
       throw new UnauthorizedException(`Unauthorized: OAuth verification failed (${googleErr.message})`);
     }
 
@@ -165,7 +185,7 @@ export class GoogleAuthGuard implements CanActivate {
       return true;
     } catch (error: any) {
       this.logger.error(`Database user synchronization failed for ${email}: ${error.message}`);
-      throw new UnauthorizedException(`Unauthorized: Database error while synchronizing user account (${error.message})`);
+      throw new ServiceUnavailableException(`Database temporarily unavailable. Please try again later.`);
     }
   }
 }

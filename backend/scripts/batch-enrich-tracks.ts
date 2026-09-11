@@ -229,9 +229,13 @@ async function run() {
     'postgresql://postgres:postgrespassword@localhost:5432/audioscape?schema=public';
 
   const isNeon = connectionString.includes('neon.tech');
+  const useSsl = isNeon || connectionString.includes('sslmode=require');
   console.log(`🔌 Target Database:     ${isNeon ? 'Neon Cloud' : 'Local Docker PostgreSQL'} (${connectionString.split('@')[1] || connectionString})`);
 
-  const pool = new Pool({ connectionString });
+  const pool = new Pool({
+    connectionString,
+    ssl: useSsl ? { rejectUnauthorized: false } : undefined,
+  });
   const adapter = new PrismaPg(pool);
   const prisma = new PrismaClient({ adapter });
 

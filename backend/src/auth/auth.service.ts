@@ -1,4 +1,4 @@
-import { Injectable, Logger, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, UnauthorizedException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { OAuth2Client } from 'google-auth-library';
 import * as jwt from 'jsonwebtoken';
 import { PrismaService } from '../prisma/prisma.service';
@@ -60,12 +60,13 @@ export class AuthService {
       throw new UnauthorizedException('Either idToken or accessToken is required for Google login');
     }
 
-    try {
-      let googleId: string;
-      let email: string;
-      let displayName: string;
-      let photoUrl: string | null = null;
+    let googleId: string;
+    let email: string;
+    let displayName: string;
+    let photoUrl: string | null = null;
 
+    // 1. Cryptographic token verification directly with Google OAuth 2.0 servers
+    try {
       if (idToken) {
         const ticket = await this.googleClient.verifyIdToken({
           idToken,
@@ -111,9 +112,18 @@ export class AuthService {
       }
 
       this.logger.log(`Google OAuth verified for: ${email} (${googleId})`);
+    } catch (googleError: any) {
+      this.logger.error(`Google token verification failed: ${googleError.message}`);
+      if (googleError instanceof UnauthorizedException) {
+        throw googleError;
+      }
+      throw new UnauthorizedException(`Google Authentication failed: ${googleError.message}`);
+    }
 
-      // Match existing user by email or authId
-      let user = await this.prisma.user.findFirst({
+    // 2. Synchronize user profile in PostgreSQL database (Isolated from OAuth token verification)
+    let user: any;
+    try {
+      user = await this.prisma.user.findFirst({
         where: { OR: [{ email }, { authId: googleId }] },
       });
 
@@ -139,19 +149,19 @@ export class AuthService {
           },
         });
       }
-
-      const { accessToken: jwtAccessToken, refreshToken: jwtRefreshToken } = this.generateTokens(user);
-
-      return {
-        message: 'Google OAuth authentication successful',
-        user,
-        accessToken: jwtAccessToken,
-        refreshToken: jwtRefreshToken,
-      };
-    } catch (error: any) {
-      this.logger.error(`Google token verification failed: ${error.message}`);
-      throw new UnauthorizedException(`Google Authentication failed: ${error.message}`);
+    } catch (dbError: any) {
+      this.logger.error(`Database error during user sync for ${email}: ${dbError.message}`);
+      throw new ServiceUnavailableException('Database temporarily unavailable. Please try again later.');
     }
+
+    const { accessToken: jwtAccessToken, refreshToken: jwtRefreshToken } = this.generateTokens(user);
+
+    return {
+      message: 'Google OAuth authentication successful',
+      user,
+      accessToken: jwtAccessToken,
+      refreshToken: jwtRefreshToken,
+    };
   }
 
   /**
@@ -164,32 +174,39 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token missing');
     }
 
+    let decoded: any;
     try {
-      const decoded = jwt.verify(refreshToken, this.getJwtRefreshSecret()) as any;
+      decoded = jwt.verify(refreshToken, this.getJwtRefreshSecret()) as any;
       if (!decoded || !decoded.sub) {
         throw new UnauthorizedException('Invalid refresh token payload');
       }
-
-      const user = await this.prisma.user.findUnique({
-        where: { id: decoded.sub },
-      });
-
-      if (!user) {
-        throw new UnauthorizedException('User associated with refresh token no longer exists');
-      }
-
-      const tokens = this.generateTokens(user);
-
-      return {
-        message: 'Session refreshed successfully',
-        user,
-        accessToken: tokens.accessToken,
-        refreshToken: tokens.refreshToken,
-      };
-    } catch (error: any) {
-      this.logger.warn(`Session refresh failed: ${error.message}`);
+    } catch (tokenErr: any) {
+      this.logger.warn(`Session refresh JWT validation failed: ${tokenErr.message}`);
       throw new UnauthorizedException('Invalid or expired refresh session');
     }
+
+    let user: any;
+    try {
+      user = await this.prisma.user.findUnique({
+        where: { id: decoded.sub },
+      });
+    } catch (dbError: any) {
+      this.logger.error(`Database error during session refresh for sub ${decoded.sub}: ${dbError.message}`);
+      throw new ServiceUnavailableException('Database temporarily unavailable. Please try again later.');
+    }
+
+    if (!user) {
+      throw new UnauthorizedException('User associated with refresh token no longer exists');
+    }
+
+    const tokens = this.generateTokens(user);
+
+    return {
+      message: 'Session refreshed successfully',
+      user,
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
   }
 
   /**
