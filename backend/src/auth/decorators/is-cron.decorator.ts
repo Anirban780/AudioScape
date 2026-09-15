@@ -14,3 +14,17 @@ import { SetMetadata } from '@nestjs/common';
  */
 export const IS_CRON_KEY = 'isCron';
 export const IsCron = () => SetMetadata(IS_CRON_KEY, true);
+
+/**
+ * ============================================================================
+ * CUSTOM METHOD DECORATOR: @OptionalAuth()
+ * ============================================================================
+ * @module AuthModule
+ * 
+ * PURPOSE:
+ * Marks an endpoint as allowing optional authentication. Signals GoogleAuthGuard
+ * that anonymous requests should be permitted (with request.user set to null).
+ * ============================================================================
+ */
+export const IS_OPTIONAL_KEY = 'isOptional';
+export const OptionalAuth = () => SetMetadata(IS_OPTIONAL_KEY, true);

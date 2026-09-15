@@ -10,7 +10,7 @@ import { Reflector } from '@nestjs/core';
 import { OAuth2Client } from 'google-auth-library';
 import * as jwt from 'jsonwebtoken';
 import { PrismaService } from '../prisma/prisma.service';
-import { IS_CRON_KEY } from './decorators/is-cron.decorator';
+import { IS_CRON_KEY, IS_OPTIONAL_KEY } from './decorators/is-cron.decorator';
 
 /**
  * ============================================================================
@@ -52,14 +52,28 @@ export class GoogleAuthGuard implements CanActivate {
       return true;
     }
 
+    // Check if endpoint is decorated with @OptionalAuth() to allow anonymous guests
+    const isOptional = this.reflector.getAllAndOverride<boolean>(IS_OPTIONAL_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
     const authHeader = request.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      if (isOptional) {
+        request.user = null;
+        return true;
+      }
       throw new UnauthorizedException('Unauthorized: No valid Bearer token provided in Authorization header');
     }
 
     const token = authHeader.split('Bearer ')[1]?.trim();
     if (!token) {
+      if (isOptional) {
+        request.user = null;
+        return true;
+      }
       throw new UnauthorizedException('Unauthorized: Bearer token string is empty');
     }
 
@@ -142,6 +156,10 @@ export class GoogleAuthGuard implements CanActivate {
         }
       }
     } catch (googleErr: any) {
+      if (isOptional) {
+        request.user = null;
+        return true;
+      }
       this.logger.error(`Google token verification failed in guard: ${googleErr.message}`);
       if (googleErr instanceof UnauthorizedException) {
         throw googleErr;

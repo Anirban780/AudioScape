@@ -585,6 +585,103 @@ export async function fetchCategorySummaries() {
     return await fetchFreshCategorySummaries(CACHE_KEY);
 }
 
+const DEFAULT_SHOWCASE_CATEGORIES = [
+    {
+        slug: "lofi-chill",
+        name: "Lo-Fi & Chill",
+        keyword: "lofi music",
+        tagline: "Beats to relax, study, and unwind",
+        thumbnail: "https://i.ytimg.com/vi/jfKfPfyJRdk/hqdefault.jpg",
+        trackCount: 20,
+    },
+    {
+        slug: "synthwave",
+        name: "Synthwave",
+        keyword: "synthwave",
+        tagline: "Retrofuturistic neon & analog synthscapes",
+        thumbnail: "https://i.ytimg.com/vi/4xDzrJKXOOY/hqdefault.jpg",
+        trackCount: 20,
+    },
+    {
+        slug: "phonk",
+        name: "Phonk",
+        keyword: "phonk music",
+        tagline: "High-octane drift beats & distorted 808s",
+        thumbnail: "https://i.ytimg.com/vi/1-s8NZtE4gY/hqdefault.jpg",
+        trackCount: 20,
+    },
+    {
+        slug: "pop-hits",
+        name: "Pop Hits",
+        keyword: "pop hits",
+        tagline: "Chart-topping hooks & modern anthems",
+        thumbnail: "https://i.ytimg.com/vi/JGwWNGJdvx8/hqdefault.jpg",
+        trackCount: 20,
+    },
+    {
+        slug: "chill-beats",
+        name: "Chill Beats",
+        keyword: "chill beats",
+        tagline: "Low-tempo grooves & laid-back rhythms",
+        thumbnail: "https://i.ytimg.com/vi/5yx6BWlEVcY/hqdefault.jpg",
+        trackCount: 20,
+    },
+    {
+        slug: "indie-rock",
+        name: "Indie Rock",
+        keyword: "indie rock",
+        tagline: "Raw guitars, authentic riffs & indie vibes",
+        thumbnail: "https://i.ytimg.com/vi/hX3bQ13v_g8/hqdefault.jpg",
+        trackCount: 20,
+    },
+    {
+        slug: "workout-energy",
+        name: "Workout Energy",
+        keyword: "workout music",
+        tagline: "Maximum adrenaline & high BPM power",
+        thumbnail: "https://i.ytimg.com/vi/2vjPBrBU-TM/hqdefault.jpg",
+        trackCount: 20,
+    },
+    {
+        slug: "jazz-soul",
+        name: "Jazz & Soul",
+        keyword: "jazz chill",
+        tagline: "Timeless brass, smooth chords & soulful swing",
+        thumbnail: "https://i.ytimg.com/vi/Dx5qFachd3A/hqdefault.jpg",
+        trackCount: 20,
+    },
+    {
+        slug: "ambient-focus",
+        name: "Focus & Ambient",
+        keyword: "ambient music",
+        tagline: "Atmospheric soundscapes for deep flow",
+        thumbnail: "https://i.ytimg.com/vi/DWcJFNfaw9c/hqdefault.jpg",
+        trackCount: 20,
+    },
+    {
+        slug: "rock-classics",
+        name: "Rock Classics",
+        keyword: "rock classics",
+        tagline: "Legendary anthems & vintage riffs",
+        thumbnail: "https://i.ytimg.com/vi/fJ9rUzIMcZQ/hqdefault.jpg",
+        trackCount: 20,
+    },
+];
+
+function getFallbackCategorySummaries(cacheKey) {
+    try {
+        const raw = localStorage.getItem(cacheKey);
+        if (raw) {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed.data) && parsed.data.length > 0) {
+                const cleaned = parsed.data.filter((d) => !d.thumbnail || !d.thumbnail.includes("unsplash.com"));
+                if (cleaned.length > 0) return cleaned;
+            }
+        }
+    } catch {}
+    return DEFAULT_SHOWCASE_CATEGORIES;
+}
+
 async function fetchFreshCategorySummaries(cacheKey) {
     const CACHE_KEY = cacheKey || "audioscape_cached_category_summaries_v2_anonymous";
     try {
@@ -597,7 +694,7 @@ async function fetchFreshCategorySummaries(cacheKey) {
         });
 
         if (!response.ok) {
-            throw new Error(`Failed to fetch category summaries: ${response.status} ${response.statusText}`);
+            return getFallbackCategorySummaries(CACHE_KEY);
         }
 
         const data = await response.json();
@@ -623,19 +720,9 @@ async function fetchFreshCategorySummaries(cacheKey) {
 
             return formatted;
         }
-        return [];
-    } catch (err) {
-        console.error("fetchCategorySummaries error:", err);
-        try {
-            const raw = localStorage.getItem(CACHE_KEY);
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                if (Array.isArray(parsed.data)) {
-                    return parsed.data.filter((d) => !d.thumbnail || !d.thumbnail.includes("unsplash.com"));
-                }
-            }
-        } catch {}
-        return [];
+        return getFallbackCategorySummaries(CACHE_KEY);
+    } catch {
+        return getFallbackCategorySummaries(CACHE_KEY);
     }
 }
 

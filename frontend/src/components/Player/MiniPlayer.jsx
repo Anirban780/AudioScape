@@ -261,11 +261,11 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
   );
 
   const renderArtworkCircle = (size = 'w-12 h-12', ring = 'ring-[var(--color-primary)]/40') => (
-    <div className="relative shrink-0">
+    <div className={`relative shrink-0 ${size} aspect-square`}>
       <img
         src={thumbnailUrl}
         alt={cleanTitle}
-        className={`${size} rounded-full object-cover shadow-md border border-white/20 ring-2 ${ring} transition-all duration-300`}
+        className={`w-full h-full aspect-square rounded-full object-cover shadow-md border border-white/20 ring-2 ${ring} transition-all duration-300`}
       />
       {isPlaying && (
         <div className="absolute inset-0 bg-black/45 rounded-full flex items-center justify-center gap-0.5 backdrop-blur-[1px]">
@@ -299,12 +299,12 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
         className="z-50"
       >
         <div className="mini-player-capsule relative w-full h-full rounded-full p-3 px-4 flex items-center justify-between gap-3 text-[var(--color-on-surface)] select-none cursor-move group transition-all duration-300">
-          {/* Left: artwork + info */}
-          <div className="flex items-center gap-3.5 min-w-0 flex-1">
+          {/* Left: artwork + info (Strict boundaries prevent thumbnail upward displacement) */}
+          <div className="flex items-center gap-3.5 min-w-0 max-w-[200px] sm:max-w-xs md:max-w-sm flex-1 overflow-hidden">
             {renderArtworkCircle('w-12 h-12')}
-            <div className="min-w-0 flex-1">
-              <p className="text-xs sm:text-sm font-bold truncate text-[var(--color-on-surface)] tracking-tight leading-snug" title={cleanTitle}>{cleanTitle}</p>
-              <p className="text-[11px] text-[var(--color-on-surface-variant)] truncate mt-0.5 font-medium" title={cleanArtist}>{cleanArtist}</p>
+            <div className="flex flex-col justify-center min-w-0 flex-1 overflow-hidden">
+              <p className="text-xs sm:text-sm font-bold truncate text-[var(--color-on-surface)] tracking-tight leading-snug line-clamp-1" title={cleanTitle}>{cleanTitle}</p>
+              <p className="text-[11px] text-[var(--color-on-surface-variant)] truncate mt-0.5 font-medium line-clamp-1" title={cleanArtist}>{cleanArtist}</p>
             </div>
           </div>
           {/* Right: controls + 3-dot layout menu */}
@@ -348,8 +348,8 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
           {/* Left: artwork only */}
           {renderArtworkCircle('w-9 h-9', 'ring-[var(--color-primary)]/50')}
           {/* Center: song title */}
-          <div className="min-w-0 flex-1 px-2">
-            <p className="text-[11px] font-bold truncate text-[var(--color-on-surface)] tracking-tight" title={cleanTitle}>{cleanTitle}</p>
+          <div className="min-w-0 flex-1 max-w-[160px] sm:max-w-[220px] px-2 overflow-hidden flex flex-col justify-center">
+            <p className="text-[11px] font-bold truncate text-[var(--color-on-surface)] tracking-tight line-clamp-1" title={cleanTitle}>{cleanTitle}</p>
           </div>
           {/* Right: minimal controls + 3-dot layout menu + fullscreen expand */}
           <div className="flex items-center gap-1 shrink-0">
@@ -376,11 +376,11 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
       }`}>
         <div className="relative flex items-center justify-between gap-4 px-5 py-3 text-[var(--color-on-surface)]">
           {/* Left: artwork + info */}
-          <div className="flex items-center gap-3.5 min-w-0 w-[30%]">
+          <div className="flex items-center gap-3.5 min-w-0 w-[30%] max-w-sm overflow-hidden">
             {renderArtworkCircle('w-11 h-11')}
-            <div className="min-w-0">
-              <p className="text-sm font-bold truncate text-[var(--color-on-surface)] tracking-tight leading-snug" title={cleanTitle}>{cleanTitle}</p>
-              <p className="text-[11px] text-[var(--color-on-surface-variant)] truncate mt-0.5 font-medium" title={cleanArtist}>{cleanArtist}</p>
+            <div className="min-w-0 flex-1 overflow-hidden flex flex-col justify-center">
+              <p className="text-sm font-bold truncate text-[var(--color-on-surface)] tracking-tight leading-snug line-clamp-1" title={cleanTitle}>{cleanTitle}</p>
+              <p className="text-[11px] text-[var(--color-on-surface-variant)] truncate mt-0.5 font-medium line-clamp-1" title={cleanArtist}>{cleanArtist}</p>
             </div>
             <button onClick={toggleLike} className={`ml-1 p-1.5 rounded-full transition-colors cursor-pointer shrink-0 ${isLiked ? 'text-pink-500' : 'text-[var(--color-on-surface-variant)] hover:text-pink-400'}`} title={isLiked ? 'Unlike' : 'Like'} aria-label="Like"><Heart size={16} fill={isLiked ? 'currentColor' : 'none'} /></button>
           </div>
@@ -445,11 +445,11 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
             style={{ zIndex: 60 }}
           >
             {/* Track info */}
-            <div className="flex items-center gap-3">
-              <img src={thumbnailUrl} alt={cleanTitle} className="w-10 h-10 rounded-xl object-cover shrink-0 border border-[var(--color-border-strong)]" />
-              <div className="min-w-0">
-                <p className="text-xs font-bold truncate text-[var(--color-on-surface)]" title={cleanTitle}>{cleanTitle}</p>
-                <p className="text-[11px] text-[var(--color-on-surface-variant)] truncate mt-0.5 font-medium" title={cleanArtist}>{cleanArtist}</p>
+            <div className="flex items-center gap-3 min-w-0 overflow-hidden">
+              <img src={thumbnailUrl} alt={cleanTitle} className="w-10 h-10 aspect-square rounded-xl object-cover shrink-0 border border-[var(--color-border-strong)]" />
+              <div className="min-w-0 flex-1 overflow-hidden flex flex-col justify-center">
+                <p className="text-xs font-bold truncate text-[var(--color-on-surface)] line-clamp-1" title={cleanTitle}>{cleanTitle}</p>
+                <p className="text-[11px] text-[var(--color-on-surface-variant)] truncate mt-0.5 font-medium line-clamp-1" title={cleanArtist}>{cleanArtist}</p>
               </div>
             </div>
 
