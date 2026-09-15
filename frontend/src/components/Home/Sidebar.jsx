@@ -1,6 +1,6 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { Home, Library, Heart, PanelLeftClose, PanelLeftOpen, Sparkles } from 'lucide-react';
+import { Home, Library, Heart, History, PanelLeftClose, PanelLeftOpen, Sparkles, Maximize2, Minimize2 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import usePlayerStore from '@/store/usePlayerStore';
@@ -17,16 +17,18 @@ import { AudioScapeMark } from '@/components/common/AudioScapeLogo';
  * 1. Desktop Expandable/Collapsible Rail (w-60 <-> w-20) synced with global Zustand store.
  * 2. Mobile Backdrop Overlay Drawer mode.
  * 3. Rich, non-tight active & hover pill styling with breathing room.
+ * 4. User preference toggle for default player launch mode (Full Screen vs Mini Player).
  * 
  * WHY IT WAS DESIGNED THIS WAY:
  * 1. Global State Persistence: Uses `useSidebarStore` (`isSidebarCollapsed`) so the sidebar
- *    state remains persisted across all page navigations (Home -> Explore -> Favourites -> Playlists).
+ *    state remains persisted across all page navigations (Home -> Explore -> Favourites -> Playlists -> History).
  * 2. Generous Pill Padding: Replaced tight items with spacious `py-3.5 px-4 my-1 rounded-2xl` pills,
  *    subtle glassmorphic active background (`bg-[var(--color-primary)]/15`), and left accent bar.
  * 3. Button-First Header Layout: Places toggle icon first on left, followed by "AudioScape" title.
  * 
  * HOW IT WORKS:
  * - Reads `isSidebarCollapsed` & `toggleSidebarCollapsed` from `useSidebarStore`.
+ * - Reads `defaultPlayerMode` & `toggleDefaultPlayerMode` from `usePlayerStore`.
  * - Applies smooth `.sidebar-transition` utility for fluid layout pacing.
  */
 
@@ -38,6 +40,7 @@ const Sidebar = ({
   isMobile = false,
 }) => {
   const { isSidebarCollapsed: storeCollapsed, toggleSidebarCollapsed } = useSidebarStore();
+  const { defaultPlayerMode, toggleDefaultPlayerMode } = usePlayerStore();
 
   const isCollapsed = isMobile
     ? false
@@ -137,10 +140,67 @@ const Sidebar = ({
         <MenuItem icon={Sparkles} text="Discover" to="/recommendations" />
         <MenuItem icon={Heart} text="Favourites" to="/favourites" />
         <MenuItem icon={Library} text="Playlists" to="/playlists" />
+        <MenuItem icon={History} text="History" to="/history" />
       </ul>
 
-      {/* Sidebar Footer: Toggle Button Moved to Bottom for Clean Header UX */}
-      <div className={cn('mt-auto pt-2 border-t border-[var(--color-border-default)]/30', isCollapsed && 'flex justify-center')}>
+      {/* Sidebar Footer: Player Mode Setting & Collapse Toggle */}
+      <div className={cn('mt-auto pt-2 border-t border-[var(--color-border-default)]/30 flex flex-col gap-1.5', isCollapsed && 'items-center')}>
+        {/* Default Player Mode Switcher */}
+        {isCollapsed ? (
+          <button
+            type="button"
+            onClick={toggleDefaultPlayerMode}
+            className="w-12 h-12 flex items-center justify-center rounded-2xl cursor-pointer text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-all border border-transparent hover:border-[var(--color-primary)]/30"
+            title={`Default Player: ${defaultPlayerMode === 'full' ? 'Full Screen' : 'Mini Player'} (Click to switch)`}
+            aria-label={`Default Player: ${defaultPlayerMode === 'full' ? 'Full Screen' : 'Mini Player'}`}
+          >
+            {defaultPlayerMode === 'full' ? (
+              <Maximize2 size={20} className="text-[var(--color-primary)] transition-transform hover:scale-110" />
+            ) : (
+              <Minimize2 size={20} className="text-[var(--color-on-surface-variant)] transition-transform hover:scale-110" />
+            )}
+          </button>
+        ) : (
+          <div className="flex items-center justify-between py-1.5 px-3 rounded-2xl bg-[var(--color-surface-base)]/40 border border-[var(--color-border-default)]/60 text-xs my-0.5">
+            <div className="flex items-center gap-2 text-[var(--color-on-surface-variant)]">
+              {defaultPlayerMode === 'full' ? (
+                <Maximize2 size={16} className="text-[var(--color-primary)] shrink-0" />
+              ) : (
+                <Minimize2 size={16} className="text-[var(--color-primary)] shrink-0" />
+              )}
+              <span className="font-semibold text-xs text-[var(--color-on-surface)]">Player</span>
+            </div>
+            <button
+              type="button"
+              onClick={toggleDefaultPlayerMode}
+              className="inline-flex items-center p-0.5 rounded-xl bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] cursor-pointer transition-all hover:border-[var(--color-primary)]/40"
+              title={`Default player mode: ${defaultPlayerMode === 'full' ? 'Full Screen' : 'Mini Player'} (Click to toggle)`}
+            >
+              <span
+                className={cn(
+                  'px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all',
+                  defaultPlayerMode === 'full'
+                    ? 'bg-[var(--color-primary)] text-[var(--color-text-on-primary)] shadow-xs'
+                    : 'text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)]'
+                )}
+              >
+                Full
+              </span>
+              <span
+                className={cn(
+                  'px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all',
+                  defaultPlayerMode === 'mini'
+                    ? 'bg-[var(--color-primary)] text-[var(--color-text-on-primary)] shadow-xs'
+                    : 'text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)]'
+                )}
+              >
+                Mini
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* Sidebar Collapse Toggle Button */}
         <button
           onClick={handleToggle}
           className={cn(

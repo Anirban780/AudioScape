@@ -3,7 +3,7 @@ import Sidebar from "@/components/Home/Sidebar";
 import ProgressBar from "./ProgressBar";
 import PlayerControls from "./PlayerControls";
 import VolumeBar from "./VolumeBar";
-import { X, ListMusic, Sun, Moon } from "lucide-react";
+import { Minimize2, ListMusic, Sun, Moon } from "lucide-react";
 import placeholder from "@/assets/placeholder.jpg";
 import usePlayerStore from "@/store/usePlayerStore";
 import useSidebarStore from "@/store/useSidebarStore";
@@ -125,11 +125,11 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
         <div className="absolute top-3 left-3 sm:top-5 sm:left-6 z-30 flex items-center gap-2 sm:gap-3">
           <button
             onClick={handleFullScreenToggle}
-            className="p-2.5 sm:p-3 bg-[var(--color-surface-overlay)] border border-[var(--color-border-strong)] hover:border-red-500/40 hover:bg-red-500/15 text-[var(--color-on-surface)] hover:text-red-400 rounded-full transition-all duration-200 shadow-md hover:scale-105 active:scale-95 flex items-center justify-center shrink-0 cursor-pointer"
-            title="Exit Fullscreen (Esc)"
-            aria-label="Exit Fullscreen"
+            className="p-2.5 sm:p-3 bg-[var(--color-surface-overlay)] border border-[var(--color-border-strong)] hover:border-[var(--color-primary)]/40 hover:bg-[var(--color-state-hover)] text-[var(--color-on-surface)] hover:text-[var(--color-primary)] rounded-full transition-all duration-200 shadow-md hover:scale-105 active:scale-95 flex items-center justify-center shrink-0 cursor-pointer"
+            title="Minimize Player (Esc)"
+            aria-label="Minimize Player"
           >
-            <X size={18} />
+            <Minimize2 size={18} />
           </button>
 
           {/* Consistent Light/Dark Theme Toggle Button */}

@@ -7,7 +7,7 @@ import usePlaylistStore from '@/store/usePlaylistStore';
 import { useRefreshOn } from "@/store/useDataRefreshStore";
 import Loader from '@/components/Home/Loader';
 import toast from 'react-hot-toast';
-import { Heart, HeartOff, ListPlus, Loader2, X, Music } from 'lucide-react';
+import { Heart, HeartOff, ListPlus, Loader2, X, Music, ChevronLeft, ChevronRight } from 'lucide-react';
 import MediaGrid from '@/components/Layout/MediaGrid';
 import FavoritesHeroBanner from '@/components/Favorites/FavoritesHeroBanner';
 import FavoritesFilterBar from '@/components/Favorites/FavoritesFilterBar';
@@ -50,6 +50,11 @@ const FavoritesPage = () => {
     const [viewMode, setViewMode] = useState(() => {
         return localStorage.getItem("audioscape-favorites-view") || "grid";
     });
+
+    // Pagination State (matching Discover page pagination pattern)
+    const [page, setPage] = useState(1);
+    const [jumpInput, setJumpInput] = useState("");
+    const limit = 50; // max 50 songs per page
 
     useEffect(() => {
         localStorage.setItem("audioscape-favorites-view", viewMode);
@@ -188,6 +193,93 @@ const FavoritesPage = () => {
         return result;
     }, [likedSongs, searchQuery, sortBy, sortDirection]);
 
+    const totalPages = Math.max(1, Math.ceil(processedSongs.length / limit));
+
+    // Auto-adjust page if current page exceeds totalPages (e.g. after removing favorite)
+    useEffect(() => {
+        if (page > totalPages) {
+            setPage(totalPages);
+        }
+    }, [page, totalPages]);
+
+    // Paginated songs slice for the active page
+    const paginatedSongs = useMemo(() => {
+        const start = (page - 1) * limit;
+        return processedSongs.slice(start, start + limit);
+    }, [processedSongs, page, limit]);
+
+    // Pagination Handlers matching Discover page UX
+    const handleGoToPage = (targetPage) => {
+        const pageNum = Number(targetPage);
+        const maxPage = totalPages || 1;
+        if (pageNum >= 1 && pageNum <= maxPage && pageNum !== page) {
+            setPage(pageNum);
+            window.scrollTo({ top: 0, behavior: "smooth" });
+        }
+    };
+
+    const handlePrevPage = () => {
+        if (page > 1) {
+            handleGoToPage(page - 1);
+        }
+    };
+
+    const handleNextPage = () => {
+        if (page < totalPages) {
+            handleGoToPage(page + 1);
+        }
+    };
+
+    const handleJumpSubmit = (e) => {
+        e.preventDefault();
+        const target = parseInt(jumpInput, 10);
+        const maxPage = totalPages || 1;
+        if (!isNaN(target) && target >= 1 && target <= maxPage) {
+            handleGoToPage(target);
+            setJumpInput("");
+        } else {
+            toast.error(`Please enter a page number between 1 and ${maxPage}`);
+        }
+    };
+
+    // Generate numbered page buttons (with ellipsis for large page counts)
+    const pageNumbers = useMemo(() => {
+        if (totalPages <= 7) {
+            return Array.from({ length: totalPages }, (_, i) => i + 1);
+        }
+        const pages = new Set([1, totalPages, page]);
+        if (page > 1) pages.add(page - 1);
+        if (page < totalPages) pages.add(page + 1);
+        if (page === 1) { pages.add(2); pages.add(3); }
+        if (page === totalPages) { pages.add(totalPages - 1); pages.add(totalPages - 2); }
+
+        const sorted = Array.from(pages).sort((a, b) => a - b);
+        const result = [];
+        for (let i = 0; i < sorted.length; i++) {
+            if (i > 0 && sorted[i] - sorted[i - 1] > 1) {
+                result.push("...");
+            }
+            result.push(sorted[i]);
+        }
+        return result;
+    }, [totalPages, page]);
+
+    // Handlers for search/sort resetting page to 1
+    const handleSearchChange = (query) => {
+        setSearchQuery(query);
+        setPage(1);
+    };
+
+    const handleSortChange = (newSort) => {
+        setSortBy(newSort);
+        setPage(1);
+    };
+
+    const handleDirectionToggle = () => {
+        setSortDirection((prev) => (prev === "desc" ? "asc" : "desc"));
+        setPage(1);
+    };
+
     // Playback Handlers
     const handlePlayTrack = (track) => {
         setQueue(processedSongs);
@@ -266,15 +358,15 @@ const FavoritesPage = () => {
                         {/* 2. Filter & Sort Bar */}
                         <FavoritesFilterBar 
                             sortBy={sortBy}
-                            onSortChange={setSortBy}
+                            onSortChange={handleSortChange}
                             searchQuery={searchQuery}
-                            onSearchChange={setSearchQuery}
+                            onSearchChange={handleSearchChange}
                             viewMode={viewMode}
                             onViewChange={setViewMode}
                             totalCount={likedSongs.length}
                             filteredCount={processedSongs.length}
                             sortDirection={sortDirection}
-                            onDirectionToggle={() => setSortDirection(prev => prev === "desc" ? "asc" : "desc")}
+                            onDirectionToggle={handleDirectionToggle}
                         />
 
                         {/* 3. Track Grid / List */}
@@ -282,7 +374,7 @@ const FavoritesPage = () => {
                             <div className="text-center py-12">
                                 <p className="text-[var(--color-on-surface)] font-medium">No matches found for "{searchQuery}"</p>
                                 <button 
-                                    onClick={() => setSearchQuery("")}
+                                    onClick={() => handleSearchChange("")}
                                     className="mt-4 text-pink-500 hover:underline text-sm font-bold cursor-pointer"
                                 >
                                     Clear search
@@ -290,29 +382,33 @@ const FavoritesPage = () => {
                             </div>
                         ) : viewMode === "grid" ? (
                             <MediaGrid>
-                                {processedSongs.map((track, index) => (
-                                    <FavoritesVinylCard
-                                        key={`${track.id || track.videoId}-${index}`}
-                                        song={track}
-                                        index={index}
-                                        onPlay={handlePlayTrack}
-                                        onAddToPlaylist={handleAddToPlaylist}
-                                        onRemove={initiateRemoveFavorite}
-                                    />
-                                ))}
+                                {paginatedSongs.map((track, index) => {
+                                    const absoluteIndex = (page - 1) * limit + index;
+                                    return (
+                                        <FavoritesVinylCard
+                                            key={`${track.id || track.videoId}-${absoluteIndex}`}
+                                            song={track}
+                                            index={absoluteIndex}
+                                            onPlay={handlePlayTrack}
+                                            onAddToPlaylist={handleAddToPlaylist}
+                                            onRemove={initiateRemoveFavorite}
+                                        />
+                                    );
+                                })}
                             </MediaGrid>
                         ) : (
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                {processedSongs.map((track, index) => {
+                                {paginatedSongs.map((track, index) => {
+                                    const absoluteIndex = (page - 1) * limit + index;
                                     const title = track.name || track.title || "Unknown Title";
                                     const artist = track.artist || track.channelTitle || "Unknown Artist";
                                     const thumb = track.thumbnail || track.thumbNail || "";
                                     return (
-                                        <div key={`${track.id || track.videoId}-${index}`} 
+                                        <div key={`${track.id || track.videoId}-${absoluteIndex}`} 
                                              onClick={() => handlePlayTrack(track)}
                                              className="flex items-center gap-3 bg-[var(--color-surface-raised)] p-2.5 pr-4 rounded-xl hover:bg-[var(--color-surface-overlay)] transition-colors group cursor-pointer border border-[var(--color-border-subtle)] hover:border-pink-500/30">
                                             <div className="w-7 text-center text-xs font-bold text-[var(--color-on-surface-variant)] group-hover:text-pink-500 transition-colors">
-                                                {index + 1}
+                                                {absoluteIndex + 1}
                                             </div>
                                             <div className="relative w-12 h-12 shrink-0 rounded-lg overflow-hidden bg-[var(--color-surface-overlay)] flex items-center justify-center">
                                                 {thumb && !isImageDead(track.id || track.videoId) ? (
@@ -362,6 +458,102 @@ const FavoritesPage = () => {
                                         </div>
                                     );
                                 })}
+                            </div>
+                        )}
+
+                        {/* 4. Pagination Footer Controls (Discover-style) */}
+                        {!loading && processedSongs.length > 0 && (
+                            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-10 pt-6 border-t border-[var(--color-border-default)]">
+                                <div className="text-xs font-semibold text-[var(--color-on-surface-variant)]">
+                                    Showing <span className="text-[var(--color-on-surface)] font-bold">{paginatedSongs.length}</span> of {processedSongs.length} tracks • Page {page} of {totalPages || 1}
+                                </div>
+
+                                <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap justify-center">
+                                    {/* Previous Page Button */}
+                                    <button
+                                        onClick={handlePrevPage}
+                                        disabled={page <= 1}
+                                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] hover:border-pink-500/50 text-[var(--color-on-surface)] font-bold text-xs transition-all shadow-xs disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                                        title="Previous page"
+                                        aria-label="Previous page"
+                                    >
+                                        <ChevronLeft size={16} />
+                                        <span className="hidden sm:inline">Prev</span>
+                                    </button>
+
+                                    {/* Numbered Page Buttons */}
+                                    <div className="flex items-center gap-1">
+                                        {pageNumbers.map((item, idx) => {
+                                            if (item === "...") {
+                                                return (
+                                                    <span
+                                                        key={`ellipsis-${idx}`}
+                                                        className="w-8 h-8 flex items-center justify-center text-xs text-[var(--color-on-surface-variant)] select-none"
+                                                    >
+                                                        ...
+                                                    </span>
+                                                );
+                                            }
+                                            const pageNum = Number(item);
+                                            const isActive = pageNum === page;
+                                            return (
+                                                <button
+                                                    key={`page-${pageNum}`}
+                                                    onClick={() => handleGoToPage(pageNum)}
+                                                    className={`min-w-[34px] h-[34px] px-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer flex items-center justify-center ${
+                                                        isActive
+                                                            ? "bg-pink-500 text-white shadow-md shadow-pink-500/25 scale-105 border border-pink-500"
+                                                            : "bg-[var(--color-surface-raised)] text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)] border border-[var(--color-border-default)] hover:border-pink-500/50 hover:bg-[var(--color-state-hover)]"
+                                                    }`}
+                                                    title={`Go to page ${pageNum}`}
+                                                    aria-label={`Go to page ${pageNum}`}
+                                                    aria-current={isActive ? "page" : undefined}
+                                                >
+                                                    {pageNum}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {/* Next Page Button */}
+                                    <button
+                                        onClick={handleNextPage}
+                                        disabled={page >= totalPages}
+                                        className="flex items-center gap-1 px-3 py-1.5 rounded-xl bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] hover:border-pink-500/50 text-[var(--color-on-surface)] font-bold text-xs transition-all shadow-xs disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                                        title="Next page"
+                                        aria-label="Next page"
+                                    >
+                                        <span className="hidden sm:inline">Next</span>
+                                        <ChevronRight size={16} />
+                                    </button>
+
+                                    {/* Explicit "Go To" Page Input Jumper */}
+                                    {totalPages > 1 && (
+                                        <form
+                                            onSubmit={handleJumpSubmit}
+                                            className="flex items-center gap-1.5 ml-1 pl-2 sm:ml-3 sm:pl-3 border-l border-[var(--color-border-default)]"
+                                        >
+                                            <span className="text-[11px] font-semibold text-[var(--color-on-surface-variant)] hidden sm:inline">Go to:</span>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                max={totalPages}
+                                                value={jumpInput}
+                                                onChange={(e) => setJumpInput(e.target.value)}
+                                                placeholder={page.toString()}
+                                                className="w-11 h-[32px] px-1 text-xs text-center font-bold rounded-lg bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] focus:border-pink-500 focus:outline-none text-[var(--color-on-surface)] [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                aria-label="Target page number"
+                                            />
+                                            <button
+                                                type="submit"
+                                                className="h-[32px] px-2.5 text-xs font-bold rounded-lg bg-[var(--color-surface-overlay)] text-pink-400 border border-pink-500/40 hover:bg-pink-500 hover:text-white transition-all cursor-pointer shadow-xs"
+                                                title="Jump to page"
+                                            >
+                                                Go
+                                            </button>
+                                        </form>
+                                    )}
+                                </div>
                             </div>
                         )}
                     </>

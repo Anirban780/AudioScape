@@ -109,12 +109,12 @@ export async function saveSongListen(videoId, source = "SEARCH", track = {}) {
  * @param {string} userId - The ID of the user.
  * @returns {Promise<Array>} - An array of the last played songs.
  */
-export async function fetchLastPlayed(userId) {
+export async function fetchLastPlayed(userId, limit = 50, page = 1, returnPaginationData = false) {
     try {
         const headers = await getAuthHeader();
         const API_URL = await getBackendURL();
 
-        const response = await fetch(`${API_URL}/api/music/history?limit=50`, {
+        const response = await fetch(`${API_URL}/api/music/history?limit=${limit}&page=${page}`, {
             method: "GET",
             headers: { ...headers },
         });
@@ -126,7 +126,7 @@ export async function fetchLastPlayed(userId) {
         const data = await response.json();
         const rawHistory = data.data || data.history || (Array.isArray(data) ? data : []);
 
-        return rawHistory.map((item) => {
+        const mappedTracks = rawHistory.map((item) => {
             const track = item.track || item;
             const thumb = getValidThumbnailUrl(track.thumbnailUrl || item.thumbNail || item.thumbnail || "") || "";
             return {
@@ -139,9 +139,21 @@ export async function fetchLastPlayed(userId) {
                 thumbnail: thumb,
                 thumbNail: thumb,
                 lastPlayedAt: item.lastPlayedAt || item.playedAt || new Date(),
+                playCount: item.playCount || 1,
+                duration: track.duration || item.duration || "",
+                durationSeconds: track.durationSeconds || item.durationSeconds || null,
+                source: item.source || "SEARCH",
                 liked: item.liked || false,
             };
         });
+
+        if (returnPaginationData) {
+            return {
+                tracks: mappedTracks,
+                pagination: data.pagination || { total: mappedTracks.length, page: 1, limit, totalPages: 1 }
+            };
+        }
+        return mappedTracks;
     } catch (error) {
         console.error("Error fetching last played songs:", error);
         return [];
