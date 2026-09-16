@@ -3,7 +3,7 @@ import Sidebar from "@/components/Home/Sidebar";
 import ProgressBar from "./ProgressBar";
 import PlayerControls from "./PlayerControls";
 import VolumeBar from "./VolumeBar";
-import { Minimize2, ListMusic, Sun, Moon, Laptop } from "lucide-react";
+import { Minimize2, X, ListMusic, Sun, Moon, Laptop } from "lucide-react";
 import placeholder from "@/assets/placeholder.jpg";
 import usePlayerStore from "@/store/usePlayerStore";
 import useSidebarStore from "@/store/useSidebarStore";
@@ -95,7 +95,7 @@ const SlidingTrackTitle = ({ title }) => {
   );
 };
 
-const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
+const FullScreenPlayer = ({ track, player, isPlayerReady, onClose, onCloseTrack }) => {
   const {
     isPlaying,
     setIsPlaying,
@@ -146,6 +146,18 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
     }
   };
 
+  const handleCloseTrack = () => {
+    if (onCloseTrack) {
+      onCloseTrack();
+    } else {
+      if (player && typeof player.stopVideo === 'function') {
+        player.stopVideo();
+      }
+      setIsFullScreen(false);
+      setTrack(null);
+    }
+  };
+
   const rawThumb = track?.thumbnail || track?.thumbNail;
   const trackId = track?.id || track?.videoId;
   const thumbnailUrl = getHighResThumbnailUrl(rawThumb, trackId) || getValidThumbnailUrl(rawThumb) || placeholder;
@@ -185,16 +197,26 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
           />
         </div>
 
-        {/* Top-Left Action Row: Minimize Button + Theme Switcher */}
+        {/* Top-Left Action Row: Minimize Button, Close Song Button + Theme Switcher */}
         <div className="absolute top-3 left-3 sm:top-5 sm:left-6 z-30 flex items-center gap-2 sm:gap-3">
-          {/* Top-Left Minimize / Close Button */}
+          {/* Top-Left Minimize Player Button */}
           <button
             onClick={handleFullScreenToggle}
             className="p-2.5 sm:p-3 bg-[var(--color-surface-overlay)] border border-[var(--color-border-strong)] hover:bg-[var(--color-state-hover)] text-[var(--color-on-surface)] rounded-full transition-colors shadow-lg cursor-pointer"
-            title="Minimize Player"
-            aria-label="Minimize Player"
+            title="Minimize to Mini Player"
+            aria-label="Minimize to Mini Player"
           >
             <Minimize2 size={18} />
+          </button>
+
+          {/* Close Song Track Button */}
+          <button
+            onClick={handleCloseTrack}
+            className="p-2.5 sm:p-3 bg-[var(--color-surface-overlay)] border border-[var(--color-border-strong)] hover:bg-rose-500/15 hover:border-rose-500/40 hover:text-rose-500 text-[var(--color-on-surface)] rounded-full transition-all shadow-lg cursor-pointer group"
+            title="Close Song"
+            aria-label="Close Song"
+          >
+            <X size={18} className="group-hover:scale-110 transition-transform" />
           </button>
 
           {/* Consistent Light/Dark/System Theme Toggle Button */}

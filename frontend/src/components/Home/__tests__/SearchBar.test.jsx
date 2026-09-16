@@ -54,12 +54,33 @@ vi.mock('axios', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. react-hot-toast — no-op stubs
+// 4. notify & sonner — no-op stubs
 // ---------------------------------------------------------------------------
-vi.mock('react-hot-toast', () => ({
-  default: { success: vi.fn(), error: vi.fn() },
-  success: vi.fn(),
-  error: vi.fn(),
+vi.mock('@/utils/notify', () => ({
+  default: {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    rateLimit: vi.fn(),
+    trackPlaying: vi.fn(),
+    queueAdded: vi.fn(),
+  },
+  notify: {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    rateLimit: vi.fn(),
+    trackPlaying: vi.fn(),
+    queueAdded: vi.fn(),
+  },
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+  },
 }));
 
 // ---------------------------------------------------------------------------

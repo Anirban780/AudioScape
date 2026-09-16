@@ -6,7 +6,7 @@ import placeholder from "@/assets/placeholder.jpg";
 import { getBackendURL } from "@/utils/api";
 import { getValidThumbnailUrl, handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
 import useAuthStore from "@/store/useAuthStore";
-import toast from "react-hot-toast";
+import { notify } from "@/utils/notify";
 
 /**
  * Normalizes a search query string (lowercase, trim, collapse whitespace, strip punctuation)
@@ -227,12 +227,12 @@ const SearchBar = ({ onSelectTrack }) => {
       }
       if (error.response?.status === 429) {
         const errorMsg = error.response.data?.message || "Search rate limit reached (max 3/min, 20/day). Cached tracks remain available.";
-        toast.error(errorMsg, { duration: 6000, id: "rate-limit-toast" });
+        notify.rateLimit(60, errorMsg);
         setSearchStatusMsg("Rate limit reached. Try searching local cached tracks.");
         return;
       }
       console.error("Error fetching search results:", error);
-      toast.error("Search is currently unavailable. Please try again");
+      notify.error("Search is currently unavailable. Please try again");
     } finally {
       inFlightRef.current = false;
       setLoading(false);
@@ -309,7 +309,7 @@ const SearchBar = ({ onSelectTrack }) => {
     });
 
     setIsFocused(false);
-    toast.success("Track selected successfully");
+    notify.success("Track selected successfully");
 
     // 2. Fetch full metadata (duration, tags) asynchronously in background without blocking UI
     Promise.resolve(getBackendURL?.()).then((BASE_URL) => {

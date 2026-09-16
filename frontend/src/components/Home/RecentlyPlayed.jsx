@@ -10,7 +10,7 @@ import SectionHeader from "@/components/Home/SectionHeader";
 import MusicCard from "@/components/Cards/MusicCard";
 import { getValidThumbnailUrl, getHighResThumbnailUrl } from "@/utils/youtubeUtils";
 import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
-import toast from "react-hot-toast";
+import { notify } from "@/utils/notify";
 
 /**
  * ============================================================================
@@ -138,7 +138,7 @@ const RecentlyPlayed = ({ userId }) => {
   const handlePlayTrack = (song) => {
     usePlayerStore.getState().setTrack(song);
     usePlayerStore.getState().setIsPlaying(true);
-    toast.success(`Playing: ${song.name || song.title}`);
+    notify.trackPlaying(song.name || song.title, song.artist);
   };
 
   const heroTrack = recentlyPlayed[0];

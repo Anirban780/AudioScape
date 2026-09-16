@@ -4,7 +4,7 @@ import placeholder from "@/assets/placeholder.jpg";
 import usePlayerStore from "@/store/usePlayerStore";
 import { getValidThumbnailUrl, getHighResThumbnailUrl } from "@/utils/youtubeUtils";
 import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
-import toast from "react-hot-toast";
+import { notify } from "@/utils/notify";
 
 /**
  * ============================================================================
@@ -178,7 +178,7 @@ const DailyMixCards = ({ recommendations = [] }) => {
     setCurrentIndex(0);
     setTrack(mix.tracks[0], "RECOMMENDATION");
     setIsPlaying(true);
-    toast.success(`Playing ${mix.title}`);
+    notify.trackPlaying(mix.title);
   };
 
   return (

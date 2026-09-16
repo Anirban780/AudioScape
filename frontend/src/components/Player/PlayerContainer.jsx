@@ -178,6 +178,7 @@ const PlayerContainer = ({ onClose, uid }) => {
       }
     }
 
+    setIsFullScreen(false);
     setTrack(null);
     setQueue([]);
 
@@ -197,6 +198,7 @@ const PlayerContainer = ({ onClose, uid }) => {
           player={player}
           isPlayerReady={isPlayerReady}
           onClose={toggleFullScreen}
+          onCloseTrack={handleClose}
         />
       ) : (
         <MiniPlayer

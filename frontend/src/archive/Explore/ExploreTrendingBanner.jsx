@@ -3,7 +3,7 @@ import placeholder from "@/assets/placeholder.jpg";
 import { Play, Flame, Sparkles, ChevronLeft, ChevronRight, Music } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
 import { Skeleton } from "@/components/ui/skeleton";
-import toast from "react-hot-toast";
+import { notify } from "@/utils/notify";
 import { getHighResThumbnailUrl } from "@/utils/youtubeUtils";
 import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
@@ -87,7 +87,7 @@ const ExploreTrendingBanner = ({
       source: "EXPLORE",
     }, "EXPLORE");
     usePlayerStore.getState().setIsPlaying(true);
-    toast.success(`Playing: ${trackName}`);
+    notify.trackPlaying(trackName, artistName);
   };
 
   return (

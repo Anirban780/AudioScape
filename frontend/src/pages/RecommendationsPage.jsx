@@ -10,7 +10,7 @@ import { getHighResThumbnailUrl, getValidThumbnailUrl, decodeHtmlEntities } from
 import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 import { Sparkles, Play, Shuffle, ChevronLeft, ChevronRight, RefreshCw, Compass, Music, Flame, ListPlus, Heart } from "lucide-react";
 import { Link } from "react-router-dom";
-import toast from "react-hot-toast";
+import { notify } from "@/utils/notify";
 
 /**
  * ============================================================================
@@ -75,7 +75,7 @@ const RecommendationsPage = () => {
       }
     } catch (err) {
       console.error("Failed to load paginated recommendations:", err);
-      toast.error("Failed to load recommendations");
+      notify.error("Failed to load recommendations");
       setTracks([]);
     } finally {
       setLoading(false);
@@ -112,7 +112,7 @@ const RecommendationsPage = () => {
     const nextShuffle = !isShuffled;
     setIsShuffled(nextShuffle);
     setPage(1);
-    toast.success(nextShuffle ? "Shuffled recommendation mix" : "Restored original rank order");
+    notify.success(nextShuffle ? "Shuffled recommendation mix" : "Restored original rank order");
   };
 
   const handlePlayTrack = (track) => {
@@ -126,7 +126,7 @@ const RecommendationsPage = () => {
       source: "RECOMMENDATION",
     }, "RECOMMENDATION");
     setIsPlaying(true);
-    toast.success(`Playing: ${cleanTitle}`);
+    notify.trackPlaying(cleanTitle, cleanArtist);
   };
 
   const handlePlayAll = () => {
@@ -145,7 +145,7 @@ const RecommendationsPage = () => {
     setCurrentIndex(0);
     setTrack(normalizedQueue[0], "RECOMMENDATION");
     setIsPlaying(true);
-    toast.success(`Playing all ${normalizedQueue.length} recommendations`);
+    notify.success(`Playing all ${normalizedQueue.length} recommendations`);
   };
 
   // Filter tracks based on activeFilter ("all" | "discover" | "rediscover")
@@ -213,7 +213,7 @@ const RecommendationsPage = () => {
       handleGoToPage(target);
       setJumpInput("");
     } else {
-      toast.error(`Please enter a page number between 1 and ${maxPage}`);
+      notify.error(`Please enter a page number between 1 and ${maxPage}`);
     }
   };
 
@@ -357,7 +357,7 @@ const RecommendationsPage = () => {
                   </button>
 
                   <button
-                    onClick={() => toast.success("Added to your favorites!")}
+                    onClick={() => notify.success("Added to your favorites!")}
                     className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:text-pink-400 hover:border-pink-400/50 transition-colors shadow-md cursor-pointer"
                     title="Add to Favorites"
                   >

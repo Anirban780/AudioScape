@@ -4,7 +4,7 @@ import useAuthStore from "@/store/useAuthStore";
 import usePlaylistStore from "@/store/usePlaylistStore";
 import usePlayerStore from "@/store/usePlayerStore";
 import Loader from "@/components/Home/Loader";
-import toast from "react-hot-toast";
+import { notify } from "@/utils/notify";
 import { ListMusic, Disc3, Trash2, X, Loader2, Pencil } from "lucide-react";
 import { getPlaylists, getPlaylistById, deletePlaylist, createPlaylist, updatePlaylist } from "@/utils/playlists";
 import PlaylistHeroHeader from "@/components/Playlist/PlaylistHeroHeader";
@@ -61,16 +61,16 @@ const PlaylistsPage = () => {
                 tracks = fullPl?.songs || fullPl?.tracks || [];
             }
             if (!tracks.length) {
-                toast("This playlist is empty. Add songs to start playing!", { icon: "🎵" });
+                notify.info("This playlist is empty. Add songs to start playing!", { icon: "🎵" });
                 return;
             }
             setQueue(tracks, "PLAYLIST");
             await setTrack(tracks[0], "PLAYLIST");
             setIsPlaying(true);
-            toast.success(`Playing "${playlist.name}"`);
+            notify.trackPlaying(playlist.name);
         } catch (err) {
             console.error("Failed to play playlist:", err);
-            toast.error("Failed to play playlist");
+            notify.error("Failed to play playlist");
         }
     };
 
@@ -112,7 +112,7 @@ const PlaylistsPage = () => {
             const data = await getPlaylists(user.id);
             setPlaylists(data);
         } catch (err) {
-            toast.error("Failed to load playlists");
+            notify.error("Failed to load playlists");
         } finally {
             if (showLoader) setLoading(false);
         }
@@ -169,10 +169,10 @@ const PlaylistsPage = () => {
     const handleCreatePlaylist = async (name, description) => {
         try {
             await createPlaylist(user.id, name, description);
-            toast.success(`Playlist "${name}" created!`);
+            notify.success(`Playlist "${name}" created!`);
             await loadPlaylists(false);
         } catch (err) {
-            toast.error(err.message || "Failed to create playlist");
+            notify.error(err.message || "Failed to create playlist");
             throw err; // Let the modal handle re-enabling the form
         }
     };
@@ -187,10 +187,10 @@ const PlaylistsPage = () => {
         setDeleteModal((prev) => ({ ...prev, loading: true }));
         try {
             await deletePlaylist(user.id, deleteModal.playlist.id);
-            toast.success(`"${deleteModal.playlist.name}" deleted`);
+            notify.success(`"${deleteModal.playlist.name}" deleted`);
             await loadPlaylists(false);
         } catch (err) {
-            toast.error("Failed to delete playlist");
+            notify.error("Failed to delete playlist");
         } finally {
             setDeleteModal({ open: false, playlist: null, loading: false });
         }
@@ -203,7 +203,7 @@ const PlaylistsPage = () => {
 
     const handleRename = async () => {
         const trimmedName = editModal.newName.trim();
-        if (!trimmedName) return toast.error("Playlist name cannot be empty");
+        if (!trimmedName) return notify.error("Playlist name cannot be empty");
         if (trimmedName === editModal.playlist.name) {
             setEditModal({ open: false, playlist: null, newName: "", loading: false });
             return;
@@ -211,10 +211,10 @@ const PlaylistsPage = () => {
         setEditModal((prev) => ({ ...prev, loading: true }));
         try {
             await updatePlaylist(user.id, editModal.playlist.id, { name: trimmedName });
-            toast.success("Playlist renamed");
+            notify.success("Playlist renamed");
             await loadPlaylists(false);
         } catch (err) {
-            toast.error(err.message || "Failed to rename playlist");
+            notify.error(err.message || "Failed to rename playlist");
         } finally {
             setEditModal({ open: false, playlist: null, newName: "", loading: false });
         }

@@ -1,6 +1,6 @@
 import useAuthStore from '../store/useAuthStore';
 import { getBackendURL } from '../utils/api';
-import toast from 'react-hot-toast';
+import { notify } from '../utils/notify';
 
 /**
  * ============================================================================
@@ -72,11 +72,11 @@ export async function handleCredentialResponse(response) {
 
         // Save auth state in Zustand store
         setAuth(authData.user, authData.accessToken);
-        toast.success(`Welcome back, ${authData.user?.displayName || 'Music Lover'}!`);
+        notify.success(`Welcome back, ${authData.user?.displayName || 'Music Lover'}!`);
     } catch (err) {
         console.error('Error during Google sign-in:', err);
         setAuthError(err.message || 'Google sign-in failed');
-        toast.error(err.message || 'Failed to sign in with Google');
+        notify.error(err.message || 'Failed to sign in with Google');
     } finally {
         setIsLoading(false);
     }
@@ -152,11 +152,11 @@ export function initTokenClient() {
 
                     // Save auth state in Zustand store
                     setAuth(authData.user, authData.accessToken);
-                    toast.success(`Welcome back, ${authData.user?.displayName || 'Music Lover'}!`);
+                    notify.success(`Welcome back, ${authData.user?.displayName || 'Music Lover'}!`);
                 } catch (err) {
                     console.error('Error during Google sign-in:', err);
                     setAuthError(err.message || 'Google sign-in failed');
-                    toast.error(err.message || 'Failed to sign in with Google');
+                    notify.error(err.message || 'Failed to sign in with Google');
                 } finally {
                     setIsLoading(false);
                 }
@@ -217,7 +217,7 @@ export async function signInWithGoogle() {
         }
     }
 
-    toast.error('Google Sign-In is initializing. Please wait a moment and try again.');
+    notify.info('Google Sign-In is initializing. Please wait a moment and try again.');
 }
 
 /**
@@ -260,5 +260,5 @@ export function renderGoogleButton(containerElement, options = {}) {
  */
 export function logout() {
     useAuthStore.getState().logout();
-    toast.success('Signed out successfully');
+    notify.success('Signed out successfully');
 }
