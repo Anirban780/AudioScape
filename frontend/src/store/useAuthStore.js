@@ -51,6 +51,46 @@ const getInitialToken = () => {
 const initialUser = getInitialUser();
 const initialToken = getInitialToken();
 
+// In-memory proactive token refresh timer reference
+let proactiveRefreshTimer = null;
+
+const scheduleProactiveRefresh = (token) => {
+    if (proactiveRefreshTimer) {
+        clearTimeout(proactiveRefreshTimer);
+        proactiveRefreshTimer = null;
+    }
+
+    if (!token) return;
+
+    let delayMs = 13.5 * 60 * 1000; // default: 13.5 minutes for 15m token
+
+    try {
+        // Attempt to parse JWT exp claim to schedule refresh 90s before actual expiry
+        const payloadBase64 = token.split('.')[1];
+        if (payloadBase64) {
+            const decodedJson = JSON.parse(atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/')));
+            if (decodedJson.exp) {
+                const expiryMs = decodedJson.exp * 1000;
+                const timeUntilExpiry = expiryMs - Date.now();
+                // Refresh 90 seconds prior to expiry (min 10 seconds)
+                delayMs = Math.max(10000, timeUntilExpiry - 90000);
+            }
+        }
+    } catch {
+        // Fallback to default 13.5m
+    }
+
+    proactiveRefreshTimer = setTimeout(async () => {
+        console.debug('⏳ Proactive in-memory JWT refresh triggered');
+        await useAuthStore.getState().refreshAuthSession();
+    }, delayMs);
+};
+
+// If initial token was restored from localStorage, schedule proactive refresh
+if (initialToken) {
+    scheduleProactiveRefresh(initialToken);
+}
+
 const useAuthStore = create((set, get) => ({
     // ------------------------------------------------------------------------
     // STATE PROPERTIES
@@ -59,6 +99,7 @@ const useAuthStore = create((set, get) => ({
     idToken: initialToken,
     isAuthenticated: !!(initialUser && initialToken),
     isLoading: false,
+    isCheckingAuth: true, // Gate initial routing to prevent premature redirects
     authError: null,
 
     // ------------------------------------------------------------------------
@@ -80,11 +121,15 @@ const useAuthStore = create((set, get) => ({
             console.warn('Unable to persist user session info to localStorage:', e);
         }
 
+        // Arm proactive in-memory refresh before token expires
+        scheduleProactiveRefresh(idToken);
+
         set({
             user,
             idToken,
             isAuthenticated: true,
             isLoading: false,
+            isCheckingAuth: false,
             authError: null,
         });
     },
@@ -93,6 +138,11 @@ const useAuthStore = create((set, get) => ({
      * Clears authentication state and user session storage.
      */
     clearAuth: () => {
+        if (proactiveRefreshTimer) {
+            clearTimeout(proactiveRefreshTimer);
+            proactiveRefreshTimer = null;
+        }
+
         try {
             localStorage.removeItem(STORAGE_KEY_USER);
             localStorage.removeItem(STORAGE_KEY_TOKEN);
@@ -105,6 +155,7 @@ const useAuthStore = create((set, get) => ({
             idToken: null,
             isAuthenticated: false,
             isLoading: false,
+            isCheckingAuth: false,
             authError: null,
         });
     },
@@ -129,8 +180,10 @@ const useAuthStore = create((set, get) => ({
                     return true;
                 }
             } else {
-                // If refresh cookie is missing or invalid, clear stale auth state
-                get().clearAuth();
+                // If refresh cookie is missing or invalid and user had an active session, clear auth
+                if (response.status === 401 || response.status === 403) {
+                    get().clearAuth();
+                }
             }
         } catch (err) {
             console.warn('Silent auth session refresh failed:', err);
@@ -138,6 +191,24 @@ const useAuthStore = create((set, get) => ({
             get().setIsLoading(false);
         }
         return false;
+    },
+
+    /**
+     * Initial startup authentication verification check.
+     * Evaluates refresh cookie before route guards evaluate authentication.
+     */
+    checkAuth: async () => {
+        try {
+            set({ isCheckingAuth: true });
+            const success = await get().refreshAuthSession();
+            if (!success && (!get().user || !get().idToken)) {
+                get().clearAuth();
+            }
+        } catch (err) {
+            console.warn('Startup checkAuth error:', err);
+        } finally {
+            set({ isCheckingAuth: false });
+        }
     },
 
     /**

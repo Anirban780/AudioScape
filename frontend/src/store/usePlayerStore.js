@@ -13,6 +13,18 @@ import toast from 'react-hot-toast';
  * master volume control (+/- 5 step increment/decrement), track favourites status, and queue manipulations.
  */
 
+// Helper to resolve persisted default player mode ('full' | 'mini')
+const getInitialDefaultPlayerMode = () => {
+    if (typeof window === 'undefined') return 'full';
+    try {
+        const stored = localStorage.getItem('audioscape_default_player_mode');
+        return stored === 'mini' ? 'mini' : 'full';
+    } catch {
+        return 'full';
+    }
+};
+const initialDefaultPlayerMode = getInitialDefaultPlayerMode();
+
 const usePlayerStore = create((set, get) => ({
     // ------------------------------------------------------------------------
     // TRACK & PLAYBACK STATE
@@ -20,7 +32,8 @@ const usePlayerStore = create((set, get) => ({
 
     track: null,
     isPlaying: false,
-    isFullScreen: false,
+    defaultPlayerMode: initialDefaultPlayerMode, // 'full' | 'mini'
+    isFullScreen: initialDefaultPlayerMode === 'full',
     miniPlayerMode: 'float',
     progress: 0,
     duration: 0,
@@ -46,7 +59,15 @@ const usePlayerStore = create((set, get) => ({
         const effectiveSource = source || track?.source || get().playbackSource || 'SEARCH';
         const taggedTrack = track ? { ...track, source: effectiveSource } : null;
 
-        set({ track: taggedTrack, isLiked: liked, playbackSource: effectiveSource });
+        // When launching a new track, honor user's default player mode ('full' opens FullScreenPlayer)
+        const shouldBeFullScreen = track ? get().defaultPlayerMode === 'full' : get().isFullScreen;
+
+        set({ 
+            track: taggedTrack, 
+            isLiked: liked, 
+            playbackSource: effectiveSource,
+            isFullScreen: shouldBeFullScreen,
+        });
     },
     
     setPlaybackSource: (playbackSource) => set({ playbackSource }),
@@ -95,6 +116,38 @@ const usePlayerStore = create((set, get) => ({
     togglePlayPause: () => set((state) => ({ isPlaying: !state.isPlaying })),
     toggleFullScreen: () => set((state) => ({ isFullScreen: !state.isFullScreen })),
     setIsFullScreen: (isFullScreen) => set({ isFullScreen }),
+
+    /**
+     * Updates default player mode ('full' | 'mini') with localStorage persistence.
+     */
+    setDefaultPlayerMode: (mode) => {
+        const sanitized = mode === 'mini' ? 'mini' : 'full';
+        try {
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('audioscape_default_player_mode', sanitized);
+            }
+        } catch (e) {
+            console.warn('Failed to save default player mode to localStorage:', e);
+        }
+        set({ defaultPlayerMode: sanitized });
+    },
+
+    /**
+     * Toggles default player mode between 'full' and 'mini'.
+     */
+    toggleDefaultPlayerMode: () => {
+        const currentMode = get().defaultPlayerMode;
+        const newMode = currentMode === 'full' ? 'mini' : 'full';
+        try {
+            if (typeof window !== 'undefined') {
+                localStorage.setItem('audioscape_default_player_mode', newMode);
+            }
+        } catch (e) {
+            console.warn('Failed to save default player mode to localStorage:', e);
+        }
+        set({ defaultPlayerMode: newMode });
+        toast.success(newMode === 'full' ? 'Default player: Full Screen' : 'Default player: Mini Player');
+    },
 
     /**
      * Pure Mute/Unmute Toggle synchronized directly with YouTube iFrame API.
@@ -184,6 +237,7 @@ const usePlayerStore = create((set, get) => ({
                 currentIndex: 0,
                 track: normalizedTrack,
                 isPlaying: true,
+                isFullScreen: get().defaultPlayerMode === 'full',
             });
             toast.success(`Playing: ${normalizedTrack.name}`);
         } else {

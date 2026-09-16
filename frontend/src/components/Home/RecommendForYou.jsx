@@ -402,12 +402,12 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
         </div>
       )}
 
-      {/* Container-Query Driven MediaGrid replaced with Horizontal Carousel */}
+      {/* Container-Query Driven MediaGrid replaced with Horizontal Carousel (Subtask J4) */}
       <div className="relative">
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="grid grid-flow-col auto-cols-[minmax(190px,1fr)] sm:auto-cols-[minmax(210px,1fr)] gap-6 overflow-x-auto scrollbar-hide scroll-smooth py-3 px-1 relative z-10"
+          className="grid grid-flow-col auto-cols-[190px] sm:auto-cols-[210px] justify-start gap-6 overflow-x-auto scrollbar-hide scroll-smooth py-3 px-1 relative z-10"
           style={{ scrollSnapType: "x mandatory" }}
         >
           {gridSongs.map((song, index) => {
@@ -420,7 +420,7 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
                 key={`${songId}-${index}`}
                 style={{ scrollSnapAlign: "start" }}
                 onClick={() => handlePlayTrack(song)}
-                className="group relative cursor-pointer flex flex-col items-center select-none"
+                className="group relative cursor-pointer flex flex-col items-center select-none w-[190px] sm:w-[210px] max-w-[220px]"
               >
                 {/* Vinyl Record + Sleeve Container */}
                 <div className="relative w-full aspect-square rounded-2xl bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] hover:border-[var(--color-primary)]/50 shadow-md hover:shadow-xl transition-all duration-500 p-2 overflow-visible">

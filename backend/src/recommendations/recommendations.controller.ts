@@ -8,7 +8,7 @@ import { ExtendQueueDto } from './dto/extend-queue.dto';
 import { GoogleAuthGuard } from '../auth/google-auth.guard';
 import { CronAuthGuard } from '../auth/cron-auth.guard';
 import { GetUser } from '../auth/decorators/get-user.decorator';
-import { IsCron } from '../auth/decorators/is-cron.decorator';
+import { IsCron, OptionalAuth } from '../auth/decorators/is-cron.decorator';
 
 /**
  * ============================================================================
@@ -109,21 +109,23 @@ export class RecommendationsController {
    * @route GET `/api/music/explore?limit=5`
    * @header Authorization Bearer <google_id_token>
    */
+  @OptionalAuth()
   @Get('explore')
   async getExploreFeed(
-    @GetUser('id') userId: string,
+    @GetUser('id') userId?: string,
     @Query('limit') limit?: string,
   ) {
     const limitPerCategory = limit ? parseInt(limit, 10) : 5;
-    return this.recommendationsService.getExploreFeed(userId, limitPerCategory);
+    return this.recommendationsService.getExploreFeed(userId || '', limitPerCategory);
   }
 
   /**
    * Retrieves 60/40 personalized summary metadata (thumbnail, track count, tagline) for categories.
    * Feeds the Home page horizontal sliding carousel with zero YouTube API quota consumption.
    * @route GET `/api/music/categories/summary`
-   * @header Authorization Bearer <google_id_token>
+   * @header Authorization Bearer <google_id_token> (Optional)
    */
+  @OptionalAuth()
   @Get('categories/summary')
   async getCategorySummaries(@GetUser('id') userId?: string) {
     return this.recommendationsService.getCategorySummaries(userId);
@@ -132,8 +134,9 @@ export class RecommendationsController {
   /**
    * Retrieves the authoritative taxonomy of explore categories with frontend rendering metadata.
    * @route GET `/api/music/categories`
-   * @header Authorization Bearer <google_id_token>
+   * @header Authorization Bearer <google_id_token> (Optional)
    */
+  @OptionalAuth()
   @Get('categories')
   async getCategories() {
     return this.recommendationsService.getCategories();
@@ -142,8 +145,9 @@ export class RecommendationsController {
   /**
    * Retrieves full category metadata and paginated tracks for a dedicated category detail view.
    * @route GET `/api/music/categories/:slug?limit=20&offset=0`
-   * @header Authorization Bearer <google_id_token>
+   * @header Authorization Bearer <google_id_token> (Optional)
    */
+  @OptionalAuth()
   @Get('categories/:slug')
   async getCategoryDetail(
     @Param('slug') slug: string,
