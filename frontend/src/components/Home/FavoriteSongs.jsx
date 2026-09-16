@@ -120,9 +120,9 @@ const FavoriteSongs = ({ userId }) => {
 
       {/* Skeleton Loading State */}
       {loading && (
-        <div className="grid grid-flow-col auto-cols-[minmax(180px,1fr)] sm:auto-cols-[minmax(200px,1fr)] gap-5 overflow-x-auto scrollbar-hide py-2">
+        <div className="grid grid-flow-col auto-cols-[190px] sm:auto-cols-[210px] justify-start gap-5 overflow-x-auto scrollbar-hide py-2">
           {[...Array(5)].map((_, i) => (
-            <div key={i} className="flex flex-col gap-2">
+            <div key={i} className="flex flex-col gap-2 w-[190px] sm:w-[210px] max-w-[220px]">
               <Skeleton className="aspect-square rounded-2xl w-full bg-[var(--color-surface-raised)]" />
               <Skeleton className="h-4 w-3/4 bg-[var(--color-surface-raised)]" />
               <Skeleton className="h-3 w-1/2 bg-[var(--color-surface-raised)]" />
@@ -155,12 +155,12 @@ const FavoriteSongs = ({ userId }) => {
         </div>
       )}
 
-      {/* Favorites Vinyl Record Carousel */}
+      {/* Favorites Vinyl Record Carousel (Subtask J4: Fixed column sizing + justify-start prevents stretching) */}
       {!loading && favoriteSongs.length > 0 && (
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="grid grid-flow-col auto-cols-[minmax(190px,1fr)] sm:auto-cols-[minmax(210px,1fr)] gap-6 overflow-x-auto scrollbar-hide scroll-smooth py-3 px-1 relative z-10"
+          className="grid grid-flow-col auto-cols-[190px] sm:auto-cols-[210px] justify-start gap-6 overflow-x-auto scrollbar-hide scroll-smooth py-3 px-1 relative z-10"
           style={{ scrollSnapType: "x mandatory" }}
         >
           {favoriteSongs.map((song, index) => {
@@ -172,7 +172,7 @@ const FavoriteSongs = ({ userId }) => {
                 key={`${songId}-${index}`}
                 style={{ scrollSnapAlign: "start" }}
                 onClick={() => handlePlayTrack(song)}
-                className="group relative cursor-pointer flex flex-col items-center select-none"
+                className="group relative cursor-pointer flex flex-col items-center select-none w-[190px] sm:w-[210px] max-w-[220px]"
               >
                 {/* Vinyl Record + Sleeve Container */}
                 <div className="relative w-full aspect-square rounded-2xl bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] hover:border-pink-500/50 shadow-md hover:shadow-xl transition-all duration-500 p-2 overflow-visible">

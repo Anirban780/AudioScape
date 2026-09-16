@@ -18,6 +18,8 @@ import HistoryPage from "@/pages/HistoryPage";
 import RecommendationsPage from "@/pages/RecommendationsPage";
 import CategoryPage from "@/pages/CategoryPage";
 import { getBackendURL } from "@/utils/api";
+import useDynamicDocumentTitle from "@/hooks/useDynamicDocumentTitle";
+import { AudioScapeMark } from "@/components/common/AudioScapeLogo";
 
 /**
  * ============================================================================
@@ -35,14 +37,19 @@ import { getBackendURL } from "@/utils/api";
  * 2. Persistent Audio Playback: PlayerContainer and PlaylistModal are mounted at the
  *    root router level (outside individual page route switches) so audio playback
  *    is never interrupted when navigating between pages.
- * 3. Protected Routes: Unauthenticated users attempting to access protected routes
- *    (/home, /recommendations, /favourites, /playlists, /category/:slug, /history) are redirected to LandingPage ("/").
+ * 3. Protected Routes & Auth Gate: `isCheckingAuth` prevents premature redirects to `/`
+ *    before silent token refresh finishes evaluating HttpOnly refresh cookies.
+ * 4. Dynamic Document Title (Workstream J6): Updates browser tab title reactively.
  * ============================================================================
  */
 
 function AppContent() {
   const user = useAuthStore((s) => s.user);
+  const isCheckingAuth = useAuthStore((s) => s.isCheckingAuth);
   const { track } = usePlayerStore();
+
+  // Workstream J6: Reactive document title hook
+  useDynamicDocumentTitle();
 
   useEffect(() => {
     // 1. Early non-blocking background wake-up ping for Render & Neon PostgreSQL
@@ -61,8 +68,8 @@ function AppContent() {
       }
     });
 
-    // 2. Attempt silent auth session refresh on mount using HttpOnly refresh cookie
-    useAuthStore.getState().refreshAuthSession();
+    // 2. Initial silent auth session check on startup
+    useAuthStore.getState().checkAuth();
 
     // 3. Initialize Google Identity Services SDK once on application mount
     const timer = setTimeout(() => {
@@ -74,6 +81,27 @@ function AppContent() {
 
     return () => clearTimeout(timer);
   }, []);
+
+  // Workstream J7: Display sleek branded loader during initial auth verification
+  if (isCheckingAuth) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--color-surface-base)] text-[var(--color-on-surface)] transition-colors select-none">
+        <div className="relative flex flex-col items-center gap-5 animate-in fade-in duration-300">
+          <div className="p-3.5 rounded-2xl bg-[#0A0E1A] border border-[#00F0FF]/40 shadow-[0_0_30px_rgba(0,240,255,0.3)] animate-pulse">
+            <AudioScapeMark size={52} variant="gradient" hasGlow={true} />
+          </div>
+          <div className="flex flex-col items-center gap-1.5">
+            <h2 className="font-display text-2xl font-black tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-[#00F0FF] via-[#8A2BE2] to-[#FF66CC]">
+              AudioScape
+            </h2>
+            <p className="text-xs text-[var(--color-on-surface-variant)] tracking-wider uppercase font-semibold">
+              Restoring Session...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen bg-[var(--color-surface-base)] text-[var(--color-on-surface)]">

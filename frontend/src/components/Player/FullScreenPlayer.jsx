@@ -1,9 +1,9 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import Sidebar from "@/components/Home/Sidebar";
 import ProgressBar from "./ProgressBar";
 import PlayerControls from "./PlayerControls";
 import VolumeBar from "./VolumeBar";
-import { X, ListMusic, Sun, Moon } from "lucide-react";
+import { Minimize2, ListMusic, Sun, Moon, Laptop } from "lucide-react";
 import placeholder from "@/assets/placeholder.jpg";
 import usePlayerStore from "@/store/usePlayerStore";
 import useSidebarStore from "@/store/useSidebarStore";
@@ -31,7 +31,70 @@ import { cn } from "@/lib/utils";
  * 2. Left Vertical Volume Rail: Positioned after sidebar rail and before thumbnail (`lg:flex` >= 1024px).
  * 3. Pure Mute/Unmute Toggle: Speaker button directly toggles Mute/Unmute in `PlayerControls.jsx`.
  * 4. Fixed Mobile Drawer: Rendered inside a `fixed inset-0 z-50` overlay only when `showQueue` is true.
+ * 5. Workstream J1 & J3: Persistent Frosted-Glass Top Action Bar with touch-friendly 44x44px
+ *    targets, Esc keyboard indicator, and reactive theme label synchronization.
+ * 6. Responsive Artwork Headroom & Sliding Marquee Title for long track names.
  */
+
+/**
+ * Responsive 2-Line Sliding Track Title Component:
+ * - Allows up to 2 lines of prominent, beautiful typography (leveraging ample page space).
+ * - If title fits within 2 lines: rendered statically and centered.
+ * - If title exceeds 2 lines: smoothly and slowly slides vertically between lines with pauses
+ *   at top and bottom, masked with soft gradient fades and pausing on hover.
+ */
+const SlidingTrackTitle = ({ title }) => {
+  const containerRef = useRef(null);
+  const textRef = useRef(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+  const [offsetY, setOffsetY] = useState(0);
+
+  useEffect(() => {
+    const checkOverflow = () => {
+      if (containerRef.current && textRef.current) {
+        const containerHeight = containerRef.current.clientHeight;
+        const textHeight = textRef.current.scrollHeight;
+        if (textHeight > containerHeight + 4) {
+          setIsOverflowing(true);
+          setOffsetY(textHeight - containerHeight);
+        } else {
+          setIsOverflowing(false);
+          setOffsetY(0);
+        }
+      }
+    };
+
+    checkOverflow();
+    window.addEventListener("resize", checkOverflow);
+    return () => window.removeEventListener("resize", checkOverflow);
+  }, [title]);
+
+  return (
+    <div
+      ref={containerRef}
+      className={cn(
+        "w-full max-w-xl mx-auto overflow-hidden select-none relative",
+        "max-h-[3.6rem] sm:max-h-[4.4rem] md:max-h-[5.2rem]",
+        isOverflowing ? "mask-marquee-y" : ""
+      )}
+      style={{ "--slide-offset": `-${offsetY}px` }}
+      title={title}
+    >
+      <div
+        ref={textRef}
+        className={cn(
+          "text-center px-2",
+          isOverflowing ? "animate-title-slide hover:[animation-play-state:paused]" : ""
+        )}
+      >
+        <h2 className="text-lg sm:text-2xl md:text-3xl font-extrabold font-display tracking-tight text-[var(--color-on-surface)] leading-snug break-words">
+          {title}
+        </h2>
+      </div>
+    </div>
+  );
+};
+
 const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
   const {
     isPlaying,
@@ -52,11 +115,12 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
     setCurrentIndex,
     setTrack,
     isFullScreen,
+    setIsFullScreen,
     toggleFullScreen,
   } = usePlayerStore();
 
-  const { theme, setTheme } = useTheme();
   const { isSidebarCollapsed, toggleSidebarCollapsed } = useSidebarStore();
+  const { themePreference, resolvedTheme, currentLabel, cycleTheme } = useTheme();
 
   const progressRef = useRef(null);
   const volumeRef = useRef(null);
@@ -121,33 +185,39 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
           />
         </div>
 
-        {/* TOP-LEFT HEADER ACTIONS (Exit Button & Consistent Light/Dark Theme Switcher) */}
+        {/* Top-Left Action Row: Minimize Button + Theme Switcher */}
         <div className="absolute top-3 left-3 sm:top-5 sm:left-6 z-30 flex items-center gap-2 sm:gap-3">
+          {/* Top-Left Minimize / Close Button */}
           <button
             onClick={handleFullScreenToggle}
-            className="p-2.5 sm:p-3 bg-[var(--color-surface-overlay)] border border-[var(--color-border-strong)] hover:border-red-500/40 hover:bg-red-500/15 text-[var(--color-on-surface)] hover:text-red-400 rounded-full transition-all duration-200 shadow-md hover:scale-105 active:scale-95 flex items-center justify-center shrink-0 cursor-pointer"
-            title="Exit Fullscreen (Esc)"
-            aria-label="Exit Fullscreen"
+            className="p-2.5 sm:p-3 bg-[var(--color-surface-overlay)] border border-[var(--color-border-strong)] hover:bg-[var(--color-state-hover)] text-[var(--color-on-surface)] rounded-full transition-colors shadow-lg cursor-pointer"
+            title="Minimize Player"
+            aria-label="Minimize Player"
           >
-            <X size={18} />
+            <Minimize2 size={18} />
           </button>
 
-          {/* Consistent Light/Dark Theme Toggle Button */}
+          {/* Consistent Light/Dark/System Theme Toggle Button */}
           <button
-            onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+            onClick={cycleTheme}
             className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-full bg-[var(--color-surface-overlay)]/80 border border-[var(--color-border-strong)] backdrop-blur-md text-xs sm:text-sm font-bold text-[var(--color-on-surface)] flex items-center gap-2 hover:bg-[var(--color-state-hover)] hover:border-[var(--color-primary)]/40 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-md"
-            aria-label="Toggle theme"
-            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            aria-label={`Current theme: ${currentLabel}. Click to cycle.`}
+            title={`Theme: ${currentLabel} (Click to cycle)`}
           >
-            {theme === "dark" ? (
+            {themePreference === "system" ? (
               <>
-                <Sun size={16} className="text-yellow-400" />
-                <span className="hidden sm:inline">Light Mode</span>
+                <Laptop size={16} className="text-cyan-400" />
+                <span className="hidden sm:inline">System</span>
+              </>
+            ) : resolvedTheme === "dark" ? (
+              <>
+                <Moon size={16} className="text-indigo-400" />
+                <span className="hidden sm:inline">Dark</span>
               </>
             ) : (
               <>
-                <Moon size={16} className="text-indigo-600" />
-                <span className="hidden sm:inline">Dark Mode</span>
+                <Sun size={16} className="text-yellow-500" />
+                <span className="hidden sm:inline">Light</span>
               </>
             )}
           </button>
@@ -214,11 +284,9 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose }) => {
               )}
             </div>
 
-            {/* Track Metadata Titles */}
-            <div className="text-center w-full px-2 shrink-0">
-              <h2 className="text-xl sm:text-3xl md:text-4xl font-extrabold font-display tracking-tight text-[var(--color-on-surface)] leading-tight max-w-xl mx-auto" title={cleanTitle}>
-                {cleanTitle}
-              </h2>
+            {/* Track Metadata Titles with 2-Line Slow Sliding Effect for Long Titles */}
+            <div className="text-center w-full px-2 shrink-0 overflow-hidden">
+              <SlidingTrackTitle title={cleanTitle} />
               <p className="text-sm sm:text-lg text-[var(--color-on-surface-variant)] font-body font-medium mt-1.5" title={cleanArtist}>
                 {cleanArtist}
               </p>

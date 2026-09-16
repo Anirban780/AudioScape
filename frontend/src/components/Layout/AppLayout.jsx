@@ -3,7 +3,7 @@ import Sidebar from "@/components/Home/Sidebar";
 import SearchBar from "@/components/Home/SearchBar";
 import UserMenu from "@/components/Auth/UserMenu";
 import { useTheme } from "@/ThemeProvider";
-import { Sun, Moon, Menu } from "lucide-react";
+import { Sun, Moon, Laptop, Menu } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
 import useSidebarStore from "@/store/useSidebarStore";
 import Footer from "@/components/Home/Footer";
@@ -32,7 +32,7 @@ import { cn } from "@/lib/utils";
  */
 
 const AppLayout = ({ children }) => {
-  const { theme, setTheme } = useTheme();
+  const { themePreference, resolvedTheme, currentLabel, cycleTheme } = useTheme();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { isSidebarCollapsed, toggleSidebarCollapsed } = useSidebarStore();
   const { setTrack } = usePlayerStore();
@@ -58,35 +58,30 @@ const AppLayout = ({ children }) => {
         <div className="fixed inset-0 z-50 flex md:hidden">
           {/* Backdrop overlay */}
           <div
-            className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
             onClick={() => setIsSidebarOpen(false)}
           />
-          {/* Sliding drawer panel */}
-          <div className="w-64 h-full relative z-50 bg-[var(--color-surface-raised)] shadow-2xl border-r border-[var(--color-border-default)]">
-            <Sidebar
-              isCollapsed={false}
-              isMobile={true}
-              onToggleCollapse={() => setIsSidebarOpen(false)}
-            />
-          </div>
+          {/* Slide-out Drawer */}
+          <aside className="relative w-64 max-w-[80vw] h-full bg-[var(--color-surface-raised)] shadow-2xl z-10 flex flex-col animate-in slide-in-from-left duration-300">
+            <Sidebar isMobile={true} onToggle={() => setIsSidebarOpen(false)} />
+          </aside>
         </div>
       )}
 
-      {/* 3. Main Viewport Container (Smooth Cubic-Bezier Reflow Pacing) */}
-      <div className="flex flex-col flex-1 min-w-0 overflow-y-auto sidebar-transition">
+      {/* 3. Main Stage Content Viewport (Scrollable with Sticky Header) */}
+      <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto sidebar-transition">
         
-        {/* Sticky Top Navigation Header Bar with Rich Padding */}
-        <header className="sticky top-0 z-30 py-4 px-6 md:px-10 bg-[var(--color-surface-raised)]/85 backdrop-blur-md border-b border-[var(--color-border-default)] sidebar-transition">
-          <div className="flex items-center gap-4 w-full max-w-[1400px] mx-auto">
+        {/* Top Navigation & App Bar */}
+        <header className="sticky top-0 h-16 flex-shrink-0 flex items-center justify-between px-4 sm:px-6 border-b border-[var(--color-border-default)] bg-[var(--color-surface-base)]/85 backdrop-blur-md z-30 transition-colors">
+          <div className="flex items-center gap-3 w-full">
             
-            {/* Mobile Hamburger Drawer Button */}
+            {/* Mobile Hamburger Drawer Trigger */}
             <button
               onClick={() => setIsSidebarOpen(true)}
-              className="md:hidden p-2 rounded-xl bg-[var(--color-surface-base)] hover:bg-[var(--color-state-hover)] border border-[var(--color-border-default)] transition-colors text-[var(--color-on-surface)]"
-              aria-label="Open navigation menu"
-              title="Open menu"
+              className="p-2 rounded-xl text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)] hover:bg-[var(--color-state-hover)] md:hidden transition-colors cursor-pointer"
+              aria-label="Open sidebar drawer"
             >
-              <Menu size={20} />
+              <Menu size={22} />
             </button>
 
             {/* Central Search Bar Container */}
@@ -97,15 +92,17 @@ const AppLayout = ({ children }) => {
             {/* Right Header Actions: Theme Toggle & User Menu */}
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                onClick={cycleTheme}
                 className="p-2.5 rounded-full bg-[var(--color-surface-base)] hover:bg-[var(--color-state-hover)] border border-[var(--color-border-default)] transition-all cursor-pointer text-[var(--color-on-surface)] shadow-xs"
-                aria-label="Toggle theme"
-                title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+                aria-label={`Current theme: ${currentLabel}. Click to cycle.`}
+                title={`Theme: ${currentLabel} (Click to cycle)`}
               >
-                {theme === "dark" ? (
-                  <Sun size={18} className="text-yellow-400" />
+                {themePreference === "system" ? (
+                  <Laptop size={18} className="text-cyan-400" />
+                ) : resolvedTheme === "dark" ? (
+                  <Moon size={18} className="text-indigo-400" />
                 ) : (
-                  <Moon size={18} className="text-indigo-600" />
+                  <Sun size={18} className="text-yellow-500" />
                 )}
               </button>
 
