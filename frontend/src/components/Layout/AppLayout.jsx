@@ -72,25 +72,27 @@ const AppLayout = ({ children }) => {
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto sidebar-transition">
         
         {/* Top Navigation & App Bar */}
-        <header className="sticky top-0 h-16 flex-shrink-0 flex items-center justify-between px-4 sm:px-6 border-b border-[var(--color-border-default)] bg-[var(--color-surface-base)]/85 backdrop-blur-md z-30 transition-colors">
-          <div className="flex items-center gap-3 w-full">
+        <header className="sticky top-0 h-16 sm:h-20 flex-shrink-0 border-b border-[var(--color-border-default)] bg-[var(--color-surface-base)]/85 backdrop-blur-md z-30 transition-colors flex items-center">
+          <div className="w-full max-w-[1400px] mx-auto px-6 sm:px-10 md:px-14 lg:px-16 flex items-center justify-between gap-4">
             
-            {/* Mobile Hamburger Drawer Trigger */}
-            <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="p-2 rounded-xl text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)] hover:bg-[var(--color-state-hover)] md:hidden transition-colors cursor-pointer"
-              aria-label="Open sidebar drawer"
-            >
-              <Menu size={22} />
-            </button>
+            {/* Left Area: Mobile Hamburger Drawer Trigger (and desktop balance placeholder) */}
+            <div className="flex items-center md:min-w-[96px] shrink-0">
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-2 rounded-xl text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)] hover:bg-[var(--color-state-hover)] md:hidden transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/40"
+                aria-label="Open sidebar drawer"
+              >
+                <Menu size={22} />
+              </button>
+            </div>
 
-            {/* Central Search Bar Container */}
-            <div className="flex-1 max-w-xl mx-auto">
+            {/* Central Search Bar Container: Centered */}
+            <div className="flex-1 max-w-xl mx-auto px-2">
               <SearchBar onSelectTrack={setTrack} />
             </div>
 
             {/* Right Header Actions: Theme Toggle & User Menu */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center justify-end gap-3 md:min-w-[96px] shrink-0">
               <button
                 onClick={cycleTheme}
                 className="p-2.5 rounded-full bg-[var(--color-surface-base)] hover:bg-[var(--color-state-hover)] border border-[var(--color-border-default)] transition-all cursor-pointer text-[var(--color-on-surface)] shadow-xs"

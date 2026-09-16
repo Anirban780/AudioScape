@@ -75,8 +75,9 @@ export class TracksController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const dbOnly = dto.dbOnly === 'true' || dto.dbOnly === '1';
+    const forceYouTube = dto.forceYouTube === 'true' || dto.forceYouTube === '1';
     const clientId = this.extractClientId(req);
-    return this.tracksService.searchTracks(dto.query, dto.pageToken, dbOnly, clientId, res);
+    return this.tracksService.searchTracks(dto.query, dto.pageToken, dbOnly, clientId, res, forceYouTube);
   }
 
   /**
@@ -117,5 +118,42 @@ export class TracksController {
   async refreshStaleTracks(@Query('limit') limit?: string) {
     const batchLimit = limit ? parseInt(limit, 10) : 50;
     return this.tracksService.batchRefreshStaleTracks(batchLimit);
+  }
+
+  /**
+   * Background maintenance endpoint executing Search Cache Garbage Collection.
+   * Purges expired search queries past grace period and sweeps unreferenced orphan tracks.
+   * Executed by platform schedulers (GitHub Actions, Vercel Cron) with CRON_SECRET.
+   *
+   * @route POST `/youtube/cron/gc-search-cache`
+   * @route GET `/youtube/cron/gc-search-cache`
+   * @header Authorization: Bearer <CRON_SECRET>
+   */
+  @IsCron()
+  @UseGuards(CronAuthGuard)
+  @Post('cron/gc-search-cache')
+  async gcSearchCachePost(
+    @Query('graceDays') graceDays?: string,
+    @Query('orphanDays') orphanDays?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedGrace = graceDays ? parseInt(graceDays, 10) : 3;
+    const parsedOrphan = orphanDays ? parseInt(orphanDays, 10) : 30;
+    const parsedLimit = limit ? parseInt(limit, 10) : 1000;
+    return this.tracksService.gcSearchCache(parsedGrace, parsedOrphan, parsedLimit);
+  }
+
+  @IsCron()
+  @UseGuards(CronAuthGuard)
+  @Get('cron/gc-search-cache')
+  async gcSearchCacheGet(
+    @Query('graceDays') graceDays?: string,
+    @Query('orphanDays') orphanDays?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const parsedGrace = graceDays ? parseInt(graceDays, 10) : 3;
+    const parsedOrphan = orphanDays ? parseInt(orphanDays, 10) : 30;
+    const parsedLimit = limit ? parseInt(limit, 10) : 1000;
+    return this.tracksService.gcSearchCache(parsedGrace, parsedOrphan, parsedLimit);
   }
 }

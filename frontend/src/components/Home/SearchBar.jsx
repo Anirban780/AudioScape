@@ -1,4 +1,4 @@
-import { Search, X, Clock, Trash2, Database, Globe } from "lucide-react";
+import { Search, X, Clock, Trash2, Database, Globe, Music, Loader2 } from "lucide-react";
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import axios from "axios";
@@ -10,6 +10,7 @@ import { notify } from "@/utils/notify";
 
 /**
  * Normalizes a search query string (lowercase, trim, collapse whitespace, strip punctuation)
+ * using Unicode property regex to support non-Latin scripts (CJK, Cyrillic, accented Latin, etc.)
  * matching backend normalization rules to prevent redundant API calls.
  */
 const normalizeQuery = (raw) => {
@@ -18,7 +19,7 @@ const normalizeQuery = (raw) => {
     .toLowerCase()
     .trim()
     .replace(/\s+/g, " ")
-    .replace(/[^\w\s]/g, "");
+    .replace(/[^\p{L}\p{N}\s]/gu, "");
 };
 
 /**
@@ -62,6 +63,7 @@ const SearchBar = ({ onSelectTrack }) => {
   const inputRef = useRef(null);
   const abortControllerRef = useRef(null);
   const inFlightRef = useRef(false);
+  const requestSeqRef = useRef(0);
   const searchCacheRef = useRef(new Map());
   const lastSearchedNormRef = useRef("");
 
@@ -140,18 +142,27 @@ const SearchBar = ({ onSelectTrack }) => {
       return;
     }
 
-    // 1. Skip duplicate fetch if normalized query matches active results (unless forced full search)
+    // 1. Skip duplicate fetch if normalized query matches active results (unless forced full search or paging)
     if (!nextPage && !forceFullSearch && normalized === lastSearchedNormRef.current && results.length > 0) {
       return;
     }
 
     // 2. Client-side memory cache lookup (5-minute TTL)
-    const modeKey = forceFullSearch ? "full" : "db";
-    const cacheKey = `${normalized}_${modeKey}_${nextPage || "page0"}`;
-    const cachedEntry = searchCacheRef.current.get(cacheKey);
+    // Only use client memory cache for automatic debounced typing or pagination.
+    // When the user explicitly presses Enter or clicks Search (forceFullSearch=true and !nextPage),
+    // always execute full live search so pressing Enter reliably fetches fresh YouTube results.
+    const fullKey = `${normalized}_full_${nextPage || "page0"}`;
+    const dbKey = `${normalized}_db_${nextPage || "page0"}`;
+    const cacheKey = forceFullSearch ? fullKey : dbKey;
     const CACHE_TTL_MS = 5 * 60 * 1000;
 
-    if (cachedEntry && Date.now() - cachedEntry.timestamp < CACHE_TTL_MS) {
+    // During typing (!forceFullSearch), prefer full YouTube search results if already cached in memory
+    const cachedEntry = !forceFullSearch && searchCacheRef.current.has(fullKey)
+      ? searchCacheRef.current.get(fullKey)
+      : searchCacheRef.current.get(cacheKey);
+
+    const isCacheEligible = !forceFullSearch || Boolean(nextPage);
+    if (isCacheEligible && cachedEntry && Date.now() - cachedEntry.timestamp < CACHE_TTL_MS) {
       lastSearchedNormRef.current = normalized;
       setResults((prev) => {
         const existingIds = new Set(nextPage ? prev.map((t) => t.videoId) : []);
@@ -171,17 +182,22 @@ const SearchBar = ({ onSelectTrack }) => {
       abortControllerRef.current.abort();
     }
 
-    // Create a new AbortController signal for fresh searches
+    // Monotonic request sequence ID to safely drop out-of-order responses
+    const currentSeq = ++requestSeqRef.current;
+
+    // Reset abort controller for fresh search; clear inFlightRef immediately so previous abort doesn't block this request
     if (!nextPage) {
       abortControllerRef.current = new AbortController();
+      inFlightRef.current = false;
+    } else if (inFlightRef.current) {
+      return;
     }
 
-    if (inFlightRef.current) return;
     inFlightRef.current = true;
     setLoading(true);
 
     if (forceFullSearch) {
-      toast("Searching YouTube API for live tracks...", { icon: "🚀", id: "search-toast" });
+      notify.info("Searching YouTube API for live tracks...", { id: "search-toast" });
     }
 
     try {
@@ -189,24 +205,35 @@ const SearchBar = ({ onSelectTrack }) => {
       const signal = abortControllerRef.current ? abortControllerRef.current.signal : undefined;
       const isDbOnly = !forceFullSearch;
       const url = `${BASE_URL}/youtube/search?query=${encodeURIComponent(rawTrimmed)}&dbOnly=${isDbOnly}${
-        nextPage ? `&pageToken=${nextPage}` : ""
-      }`;
+        forceFullSearch ? "&forceYouTube=true" : ""
+      }${nextPage ? `&pageToken=${nextPage}` : ""}`;
 
       const token = useAuthStore.getState().idToken;
       const headers = token ? { Authorization: `Bearer ${token}` } : {};
       const response = await axios.get(url, { signal, headers });
+
+      // Discard response if a newer query has superseded this one
+      if (currentSeq !== requestSeqRef.current) return;
+
       const rawTracks = response.data.tracks || [];
       const msg = response.data.message || (isDbOnly ? "Showing database matches" : "Fetched live results from YouTube API");
       const src = response.data.source || (isDbOnly ? "postgres_fts" : "youtube_api");
 
       // Save to client-side memory cache
-      searchCacheRef.current.set(cacheKey, {
+      const cachePayload = {
         tracks: rawTracks,
         nextPageToken: response.data.nextPageToken || null,
         message: msg,
         source: src,
         timestamp: Date.now(),
-      });
+      };
+      searchCacheRef.current.set(cacheKey, cachePayload);
+
+      // When a full search succeeds on page 0, also overwrite the db typeahead cache
+      // so subsequent typing for this query immediately renders the 50 full results
+      if (forceFullSearch && !nextPage) {
+        searchCacheRef.current.set(`${normalized}_db_page0`, cachePayload);
+      }
 
       lastSearchedNormRef.current = normalized;
       setSearchStatusMsg(msg);
@@ -225,6 +252,8 @@ const SearchBar = ({ onSelectTrack }) => {
         // Request intentionally aborted by user typing — ignore silently
         return;
       }
+      if (currentSeq !== requestSeqRef.current) return;
+
       if (error.response?.status === 429) {
         const errorMsg = error.response.data?.message || "Search rate limit reached (max 3/min, 20/day). Cached tracks remain available.";
         notify.rateLimit(60, errorMsg);
@@ -234,8 +263,10 @@ const SearchBar = ({ onSelectTrack }) => {
       console.error("Error fetching search results:", error);
       notify.error("Search is currently unavailable. Please try again");
     } finally {
-      inFlightRef.current = false;
-      setLoading(false);
+      if (currentSeq === requestSeqRef.current) {
+        inFlightRef.current = false;
+        setLoading(false);
+      }
     }
   };
 
@@ -312,14 +343,16 @@ const SearchBar = ({ onSelectTrack }) => {
     notify.success("Track selected successfully");
 
     // 2. Fetch full metadata (duration, tags) asynchronously in background without blocking UI
-    Promise.resolve(getBackendURL?.()).then((BASE_URL) => {
-      if (!BASE_URL) return;
-      axios.get(`${BASE_URL}/youtube/track/${track.videoId}`, { timeout: 5000 }).catch((err) => {
-        console.warn("Background track detail fetch failed:", err.message);
+    getBackendURL?.()
+      .then((BASE_URL) => {
+        if (!BASE_URL) return;
+        axios.get(`${BASE_URL}/youtube/track/${track.videoId}`, { timeout: 5000 }).catch((err) => {
+          console.warn("Background track detail fetch failed:", err.message);
+        });
+      })
+      .catch((err) => {
+        console.warn("Background track detail fetch failed:", err?.message);
       });
-    }).catch((err) => {
-      console.warn("Background track detail fetch failed:", err?.message);
-    });
   };
 
   /**
@@ -351,8 +384,18 @@ const SearchBar = ({ onSelectTrack }) => {
     }
   };
 
+  // Auto-scroll highlighted keyboard selection into view
+  useEffect(() => {
+    if (selectedIndex >= 0 && dropdownRef.current) {
+      const selectedEl = dropdownRef.current.querySelector(`[data-result-index="${selectedIndex}"]`);
+      if (selectedEl && typeof selectedEl.scrollIntoView === "function") {
+        selectedEl.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      }
+    }
+  }, [selectedIndex]);
+
   return (
-    <div className="relative w-full max-w-lg mx-auto">
+    <div className="relative w-full max-w-xl mx-auto">
       {/* Search Input Bar with Stitch Token Styling */}
       <div className="flex items-center rounded-xl p-2 bg-[var(--color-surface-base)] border border-[var(--color-border-default)] focus-within:border-[var(--color-primary)] transition-all shadow-inner">
         <Search
@@ -369,6 +412,11 @@ const SearchBar = ({ onSelectTrack }) => {
           ref={inputRef}
           id="search-input"
           type="text"
+          role="combobox"
+          aria-expanded={isFocused && (results.length > 0 || recentSearches.length > 0)}
+          aria-controls="search-dropdown-panel"
+          aria-autocomplete="list"
+          aria-activedescendant={selectedIndex >= 0 ? `search-item-${selectedIndex}` : undefined}
           placeholder="Search songs, artists (Press Enter for YouTube API)..."
           value={query}
           onChange={handleInputChange}
@@ -405,7 +453,15 @@ const SearchBar = ({ onSelectTrack }) => {
       {isFocused && (
         <div
           ref={dropdownRef}
-          className="absolute left-0 right-0 w-full mt-2 p-2 rounded-2xl shadow-2xl max-h-80 overflow-y-auto z-50 bg-[var(--color-surface-overlay)] border border-[var(--color-border-strong)] transition-all"
+          id="search-dropdown-panel"
+          role="listbox"
+          tabIndex={-1}
+          onMouseDown={(e) => {
+            if (e.target.tagName !== "INPUT") {
+              e.preventDefault();
+            }
+          }}
+          className="absolute left-0 right-0 w-full mt-2 p-2 rounded-2xl shadow-2xl max-h-[min(32rem,calc(100vh-130px))] overflow-y-auto overscroll-contain scrollbar-custom z-50 bg-[var(--color-surface-overlay)] border border-[var(--color-border-strong)] transition-all pr-1.5"
         >
           {/* Enhanced Recent Searches Section */}
           {(!query.trim() || (results.length === 0 && !loading)) && recentSearches.length > 0 && (
@@ -450,27 +506,40 @@ const SearchBar = ({ onSelectTrack }) => {
           {/* Interactive Search Mode / Telemetry Banner */}
           {query.trim() && searchStatusMsg && (
             <div
-              className={`px-3 py-1.5 mb-2 rounded-xl text-xs flex items-center justify-between font-medium border ${
+              className={`px-3 py-1.5 mb-2 rounded-xl text-xs flex items-center justify-between gap-2 font-medium border transition-colors ${
                 searchSource === "youtube_api"
                   ? "bg-purple-900/30 text-purple-200 border-purple-700/40"
                   : "bg-[var(--color-surface-raised)] text-[var(--color-on-surface)] border-[var(--color-border-default)]"
               }`}
             >
-              <span className="flex items-center gap-1.5 truncate">
+              <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate" title={searchStatusMsg}>
                 {searchSource === "youtube_api" ? (
                   <Globe size={13} className="text-purple-400 flex-shrink-0" />
                 ) : (
                   <Database size={13} className="text-[var(--color-primary)] flex-shrink-0" />
                 )}
-                {searchStatusMsg}
-              </span>
+                <span className="truncate font-medium">
+                  {searchSource === "youtube_api"
+                    ? searchStatusMsg
+                    : searchStatusMsg.replace(/\.?\s*Press Enter for full YouTube search\.?/i, "").trim() || "Local database matches"}
+                </span>
+                {results.length > 0 && (
+                  <span className="text-[10px] text-[var(--color-on-surface-variant)] flex-shrink-0 font-normal">
+                    ({results.length})
+                  </span>
+                )}
+              </div>
               {searchSource !== "youtube_api" && (
                 <button
                   type="button"
                   onMouseDown={() => fetchSearchResults(query, "", true)}
-                  className="text-[10px] text-[var(--color-primary)] hover:text-[var(--color-on-surface)] font-semibold underline cursor-pointer ml-2 flex-shrink-0"
+                  className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[var(--color-surface-base)] hover:bg-[var(--color-surface-overlay)] text-[var(--color-primary)] hover:text-[var(--color-on-surface)] border border-[var(--color-border-default)] shadow-xs transition-colors cursor-pointer flex-shrink-0"
+                  title="Press Enter for full YouTube search"
                 >
-                  Press Enter ↵
+                  <span className="text-[10px] text-[var(--color-on-surface-variant)]">Press</span>
+                  <kbd className="px-1 py-0.2 bg-[var(--color-surface-raised)] border border-[var(--color-border-strong)] rounded text-[10px] font-mono font-semibold text-[var(--color-on-surface)]">
+                    Enter ↵
+                  </kbd>
                 </button>
               )}
             </div>
@@ -483,9 +552,13 @@ const SearchBar = ({ onSelectTrack }) => {
               return (
                 <div
                   key={`${track.videoId}-${index}`}
-                  className={`flex items-center p-2.5 cursor-pointer rounded-xl transition-colors ${
+                  id={`search-item-${index}`}
+                  role="option"
+                  aria-selected={isSelected}
+                  data-result-index={index}
+                  className={`group flex items-center p-2 cursor-pointer rounded-xl transition-all duration-150 ${
                     isSelected
-                      ? "bg-[var(--color-surface-raised)] text-[var(--color-on-surface)] font-medium border-l-4 border-[var(--color-primary)]"
+                      ? "bg-[var(--color-primary)]/10 text-[var(--color-on-surface)] font-medium ring-1 ring-[var(--color-primary)]/40 shadow-xs"
                       : "hover:bg-[var(--color-state-hover)] text-[var(--color-on-surface)]"
                   }`}
                   onMouseDown={() => handleTrackSelect(track)}
@@ -495,20 +568,46 @@ const SearchBar = ({ onSelectTrack }) => {
                     alt="Thumbnail"
                     onLoad={handleThumbnailLoad}
                     onError={(e) => handleThumbnailError(e, track.videoId || track.id)}
-                    className="w-11 h-11 rounded-lg object-cover mr-3 flex-shrink-0 shadow-sm"
+                    className="w-12 h-12 rounded-xl object-cover mr-3 flex-shrink-0 shadow-sm"
                   />
                   <div className="flex flex-col min-w-0 flex-1">
-                    <p className="font-semibold text-sm line-clamp-1 text-[var(--color-on-surface)]">{track.title}</p>
-                    <p className="text-xs text-[var(--color-on-surface-variant)] line-clamp-1 mt-0.5">{track.channelTitle}</p>
+                    <p
+                      className="font-semibold text-sm line-clamp-1 text-[var(--color-on-surface)] group-hover:text-[var(--color-primary)] transition-colors"
+                      title={track.title}
+                    >
+                      {track.title}
+                    </p>
+                    <p
+                      className="text-xs text-[var(--color-on-surface-variant)] line-clamp-1 mt-0.5 flex items-center gap-1.5"
+                      title={track.channelTitle}
+                    >
+                      <Music size={11} className="text-[var(--color-primary)]/70 flex-shrink-0" />
+                      <span className="truncate">{track.channelTitle}</span>
+                    </p>
                   </div>
                 </div>
               );
             })}
 
+          {/* Explicit Load More Results Button (Deterministic Pagination) */}
+          {pageToken && !loading && (
+            <div className="py-2 text-center">
+              <button
+                type="button"
+                onMouseDown={() => fetchSearchResults(query, pageToken, searchSource === "youtube_api")}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[var(--color-surface-raised)] hover:bg-[var(--color-surface-base)] text-[var(--color-primary)] border border-[var(--color-border-default)] hover:border-[var(--color-primary)] transition-all cursor-pointer shadow-xs"
+              >
+                Load more results ↓
+              </button>
+            </div>
+          )}
+
           {/* Empty State with Action Button */}
           {query.trim() && !loading && results.length === 0 && (
             <div className="p-4 text-center">
-              <p className="text-sm text-[var(--color-on-surface-variant)] mb-2">No local database tracks found for "{query}"</p>
+              <p className="text-sm text-[var(--color-on-surface-variant)] mb-2.5">
+                No local database tracks found for "{query}"
+              </p>
               <button
                 type="button"
                 onMouseDown={() => fetchSearchResults(query, "", true)}
@@ -520,7 +619,12 @@ const SearchBar = ({ onSelectTrack }) => {
           )}
 
           {/* Loading Indicator */}
-          {loading && <p className="p-3 text-center text-xs font-medium text-[var(--color-on-surface-variant)]">Loading search results...</p>}
+          {loading && (
+            <div className="flex items-center justify-center gap-2 p-3 text-xs font-medium text-[var(--color-on-surface-variant)]">
+              <Loader2 size={14} className="animate-spin text-[var(--color-primary)]" />
+              <span>Loading search results...</span>
+            </div>
+          )}
 
           {/* Intersection Observer Tail Boundary */}
           <div ref={observer} className="h-4"></div>

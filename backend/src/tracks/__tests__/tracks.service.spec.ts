@@ -28,21 +28,33 @@ describe('TracksService QA Unit Test Suite', () => {
       findUnique: jest.fn(),
       update: jest.fn(),
       upsert: jest.fn(),
+      deleteMany: jest.fn(),
     },
     searchQueryPage: {
       upsert: jest.fn(),
     },
     searchQueryPageResult: {
       upsert: jest.fn(),
+      create: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    queryTrackResult: {
+      upsert: jest.fn(),
+      create: jest.fn(),
+      deleteMany: jest.fn(),
     },
     tracks: {
       findUnique: jest.fn(),
       upsert: jest.fn(),
+      count: jest.fn(),
+      updateMany: jest.fn(),
     },
     channel: {
       upsert: jest.fn(),
     },
     $queryRaw: jest.fn(),
+    $executeRaw: jest.fn(),
+    $transaction: jest.fn().mockImplementation((cb) => cb(mockPrismaService)),
   };
 
   const mockYouTubeKeyManager = {
@@ -74,12 +86,19 @@ describe('TracksService QA Unit Test Suite', () => {
     // Pre-cache Music Category ID to prevent extra videoCategories HTTP calls during unit tests
     service['cachedMusicCategoryId'] = '10';
 
-    // Set default Prisma mock return values for background upsert operations
+    // Set default Prisma mock return values for background operations
     mockPrismaService.searchQuery.upsert.mockResolvedValue({ id: 'sq_mock' });
+    mockPrismaService.searchQuery.deleteMany.mockResolvedValue({ count: 5 });
     mockPrismaService.searchQueryPage.upsert.mockResolvedValue({ id: 'page_mock' });
     mockPrismaService.searchQueryPageResult.upsert.mockResolvedValue({ id: 'res_mock' });
+    mockPrismaService.searchQueryPageResult.create.mockResolvedValue({ id: 'res_mock' });
+    mockPrismaService.searchQueryPageResult.deleteMany.mockResolvedValue({ count: 50 });
+    mockPrismaService.queryTrackResult.create.mockResolvedValue({ id: 'qtr_mock' });
+    mockPrismaService.queryTrackResult.deleteMany.mockResolvedValue({ count: 50 });
     mockPrismaService.tracks.upsert.mockResolvedValue({ youtubeVideoId: 'track_mock' });
     mockPrismaService.channel.upsert.mockResolvedValue({ id: 'ch_mock' });
+    mockPrismaService.$executeRaw.mockResolvedValue(10);
+    mockPrismaService.$transaction.mockImplementation((cb) => cb(mockPrismaService));
   });
 
   /**
@@ -323,6 +342,88 @@ describe('TracksService QA Unit Test Suite', () => {
       expect(result.likeCount).toBe('3500000');
       expect(result.isEmbeddable).toBe(true);
       expect(result.licensedContent).toBe(true);
+    });
+  });
+
+  /**
+   * TC-BE-10: Ghost Track Prevention (Transactional Delete-Then-Insert)
+   * Verifies that cache storage uses $transaction and purges old page results before inserting fresh ones.
+   */
+  describe('Search Cache Transactional Synchronization', () => {
+    test('TC-BE-10: Should atomically purge existing page results and query rank slices in a transaction', async () => {
+      const mockTracks = [
+        {
+          videoId: 'fresh_vid_1',
+          title: 'Fresh Song 1',
+          thumbNail: 'http://example.com/thumb1.jpg',
+          channelTitle: 'Artist 1',
+          channelId: 'ch_1',
+        },
+      ];
+
+      await service['cacheSearchResultsInPostgres'](
+        'fresh query',
+        'fresh query',
+        mockTracks,
+        null,
+        null,
+        undefined,
+        0,
+      );
+
+      // Verify transaction was called
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
+
+      // Verify deleteMany was called to prevent ghost tracks
+      expect(mockPrismaService.searchQueryPageResult.deleteMany).toHaveBeenCalledWith({
+        where: { pageId: 'page_mock' },
+      });
+      expect(mockPrismaService.queryTrackResult.deleteMany).toHaveBeenCalledWith({
+        where: {
+          queryId: 'sq_mock',
+          rankPosition: { gte: 1, lte: 1 },
+        },
+      });
+
+      // Verify fresh records were created
+      expect(mockPrismaService.searchQueryPageResult.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            trackId: 'fresh_vid_1',
+            rankPosition: 1,
+          }),
+        }),
+      );
+      expect(mockPrismaService.queryTrackResult.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            trackId: 'fresh_vid_1',
+            rankPosition: 1,
+          }),
+        }),
+      );
+    });
+  });
+
+  /**
+   * TC-BE-11: Search Cache Garbage Collection
+   * Verifies that gcSearchCache purges expired search queries and stale orphan tracks.
+   */
+  describe('Search Cache Garbage Collection', () => {
+    test('TC-BE-11: Should purge expired search queries and sweep orphan tracks', async () => {
+      mockPrismaService.searchQuery.deleteMany.mockResolvedValueOnce({ count: 12 });
+      mockPrismaService.$executeRaw.mockResolvedValueOnce(35);
+
+      const result = await service.gcSearchCache(3, 30, 1000);
+
+      expect(result.deletedQueries).toBe(12);
+      expect(result.deletedOrphanTracks).toBe(35);
+      expect(mockPrismaService.searchQuery.deleteMany).toHaveBeenCalledWith({
+        where: {
+          expiresAt: { lt: expect.any(Date) },
+        },
+      });
+      expect(mockPrismaService.$executeRaw).toHaveBeenCalled();
     });
   });
 });

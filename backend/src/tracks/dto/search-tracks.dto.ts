@@ -40,4 +40,13 @@ export class SearchTracksDto {
   @IsString({ message: 'dbOnly must be a valid string' })
   @IsOptional()
   dbOnly?: string;
+
+  /**
+   * Optional flag to explicitly bypass local FTS matches and query YouTube Data API directly.
+   * Used when user presses Enter or clicks "Search YouTube API".
+   * @example "true"
+   */
+  @IsString({ message: 'forceYouTube must be a valid string' })
+  @IsOptional()
+  forceYouTube?: string;
 }
