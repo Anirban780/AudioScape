@@ -6,7 +6,7 @@ import { TrackItemDto } from './dto/cache-related-tracks.dto';
 import { CURATED_GENRES, CURATED_CATEGORIES, SHOWCASE_CATEGORIES, getCategoryMetadata } from './curated-genres';
 import { QueryType } from '@prisma/client';
 import { calculateTasteWeight, calculateQualityScore } from './taste-weight.util';
-import { getHighResThumbnailUrl, getValidThumbnailUrl } from '../utils/youtubeUtils';
+import { getHighResThumbnailUrl, getValidThumbnailUrl, isUnsplashUrl } from '../utils/youtubeUtils';
 
 export interface CategorySummaryDto {
   slug: string;
@@ -1357,7 +1357,7 @@ export class RecommendationsService {
             if (t.thumbNail) {
               const highRes = getHighResThumbnailUrl(t.thumbNail, t.videoId);
               const validThumb = highRes || getValidThumbnailUrl(t.thumbNail);
-              if (validThumb && !validThumb.includes('unsplash.com')) {
+              if (validThumb && !isUnsplashUrl(validThumb)) {
                 thumbnail = validThumb;
                 break;
               }
@@ -1384,7 +1384,7 @@ export class RecommendationsService {
                 if (dt.thumbnailUrl) {
                   const highRes = getHighResThumbnailUrl(dt.thumbnailUrl, dt.youtubeVideoId);
                   const validThumb = highRes || getValidThumbnailUrl(dt.thumbnailUrl);
-                  if (validThumb && !validThumb.includes('unsplash.com')) {
+                  if (validThumb && !isUnsplashUrl(validThumb)) {
                     thumbnail = validThumb;
                     break;
                   }
@@ -1402,7 +1402,7 @@ export class RecommendationsService {
             if (anyTrack?.thumbnailUrl) {
               const highRes = getHighResThumbnailUrl(anyTrack.thumbnailUrl, anyTrack.youtubeVideoId);
               const validThumb = highRes || getValidThumbnailUrl(anyTrack.thumbnailUrl);
-              if (validThumb && !validThumb.includes('unsplash.com')) {
+              if (validThumb && !isUnsplashUrl(validThumb)) {
                 thumbnail = validThumb;
               }
             }

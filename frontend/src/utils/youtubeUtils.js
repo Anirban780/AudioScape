@@ -28,13 +28,56 @@ export const RESOLUTION_TIERS = [
   "default.jpg",
 ];
 
+/**
+ * Safely checks if a URL belongs to a target domain or its subdomains.
+ */
+export function isMatchingDomain(urlStr, targetDomain) {
+  if (!urlStr || typeof urlStr !== "string" || !targetDomain) return false;
+  try {
+    const parsed = new URL(urlStr);
+    const host = parsed.hostname.toLowerCase();
+    const domain = targetDomain.toLowerCase();
+    return host === domain || host.endsWith(`.${domain}`);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Checks if a URL points to a recognized YouTube or ytimg domain.
+ */
+export function isYouTubeDomain(urlStr) {
+  if (!urlStr || typeof urlStr !== "string") return false;
+  try {
+    const parsed = new URL(urlStr);
+    const host = parsed.hostname.toLowerCase();
+    return (
+      host === "ytimg.com" ||
+      host.endsWith(".ytimg.com") ||
+      host === "youtube.com" ||
+      host.endsWith(".youtube.com") ||
+      host === "youtu.be" ||
+      host.endsWith(".youtu.be")
+    );
+  } catch {
+    return false;
+  }
+}
+
 export function getValidThumbnailUrl(originalUrl) {
   if (!originalUrl || typeof originalUrl !== "string") {
     return originalUrl;
   }
 
-  if (originalUrl.includes(BLOCKED_YOUTUBE_THUMBNAIL_DOMAIN)) {
-    return originalUrl.replace(BLOCKED_YOUTUBE_THUMBNAIL_DOMAIN, TARGET_YOUTUBE_THUMBNAIL_DOMAIN);
+  try {
+    const parsed = new URL(originalUrl);
+    const host = parsed.hostname.toLowerCase();
+    if (host === BLOCKED_YOUTUBE_THUMBNAIL_DOMAIN || host.endsWith(`.${BLOCKED_YOUTUBE_THUMBNAIL_DOMAIN}`)) {
+      parsed.hostname = TARGET_YOUTUBE_THUMBNAIL_DOMAIN;
+      return parsed.toString();
+    }
+  } catch {
+    // If not a parseable URL, return untouched
   }
 
   return originalUrl;
@@ -68,7 +111,7 @@ export function getHighResThumbnailUrl(url, videoId) {
   
   if (id && isValidYouTubeId(id)) {
     target = `https://${TARGET_YOUTUBE_THUMBNAIL_DOMAIN}/vi/${id}/hqdefault.jpg`;
-  } else if (typeof target === "string" && (target.includes("ytimg.com") || target.includes("youtube.com"))) {
+  } else if (typeof target === "string" && isYouTubeDomain(target)) {
     target = target
       .replace(/\/default\.jpg|\/mqdefault\.jpg|\/sddefault\.jpg/, "/hqdefault.jpg");
   } else if (!target) {
@@ -86,7 +129,7 @@ export function getNextFallbackThumbnailUrl(currentSrc, videoId, placeholderAsse
     return placeholderAsset;
   }
 
-  const domain = currentSrc.includes(TARGET_YOUTUBE_THUMBNAIL_DOMAIN)
+  const domain = isMatchingDomain(currentSrc, TARGET_YOUTUBE_THUMBNAIL_DOMAIN)
     ? TARGET_YOUTUBE_THUMBNAIL_DOMAIN
     : BLOCKED_YOUTUBE_THUMBNAIL_DOMAIN;
 
@@ -101,18 +144,23 @@ export function getNextFallbackThumbnailUrl(currentSrc, videoId, placeholderAsse
   return placeholderAsset;
 }
 
+const HTML_ENTITY_MAP = {
+  "&quot;": '"',
+  "&#39;": "'",
+  "&apos;": "'",
+  "&#x27;": "'",
+  "&amp;": "&",
+  "&lt;": "<",
+  "&gt;": ">",
+  "&#x2F;": "/",
+  "&#47;": "/",
+};
+
+const HTML_ENTITY_REGEX = /&(?:quot|#39|apos|#x27|amp|lt|gt|#x2F|#47);/g;
+
 export function decodeHtmlEntities(text) {
   if (!text || typeof text !== "string") return text || "";
-  return text
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&#x27;/g, "'")
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&#x2F;/g, "/")
-    .replace(/&#47;/g, "/");
+  return text.replace(HTML_ENTITY_REGEX, (match) => HTML_ENTITY_MAP[match] || match);
 }
 
 export function handleThumbnailLoad(e) {
