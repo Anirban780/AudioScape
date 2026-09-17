@@ -1,0 +1,131 @@
+import { NestFactory } from '@nestjs/core';
+import { ValidationPipe, Logger } from '@nestjs/common';
+import * as cookieParser from 'cookie-parser';
+import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
+
+/**
+ * ============================================================================
+ * BOOTSTRAP ENTRYPOINT: AUDIOSCAPE NESTJS BACKEND SERVER
+ * ============================================================================
+ * 
+ * PURPOSE:
+ * Initializes NestJS application container, sets up global middleware, CORS,
+ * validation pipes, global exception filters, and starts HTTP server on port 5000 (or process.env.PORT).
+ *
+ * PRODUCTION FEATURES CONFIGURED:
+ * 1. Global Dynamic CORS: Supports Vercel production, staging, preview branches, and local dev.
+ * 2. Cookie Parser: Parses incoming HttpOnly cookies for persistent refresh tokens (`audioscape_refresh_token`).
+ * 3. Global ValidationPipe: Automatically sanitizes, validates, and transforms request payloads using DTO definitions.
+ * 4. AllExceptionsFilter: Formats uncaught exceptions into clean, uniform JSON error responses.
+ * 5. Graceful Shutdown Hooks: Enables process signal handlers (`SIGTERM`, `SIGINT`) for clean database disconnection.
+ * ============================================================================
+ */
+// Polyfill BigInt serialization for JSON responses (Prisma BigInt columns like viewCount, likeCount)
+(BigInt.prototype as any).toJSON = function () {
+  return this.toString();
+};
+
+async function bootstrap() {
+  const logger = new Logger('Bootstrap');
+
+  // Enforce secure secrets assertion in production environment
+  if (process.env.NODE_ENV === 'production') {
+    const jwtSecret = process.env.JWT_SECRET;
+    if (!jwtSecret || jwtSecret === 'audioscape_jwt_secret_key_default') {
+      logger.error('FATAL CONFIGURATION ERROR: JWT_SECRET must be set to a secure cryptographic secret in production. Halting process.');
+      process.exit(1);
+    }
+    if (!process.env.CRON_SECRET) {
+      logger.warn('WARNING: CRON_SECRET is not configured in production environment. Background cron endpoints will reject all requests.');
+    }
+  }
+
+  const app = await NestFactory.create(AppModule);
+
+  // Security Headers Middleware (OWASP recommended defense-in-depth headers)
+  app.use((_req: any, res: any, next: () => void) => {
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-Frame-Options', 'DENY');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  });
+
+  // Enable cookie parsing middleware for HttpOnly refresh cookies
+  app.use(cookieParser());
+
+  // Enable graceful shutdown hooks for container orchestrators (Render / Kubernetes)
+  app.enableShutdownHooks();
+
+  // Configure robust CORS allowed origins with strict domain matching
+  const envOrigins = [process.env.PROD_FRONTEND_URL, process.env.FRONTEND_URL]
+    .filter((url): url is string => Boolean(url))
+    .flatMap((url) => url.split(','))
+    .map((s) => s.trim().replace(/\/+$/, ''))
+    .filter(Boolean);
+
+  const defaultAllowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:5000',
+    'https://audioscape-staging.vercel.app',
+    'https://audioscape.app',
+    'https://audio-scape-pi.vercel.app',
+    ...envOrigins,
+  ];
+
+  app.enableCors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, server-to-server)
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const normalizedOrigin = origin.trim().replace(/\/+$/, '');
+
+      // Strict origin matching: whitelisted production domains and official project preview branches
+      const isAllowed =
+        defaultAllowedOrigins.includes(normalizedOrigin) ||
+        /^https:\/\/audioscape(-[a-zA-Z0-9]+)*\.vercel\.app$/.test(normalizedOrigin) ||
+        /^https:\/\/audio-scape-pi(-[a-zA-Z0-9]+)*\.vercel\.app$/.test(normalizedOrigin);
+
+      if (isAllowed) {
+        return callback(null, true);
+      }
+
+      logger.warn(`CORS blocked for origin: ${origin}`);
+      return callback(null, false);
+    },
+    credentials: true,
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'Cookie',
+      'x-timezone',
+      'X-Timezone',
+      'timezone',
+    ],
+  });
+
+  // Attach Global ValidationPipe for DTO payload validation and type transformation
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,            // Strips unexpected properties not defined in DTOs
+      transform: true,            // Automatically transforms primitive string types to numbers/booleans
+      forbidNonWhitelisted: true, // Rejects requests with unexpected extra fields
+    }),
+  );
+
+  // Attach Global Exception Filter for standardized error handling
+  app.useGlobalFilters(new AllExceptionsFilter());
+
+  const port = process.env.PORT || 5000;
+  await app.listen(port, '0.0.0.0');
+  logger.log(`🚀 NestJS AudioScape Backend operational and listening on port ${port} (0.0.0.0)`);
+}
+
+bootstrap();

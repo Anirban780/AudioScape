@@ -1,0 +1,293 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  extensions = [pg_trgm, unaccent]
+}
+
+// ════════════════════════════════════════════════════════════
+// DOMAIN A — CORE APPLICATION
+// ════════════════════════════════════════════════════════════
+
+model User {
+  id          String    @id @default(uuid())
+  authId      String    @unique @map("auth_id")
+  email       String?   @unique
+  displayName String?   @map("display_name")
+  photoUrl    String?   @map("photo_url")
+  lastLoginAt DateTime? @map("last_login_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  listenHistory ListenHistory[]
+  playlists     Playlist[]
+  feedbacks     Feedback[]
+
+  @@map("users")
+}
+
+model ListenHistory {
+  id            String         @id @default(uuid())
+  userId        String         @map("user_id")
+  trackId       String         @map("track_id")
+  playCount     Int            @default(1) @map("play_count")
+  liked         Boolean        @default(false)
+  likedAt       DateTime?      @map("liked_at")
+  source        PlaybackSource @default(SEARCH)
+  firstPlayedAt DateTime       @default(now()) @map("first_played_at")
+  lastPlayedAt  DateTime       @default(now()) @map("last_played_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  track Tracks @relation(fields: [trackId], references: [youtubeVideoId], onDelete: Cascade)
+
+  @@unique([userId, trackId])
+  @@index([userId, lastPlayedAt(sort: Desc)])
+  @@index([trackId])
+  @@map("listen_history")
+}
+
+model Playlist {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String
+  description String?
+  coverUrl    String?  @map("cover_url")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tracks PlaylistTrack[]
+
+  @@unique([userId, name])
+  @@map("playlists")
+}
+
+model PlaylistTrack {
+  id         String   @id @default(uuid())
+  playlistId String   @map("playlist_id")
+  trackId    String   @map("track_id")
+  position   Int
+  addedAt    DateTime @default(now()) @map("added_at")
+
+  playlist Playlist @relation(fields: [playlistId], references: [id], onDelete: Cascade)
+  track    Tracks   @relation(fields: [trackId], references: [youtubeVideoId], onDelete: Cascade)
+
+  @@unique([playlistId, trackId])
+  @@index([playlistId, position])
+  @@map("playlist_tracks")
+}
+
+// ════════════════════════════════════════════════════════════
+// DOMAIN B — YOUTUBE DATA & SEARCH PIPELINE
+// ════════════════════════════════════════════════════════════
+
+model Channel {
+  id              String   @id                     // YouTube channel ID (natural key)
+  title           String
+  thumbnailUrl    String?  @map("thumbnail_url")
+  subscriberCount BigInt?  @map("subscriber_count")
+  lastFetchedAt   DateTime @default(now()) @map("last_fetched_at")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  tracks Tracks[]
+
+  @@map("channels")
+}
+
+model Tracks {
+  youtubeVideoId  String    @id @map("youtube_video_id")   // natural key
+  title           String
+  artist          String?                                  // artist name string from history/playlists/cache
+  channelId       String?   @map("channel_id")
+  description     String?
+  thumbnailUrl    String?   @map("thumbnail_url")
+  duration        String?                                   // raw ISO 8601, e.g. "PT3M45S"
+  durationSeconds Int?      @map("duration_seconds")
+  tags            String[]  @default([])                    // raw YouTube tags — search/matching only
+  genre           String[]  @default([])                    // curated keywords — feeds recommend.js TF-IDF
+  categoryId      String?   @map("category_id")
+  publishedAt     DateTime? @map("published_at")
+  viewCount       BigInt?   @map("view_count")
+  likeCount       BigInt?   @map("like_count")
+
+  searchVector Unsupported("tsvector")? @map("search_vector") // maintained via trigger
+
+  // Data Analysis & Content Quality Fields
+  topicCategories String[]  @default([]) @map("topic_categories")
+  contentTags     String[]  @default([]) @map("content_tags")
+  rawTitle        String?   @map("raw_title")
+  artistName      String?   @map("artist_name")
+  qualityScore    Float?    @map("quality_score")
+  isEmbeddable    Boolean   @default(true)  @map("is_embeddable")
+  licensedContent Boolean   @default(false) @map("licensed_content")
+
+  source        TrackSource @default(SEARCH)
+  isAvailable   Boolean     @default(true) @map("is_available")
+  lastFetchedAt DateTime    @default(now()) @map("last_fetched_at")
+  fetchCount    Int         @default(1) @map("fetch_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  channel        Channel?           @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  listenHistory  ListenHistory[]
+  playlistTracks PlaylistTrack[]
+  queryResults   QueryTrackResult[]
+  pageResults    SearchQueryPageResult[]
+
+  @@index([channelId])
+  @@index([lastFetchedAt])
+  @@index([searchVector], type: Gin)
+  // Recommendation System Phase 2 Optimization Indexes:
+  // Enables sub-millisecond artist expansion candidate retrieval and sorting
+  @@index([artist])
+  @@index([artistName])
+  @@map("tracks")
+}
+
+model SearchQuery {
+  id                 String    @id @default(uuid())
+  normalizedQuery    String    @unique @map("normalized_query")
+  rawQuery           String    @map("raw_query")
+  queryType          QueryType @default(USER_SEARCH) @map("query_type")
+  hitCount           Int       @default(1) @map("hit_count")
+  resultCount        Int?      @map("result_count")
+  lastYoutubeFetchAt DateTime? @map("last_youtube_fetch_at")
+  lastSearchedAt     DateTime  @default(now()) @map("last_searched_at")
+  expiresAt          DateTime? @map("expires_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  results QueryTrackResult[]
+  pages   SearchQueryPage[]
+
+  @@index([expiresAt])
+  @@map("search_queries")
+}
+
+model SearchQueryPage {
+  id            String                  @id @default(uuid())
+  queryId       String                  @map("query_id")
+  pageToken     String?                 @map("page_token")          // null for page 0
+  nextPageToken String?                 @map("next_page_token")
+  pageIndex     Int                     @default(0) @map("page_index")
+  createdAt     DateTime                @default(now()) @map("created_at")
+
+  query         SearchQuery             @relation(fields: [queryId], references: [id], onDelete: Cascade)
+  results       SearchQueryPageResult[]
+
+  @@unique([queryId, pageToken])
+  @@map("search_query_pages")
+}
+
+model SearchQueryPageResult {
+  id           String          @id @default(uuid())
+  pageId       String          @map("page_id")
+  trackId      String          @map("track_id")
+  rankPosition Int             @map("rank_position")             // preserves page-specific YouTube rank order
+  createdAt    DateTime        @default(now()) @map("created_at")
+
+  page         SearchQueryPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  track        Tracks          @relation(fields: [trackId], references: [youtubeVideoId], onDelete: Cascade)
+
+  @@unique([pageId, trackId])
+  @@index([trackId])
+  @@map("search_query_page_results")
+}
+
+model QueryTrackResult {
+  id           String   @id @default(uuid())
+  queryId      String   @map("query_id")
+  trackId      String   @map("track_id")
+  rankPosition Int      @map("rank_position")             // preserves original YouTube result order
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  query SearchQuery @relation(fields: [queryId], references: [id], onDelete: Cascade)
+  track Tracks      @relation(fields: [trackId], references: [youtubeVideoId], onDelete: Cascade)
+
+  @@unique([queryId, trackId])
+  @@index([trackId])
+  @@map("query_track_results")
+}
+
+model ApiQuotaUsage {
+  id            String      @id @default(uuid())
+  date          DateTime    @db.Date
+  endpoint      ApiEndpoint
+  apiKeyId      String      @default("A") @map("api_key_id")
+  unitsConsumed Int         @default(0) @map("units_consumed")
+  callCount     Int         @default(0) @map("call_count")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@unique([date, endpoint, apiKeyId])
+  @@map("api_quota_usage")
+}
+
+model UserDailySearch {
+  id          String   @id @default(uuid())
+  identifier  String   @map("identifier") // user email (e.g. user@example.com) or client IP
+  date        DateTime @db.Date
+  searchCount Int      @default(0) @map("search_count")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([identifier, date])
+  @@index([date])
+  @@map("user_daily_searches")
+}
+
+model Feedback {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  userEmail  String   @map("user_email")
+  userName   String?  @map("user_name")
+  category   String   @default("general")
+  rating     Int?
+  subject    String
+  message    String   @db.Text
+  deviceInfo String?  @map("device_info") @db.Text
+  status     String   @default("PENDING")
+  emailSent  Boolean  @default(false) @map("email_sent")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([category])
+  @@map("feedbacks")
+}
+
+// ════════════════════════════════════════════════════════════
+// ENUMS
+// ════════════════════════════════════════════════════════════
+
+enum PlaybackSource {
+  SEARCH
+  EXPLORE
+  RECOMMENDATION
+  PLAYLIST
+  RELATED_QUEUE
+}
+
+enum TrackSource {
+  SEARCH
+  RELATED_CACHE
+  RECOMMENDATION_BACKFILL
+  MANUAL
+}
+
+enum QueryType {
+  USER_SEARCH
+  CURATED_KEYWORD
+  RECOMMENDATION
+}
+
+enum ApiEndpoint {
+  SEARCH_LIST
+  VIDEOS_LIST
+  VIDEO_CATEGORIES_LIST
+}

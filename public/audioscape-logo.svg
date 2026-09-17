@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 180" width="800" height="180">
+  <defs>
+    <!-- HD Aura Lumina Gradient -->
+    <linearGradient id="lockup-aura-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#00F0FF" />
+      <stop offset="55%" stop-color="#8A2BE2" />
+      <stop offset="100%" stop-color="#FF66CC" />
+    </linearGradient>
+
+    <!-- Wordmark Gradient for "Scape" -->
+    <linearGradient id="scape-text-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#00F0FF" />
+      <stop offset="100%" stop-color="#8A2BE2" />
+    </linearGradient>
+
+    <!-- Ambient Glow -->
+    <filter id="lockup-glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="8" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Left: Redesigned 'A' Mark Icon -->
+  <g transform="translate(40, 25) scale(0.25)" filter="url(#lockup-glow)">
+    <!-- Architectural 'A' Chevron Frame -->
+    <path 
+      d="M 256 84 
+         C 268 84, 280 92, 286 105 
+         L 428 396 
+         C 436 414, 426 428, 406 428 
+         L 332 428 
+         C 318 428, 306 419, 300 406 
+         L 256 300 
+         L 212 406 
+         C 206 419, 194 428, 180 428 
+         L 106 428 
+         C 86 428, 76 414, 84 396 
+         L 226 105 
+         C 232 92, 244 84, 256 84 Z" 
+      fill="url(#lockup-aura-grad)" 
+    />
+
+    <!-- Precision Audio Waveform Pulse Crossbar -->
+    <path 
+      d="M 136 308 
+         L 188 308 
+         Q 222 236, 256 308 
+         T 324 308 
+         L 376 308" 
+      fill="none" 
+      stroke="#00F0FF" 
+      stroke-width="26" 
+      stroke-linecap="round" 
+      stroke-linejoin="round" 
+    />
+  </g>
+
+  <!-- Right: Wordmark & Tagline -->
+  <!-- "Audio" in crisp Pure White -->
+  <text 
+    x="180" 
+    y="105" 
+    font-family="'Sora', 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" 
+    font-size="68" 
+    font-weight="800" 
+    letter-spacing="-0.03em" 
+    fill="#EEF2FF"
+  >
+    Audio<tspan fill="url(#scape-text-grad)">Scape</tspan>
+  </text>
+
+  <!-- Tagline: "SOUNDSCAPES DEFINED BY LIGHT & RHYTHM" -->
+  <text 
+    x="184" 
+    y="136" 
+    font-family="'Space Mono', monospace" 
+    font-size="14" 
+    font-weight="700" 
+    letter-spacing="0.22em" 
+    fill="#94A3B8"
+  >
+    SOUNDSCAPES DEFINED BY LIGHT &amp; RHYTHM
+  </text>
+
+  <!-- Audio Aura Accent Dot -->
+  <circle cx="730" cy="74" r="5" fill="#00F0FF" filter="url(#lockup-glow)" />
+</svg>

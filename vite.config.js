@@ -10,15 +10,30 @@ export default defineConfig({
     tailwindcss(),
   ],
   resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./utils"),
-      "utils": path.resolve(__dirname, "./utils"),
-    },
+    alias: [
+      { find: /^@\/assets\/(.*)/, replacement: path.resolve(__dirname, "./frontend/assets/$1") },
+      { find: /^@assets\/(.*)/, replacement: path.resolve(__dirname, "./frontend/assets/$1") },
+      { find: "@", replacement: path.resolve(__dirname, "./frontend/src") },
+    ],
   },
   build: {
-    outDir: "dist", // Ensure Vercel serves the correct folder
+    outDir: "dist",
   },
   server: {
-    host: true,
+    host: '0.0.0.0',
+    port: 5173,
+    strictPort: true,
+    watch: {
+      usePolling: true,
+    },
+  },
+  test: {
+    // Use jsdom to emulate browser APIs (localStorage, DOM, IntersectionObserver stub)
+    globals: true,
+    environment: 'jsdom',
+    // Wire up @testing-library/jest-dom matchers (toBeInTheDocument, etc.) for all test files
+    setupFiles: ['@testing-library/jest-dom'],
+    // Only run frontend tests, avoid backend NestJS spec files
+    include: ['frontend/src/**/*.{test,spec}.{js,jsx,ts,tsx}'],
   },
 })

@@ -1,0 +1,441 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+.font-display {
+  font-family: 'Outfit', sans-serif;
+}
+
+.font-body {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+}
+
+:root {
+
+  /* Aura Lumina (Light Theme Tokens) */
+  --background: hsl(255 33% 98%);
+  --foreground: hsl(223 21% 16%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(223 21% 16%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(223 21% 16%);
+  --primary: hsl(262 83% 58%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(336 78% 43%);
+  --secondary-foreground: hsl(0 0% 100%);
+  --tertiary: hsl(221 78% 57%);
+  --muted: hsl(252 24% 94%);
+  --muted-foreground: hsl(218 14% 34%);
+  --accent: hsl(262 83% 96%);
+  --accent-foreground: hsl(262 83% 58%);
+  --destructive: hsl(346 84% 61%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(253 27% 91%);
+  --input: hsl(253 27% 91%);
+  --ring: hsl(262 83% 58%);
+  --radius: 0.75rem;
+
+  --color-primary: #7C3AED;
+  --color-secondary: #C2185B;
+  --color-tertiary: #3C71E5;
+  --color-surface-base: #F8F7FC;
+  --color-surface-raised: #FFFFFF;
+  --color-surface-overlay: #FFFFFF;
+  --color-on-surface: #1F2430;
+  --color-on-surface-variant: #4B5563;
+  --color-border-default: #E4E1F0;
+  --color-border-strong: #C9C3E0;
+  --color-text-on-primary: #FFFFFF;
+  --color-text-on-secondary: #FFFFFF;
+  --color-state-active: rgba(124, 58, 237, 0.10);
+  --color-state-hover: rgba(124, 58, 237, 0.06);
+}
+
+.dark {
+  /* Midnight Studio (Dark Theme Tokens) */
+  --background: hsl(225 47% 4%);
+  --foreground: hsl(220 14% 90%);
+  --card: hsl(223 30% 12%);
+  --card-foreground: hsl(220 14% 90%);
+  --popover: hsl(221 28% 15%);
+  --popover-foreground: hsl(220 14% 90%);
+  --primary: hsl(257 91% 76%);
+  --primary-foreground: hsl(225 47% 4%);
+  --secondary: hsl(330 81% 60%);
+  --secondary-foreground: hsl(0 0% 100%);
+  --tertiary: hsl(221 83% 53%);
+  --muted: hsl(223 22% 20%);
+  --muted-foreground: hsl(215 14% 65%);
+  --accent: hsl(257 91% 20%);
+  --accent-foreground: hsl(257 91% 76%);
+  --destructive: hsl(346 84% 61%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(222 20% 30%);
+  --input: hsl(222 20% 30%);
+  --ring: hsl(257 91% 76%);
+
+  --color-primary: #A78BFA;
+  --color-secondary: #EC4899;
+  --color-tertiary: #2563EB;
+  --color-surface-base: #05070E;
+  --color-surface-raised: #121724;
+  --color-surface-overlay: #1B2234;
+  --color-on-surface: #E5E7EB;
+  --color-on-surface-variant: #9CA3AF;
+  /* Enhanced border contrast for Midnight Studio dark mode
+     WHY: Provides distinct visual boundaries around cards, sidebar, header,
+     and search containers against dark backgrounds. */
+  --color-border-default: #37435D;
+  --color-border-strong: #4C5B7C;
+  --color-text-on-primary: #05070E;
+  --color-text-on-secondary: #FFFFFF;
+  --color-state-active: rgba(167, 139, 250, 0.20);
+  --color-state-hover: rgba(167, 139, 250, 0.12);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+.scrollbar-custom,
+.custom-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-border-strong, #888) transparent;
+}
+
+.scrollbar-custom::-webkit-scrollbar,
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-track,
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb,
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong, #888);
+  border-radius: 10px;
+}
+
+.scrollbar-custom::-webkit-scrollbar-thumb:hover,
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary, #555);
+}
+
+html {
+  font-size: 100%;
+}
+
+.mini-player-header {
+  cursor: move;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+  user-select: none;
+}
+
+@media (max-width: 768px) {
+  html {
+    font-size: 90%;
+  }
+}
+
+@media (max-width: 480px) {
+  html {
+    font-size: 85%;
+  }
+}
+/* Vertical Smooth Pan Animation for Hero Banner Background Artwork */
+@keyframes heroPanUpDown {
+  0% {
+    object-position: center 5%;
+    transform: scale(1.04);
+  }
+  50% {
+    object-position: center 95%;
+    transform: scale(1.08);
+  }
+  100% {
+    object-position: center 5%;
+    transform: scale(1.04);
+  }
+}
+
+.animate-pan-vertical {
+  animation: heroPanUpDown 12s ease-in-out infinite alternate;
+  will-change: object-position, transform;
+}
+
+.animate-pan-horizontal {
+  animation: heroPanLeftRight 12s ease-in-out infinite alternate;
+  will-change: object-position, transform;
+}
+
+/* Category Card Pan on Hover/Focus Only */
+.animate-pan-horizontal-hover {
+  animation: heroPanLeftRight 10s ease-in-out infinite alternate;
+  animation-play-state: paused;
+  will-change: object-position, transform;
+}
+
+.group:hover .animate-pan-horizontal-hover,
+.group:focus-within .animate-pan-horizontal-hover,
+.group:focus .animate-pan-horizontal-hover {
+  animation-play-state: running;
+}
+
+@keyframes heroPanLeftRight {
+  0% {
+    object-position: 5% center;
+    transform: scale(1.05);
+  }
+  50% {
+    object-position: 95% center;
+    transform: scale(1.08);
+  }
+  100% {
+    object-position: 5% center;
+    transform: scale(1.05);
+  }
+}
+
+/* Cinematic Zoom-In Animation for Hero Banner Background Artwork */
+@keyframes heroZoomIn {
+  0% {
+    transform: scale(1.0);
+  }
+  100% {
+    transform: scale(1.15);
+  }
+}
+
+.animate-zoom-in {
+  animation: heroZoomIn 7s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  will-change: transform;
+}
+
+/* Smooth Layout Pacing & Transition Utilities for Sidebar & Page Reflow */
+.sidebar-transition {
+  transition: width 350ms cubic-bezier(0.4, 0, 0.2, 1),
+              max-width 350ms cubic-bezier(0.4, 0, 0.2, 1),
+              padding 350ms cubic-bezier(0.4, 0, 0.2, 1),
+              margin 350ms cubic-bezier(0.4, 0, 0.2, 1);
+  will-change: width, max-width;
+}
+
+/* Animated Accent Bar for Section Headers */
+@keyframes accentBarGrow {
+  0% {
+    width: 0%;
+    opacity: 0;
+  }
+  100% {
+    width: 100%;
+    opacity: 1;
+  }
+}
+
+.animate-accent-bar {
+  animation: accentBarGrow 800ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Vinyl Record Hover Animation for Favorite Songs Carousel */
+@keyframes vinylSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-vinyl-spin {
+  animation: vinylSpin 8s linear infinite;
+}
+
+/* ============================================================================
+   STITCH PLAYER DESIGN SYSTEM UTILITIES (Midnight Studio & Aura Lumina)
+   ============================================================================ */
+
+/* Breathing Ambient Glow Animation behind Album Artwork */
+@keyframes ambientGlowPulse {
+  0% {
+    transform: scale(0.98) translate(-50%, -50%);
+    opacity: 0.25;
+  }
+  50% {
+    transform: scale(1.08) translate(-50%, -50%);
+    opacity: 0.45;
+  }
+  100% {
+    transform: scale(0.98) translate(-50%, -50%);
+    opacity: 0.25;
+  }
+}
+
+.animate-ambient-glow {
+  animation: ambientGlowPulse 6s ease-in-out infinite;
+  will-change: transform, opacity;
+}
+
+/* Dynamic Equalizer Bar Animations for Active Playing Track Indicator */
+@keyframes eqBarPulse1 {
+  0%, 100% { height: 4px; }
+  50% { height: 16px; }
+}
+
+@keyframes eqBarPulse2 {
+  0%, 100% { height: 16px; }
+  50% { height: 6px; }
+}
+
+@keyframes eqBarPulse3 {
+  0%, 100% { height: 8px; }
+  50% { height: 18px; }
+}
+
+.animate-eq-1 { animation: eqBarPulse1 0.8s ease-in-out infinite; }
+.animate-eq-2 { animation: eqBarPulse2 0.6s ease-in-out infinite; }
+.animate-eq-3 { animation: eqBarPulse3 0.9s ease-in-out infinite; }
+
+/* Premium Glassmorphic Card Container for Floating Player Panels */
+.player-glass-card {
+  background: var(--color-surface-overlay);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--color-border-strong);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4), 0 0 20px rgba(167, 139, 250, 0.08);
+}
+
+/* Primary Button Ambient Glow Effect */
+.player-btn-primary-glow {
+  box-shadow: 0 0 25px var(--color-primary), 0 0 10px rgba(255, 255, 255, 0.4);
+}
+
+/* Horizontal Capsule Dock Container for Floating Mini Player Widget */
+.mini-player-capsule {
+  background: var(--color-surface-overlay);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--color-border-strong);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35), 0 0 30px rgba(167, 139, 250, 0.15);
+}
+
+/* ============================================================================
+   SLIDING ANIMATION FOR LONG TRACK TITLES (SLOW & REFINED)
+   ============================================================================ */
+@keyframes marqueeScroll {
+  0% {
+    transform: translateX(0%);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  display: inline-flex;
+  width: max-content;
+  animation: marqueeScroll 45s linear infinite;
+  will-change: transform;
+}
+
+.animate-marquee:hover {
+  animation-play-state: paused;
+}
+
+/* Gradient Fade Mask for Marquee Title Container */
+.mask-marquee {
+  mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 5%,
+    black 95%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0%,
+    black 5%,
+    black 95%,
+    transparent 100%
+  );
+}
+
+/* 2-Line Slow Vertical Slide for Multi-Line Titles */
+@keyframes titleVerticalSlide {
+  0%, 30% {
+    transform: translateY(0);
+  }
+  50%, 80% {
+    transform: translateY(var(--slide-offset, 0px));
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+
+.animate-title-slide {
+  animation: titleVerticalSlide 12s ease-in-out infinite;
+  will-change: transform;
+}
+
+.animate-title-slide:hover {
+  animation-play-state: paused;
+}
+
+.mask-marquee-y {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 8%,
+    black 92%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 8%,
+    black 92%,
+    transparent 100%
+  );
+}
+

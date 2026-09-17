@@ -1,0 +1,429 @@
+import { Test, TestingModule } from '@nestjs/testing';
+import { TracksService } from '../tracks.service';
+import { PrismaService } from '../../prisma/prisma.service';
+import { YouTubeKeyManager } from '../youtube-key-manager';
+import { SearchRateLimiterService } from '../search-rate-limiter.service';
+import axios from 'axios';
+
+jest.mock('axios');
+const mockedAxios = axios as jest.Mocked<typeof axios>;
+
+/**
+ * ============================================================================
+ * QA UNIT TEST SUITE: BACKEND TRACKS & SEARCH SERVICE (tracks.service.spec.ts)
+ * ============================================================================
+ * 
+ * WHAT THIS SUITE TESTS:
+ * Validates backend query normalization, 3-tier search strategy (Relational Page Cache,
+ * PostgreSQL Full-Text Search GIN index, YouTube API fallback), metadata caching,
+ * and API quota usage telemetry logging.
+ */
+describe('TracksService QA Unit Test Suite', () => {
+  let service: TracksService;
+  let prisma: PrismaService;
+  let keyManager: YouTubeKeyManager;
+
+  const mockPrismaService = {
+    searchQuery: {
+      findUnique: jest.fn(),
+      update: jest.fn(),
+      upsert: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    searchQueryPage: {
+      upsert: jest.fn(),
+    },
+    searchQueryPageResult: {
+      upsert: jest.fn(),
+      create: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    queryTrackResult: {
+      upsert: jest.fn(),
+      create: jest.fn(),
+      deleteMany: jest.fn(),
+    },
+    tracks: {
+      findUnique: jest.fn(),
+      upsert: jest.fn(),
+      count: jest.fn(),
+      updateMany: jest.fn(),
+    },
+    channel: {
+      upsert: jest.fn(),
+    },
+    $queryRaw: jest.fn(),
+    $executeRaw: jest.fn(),
+    $transaction: jest.fn().mockImplementation((cb) => cb(mockPrismaService)),
+  };
+
+  const mockYouTubeKeyManager = {
+    getActiveApiKey: jest.fn().mockResolvedValue({ key: 'MOCK_KEY_A', keyId: 'A' }),
+    recordQuotaUsage: jest.fn().mockResolvedValue(undefined),
+  };
+
+  const mockSearchRateLimiterService = {
+    checkAndConsume: jest.fn(),
+    getRemaining: jest.fn().mockReturnValue({ remainingMinute: 3, remainingDay: 20 }),
+  };
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        TracksService,
+        { provide: PrismaService, useValue: mockPrismaService },
+        { provide: YouTubeKeyManager, useValue: mockYouTubeKeyManager },
+        { provide: SearchRateLimiterService, useValue: mockSearchRateLimiterService },
+      ],
+    }).compile();
+
+    service = module.get<TracksService>(TracksService);
+    prisma = module.get<PrismaService>(PrismaService);
+    keyManager = module.get<YouTubeKeyManager>(YouTubeKeyManager);
+
+    // Pre-cache Music Category ID to prevent extra videoCategories HTTP calls during unit tests
+    service['cachedMusicCategoryId'] = '10';
+
+    // Set default Prisma mock return values for background operations
+    mockPrismaService.searchQuery.upsert.mockResolvedValue({ id: 'sq_mock' });
+    mockPrismaService.searchQuery.deleteMany.mockResolvedValue({ count: 5 });
+    mockPrismaService.searchQueryPage.upsert.mockResolvedValue({ id: 'page_mock' });
+    mockPrismaService.searchQueryPageResult.upsert.mockResolvedValue({ id: 'res_mock' });
+    mockPrismaService.searchQueryPageResult.create.mockResolvedValue({ id: 'res_mock' });
+    mockPrismaService.searchQueryPageResult.deleteMany.mockResolvedValue({ count: 50 });
+    mockPrismaService.queryTrackResult.create.mockResolvedValue({ id: 'qtr_mock' });
+    mockPrismaService.queryTrackResult.deleteMany.mockResolvedValue({ count: 50 });
+    mockPrismaService.tracks.upsert.mockResolvedValue({ youtubeVideoId: 'track_mock' });
+    mockPrismaService.channel.upsert.mockResolvedValue({ id: 'ch_mock' });
+    mockPrismaService.$executeRaw.mockResolvedValue(10);
+    mockPrismaService.$transaction.mockImplementation((cb) => cb(mockPrismaService));
+  });
+
+  /**
+   * TC-BE-01: Query Normalization
+   * Verifies that raw queries with excess whitespace and punctuation are normalized.
+   */
+  describe('Query Normalization Strategy', () => {
+    test('TC-BE-01: Should normalize queries by collapsing whitespace and stripping punctuation', async () => {
+      mockPrismaService.searchQuery.findUnique.mockResolvedValue(null);
+      mockPrismaService.$queryRaw.mockResolvedValue([]);
+      mockedAxios.get.mockResolvedValueOnce({
+        data: { items: [], nextPageToken: null },
+      });
+
+      // Execute search with noisy query
+      await service.searchTracks('  Taylor   Swift!!  ');
+
+      // Verify normalized query used in database lookup
+      expect(mockPrismaService.searchQuery.findUnique).toHaveBeenCalledWith({
+        where: { normalizedQuery: 'taylor swift' },
+        include: expect.any(Object),
+      });
+    });
+  });
+
+  /**
+   * TC-BE-02: Relational SearchQueryPage Cache Hit
+   * Verifies that repeating a query with a matching pageToken returns cached tracks instantly.
+   */
+  describe('Tier 1: Relational Page Cache', () => {
+    test('TC-BE-02: Should return cached page results when unexpired relational page exists', async () => {
+      const mockCachedDate = new Date();
+      mockCachedDate.setHours(mockCachedDate.getHours() + 12); // Valid 12h future expiry
+
+      mockPrismaService.searchQuery.findUnique.mockResolvedValue({
+        id: 'sq_1',
+        normalizedQuery: 'lofi',
+        expiresAt: mockCachedDate,
+        pages: [
+          {
+            id: 'page_0',
+            pageToken: null,
+            nextPageToken: 'token_next',
+            results: [
+              {
+                rankPosition: 1,
+                track: {
+                  youtubeVideoId: 'v1',
+                  title: 'Cached Lofi One',
+                  thumbnailUrl: 't1.jpg',
+                  artist: 'Artist A',
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      const result = await service.searchTracks('lofi', '');
+
+      expect(result.cached).toBe(true);
+      expect(result.source).toBe('page_cache');
+      expect(result.tracks).toHaveLength(1);
+      expect(result.tracks[0].title).toBe('Cached Lofi One');
+      expect(mockedAxios.get).not.toHaveBeenCalled();
+      expect(mockPrismaService.searchQuery.update).toHaveBeenCalledWith({
+        where: { id: 'sq_1' },
+        data: expect.objectContaining({ hitCount: { increment: 1 } }),
+      });
+    });
+  });
+
+  /**
+   * TC-BE-03: PostgreSQL Full-Text Search (FTS) Lookup
+   * Verifies that when >= 8 local track matches exist, FTS returns local tracks with zero YouTube quota cost.
+   */
+  describe('Tier 2: PostgreSQL Full-Text Search (FTS)', () => {
+    test('TC-BE-03: Should return local FTS matches when count >= 8 and skip YouTube API', async () => {
+      mockPrismaService.searchQuery.findUnique.mockResolvedValue(null);
+
+      // Mock 8 local matching tracks returned by PostgreSQL ts_rank
+      const mockFtsMatches = Array.from({ length: 8 }, (_, i) => ({
+        videoId: `vid_${i}`,
+        title: `Local Track ${i}`,
+        channelTitle: `Artist ${i}`,
+        thumbNail: `thumb_${i}.jpg`,
+        rank: 0.9 - i * 0.05,
+      }));
+
+      mockPrismaService.$queryRaw.mockResolvedValue(mockFtsMatches);
+
+      const result = await service.searchTracks('chill', '');
+
+      expect(result.cached).toBe(true);
+      expect(result.source).toBe('postgres_fts');
+      expect(result.tracks).toHaveLength(8);
+      expect(mockedAxios.get).not.toHaveBeenCalled(); // 0 YouTube API quota units consumed!
+    });
+  });
+
+  /**
+   * TC-BE-04: YouTube API Fallback & Page Storage
+   * Verifies that a cache miss queries YouTube API and writes SearchQueryPage relational records.
+   */
+  describe('Tier 3: YouTube API Fallback & Relational Persistence', () => {
+    test('TC-BE-04: Should fetch from YouTube API on cache miss and write page records', async () => {
+      mockPrismaService.searchQuery.findUnique.mockResolvedValue(null);
+      mockPrismaService.$queryRaw.mockResolvedValue([]); // FTS Miss
+
+      mockedAxios.get.mockResolvedValueOnce({
+        data: {
+          items: [
+            {
+              id: { videoId: 'yt_1' },
+              snippet: {
+                title: 'YouTube Track One',
+                channelTitle: 'Channel A',
+                channelId: 'ch_1',
+                thumbnails: { default: { url: 'yt_t1.jpg' } },
+              },
+            },
+          ],
+          nextPageToken: 'token_yt_2',
+        },
+      });
+
+      mockPrismaService.searchQuery.upsert.mockResolvedValue({ id: 'sq_new' });
+      mockPrismaService.searchQueryPage.upsert.mockResolvedValue({ id: 'page_new' });
+      mockPrismaService.channel.upsert.mockResolvedValue({ id: 'ch_1' });
+      mockPrismaService.tracks.upsert.mockResolvedValue({ youtubeVideoId: 'yt_1' });
+
+      const result = await service.searchTracks('ambient', '');
+
+      expect(result.cached).toBe(false);
+      expect(result.source).toBe('youtube_api');
+      expect(result.nextPageToken).toBe('token_yt_2');
+      expect(result.tracks[0].videoId).toBe('yt_1');
+
+      // Verify quota usage logged
+      expect(mockYouTubeKeyManager.recordQuotaUsage).toHaveBeenCalledWith('SEARCH_LIST', 100, 'A');
+      // Verify rate limiter checkAndConsume was invoked
+      expect(mockSearchRateLimiterService.checkAndConsume).toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * TC-BE-05: Track Detail Caching
+   * Verifies getTrackDetails uses local database when metadata exists.
+   */
+  describe('Single Track Details Lookup', () => {
+    test('TC-BE-05: Should return track details from Postgres table if present', async () => {
+      mockPrismaService.tracks.findUnique.mockResolvedValue({
+        youtubeVideoId: 'track_123',
+        title: 'Cached Song',
+        artist: 'Cached Artist',
+        thumbnailUrl: 'thumb.jpg',
+        duration: 'PT3M30S',
+        durationSeconds: 210,
+        genre: ['Lofi'],
+        channelId: 'ch_1',
+      });
+
+      const result = await service.getTrackDetails('track_123');
+
+      expect(result.videoId).toBe('track_123');
+      expect(result.durationSeconds).toBe(210);
+      expect(mockedAxios.get).not.toHaveBeenCalled();
+    });
+  });
+
+  /**
+   * TC-BE-06: Strict DB-Only Live Search
+   * Verifies that when dbOnly is true (live typing mode), YouTube API is never called even on FTS miss.
+   */
+  describe('Strict DB-Only Live Search Mode', () => {
+    test('TC-BE-06: Should restrict search to database and skip YouTube API when dbOnly is true', async () => {
+      mockPrismaService.searchQuery.findUnique.mockResolvedValue(null);
+      mockPrismaService.$queryRaw.mockResolvedValue([]); // FTS Miss
+
+      const result = await service.searchTracks('synthwave', '', true);
+
+      expect(result.cached).toBe(true);
+      expect(result.source).toBe('postgres_fts');
+      expect(result.tracks).toHaveLength(0);
+      expect(result.message).toContain('No local database matches found');
+      expect(mockedAxios.get).not.toHaveBeenCalled(); // 0 YouTube API quota units consumed!
+    });
+  });
+
+  /**
+   * TC-BE-07: Live Enrichment with Force Refresh
+   * Verifies that getTrackDetails bypasses local cache when forceRefresh is true,
+   * queries YouTube API with snippet, contentDetails, statistics, and status,
+   * and extracts statistics and licensing fields.
+   */
+  describe('Live Track Enrichment & Metadata Extraction', () => {
+    test('TC-BE-07: Should bypass cache and extract rich fields when forceRefresh is true', async () => {
+      mockPrismaService.tracks.findUnique.mockResolvedValue({
+        youtubeVideoId: 'track_enrich_1',
+        title: 'Old Title',
+        duration: 'PT3M0S',
+      });
+
+      mockedAxios.get.mockResolvedValueOnce({
+        data: {
+          items: [
+            {
+              id: 'track_enrich_1',
+              snippet: {
+                title: 'Arijit Singh - Tum Hi Ho (Official Video)',
+                description: 'Official music video for Tum Hi Ho',
+                channelTitle: 'T-Series',
+                channelId: 'ch_tseries',
+                publishedAt: '2013-04-08T00:00:00Z',
+                tags: ['bollywood', 'arijit singh', 'romance'],
+                categoryId: '10',
+              },
+              contentDetails: {
+                duration: 'PT4M22S',
+                licensedContent: true,
+              },
+              statistics: {
+                viewCount: '500000000',
+                likeCount: '3500000',
+              },
+              status: {
+                embeddable: true,
+              },
+            },
+          ],
+        },
+      });
+
+      const result = await service.getTrackDetails('track_enrich_1', true);
+
+      expect(mockedAxios.get).toHaveBeenCalled();
+      expect(result.videoId).toBe('track_enrich_1');
+      expect(result.artistName).toBe('Arijit Singh');
+      expect(result.title).toBe('Tum Hi Ho');
+      expect(result.viewCount).toBe('500000000');
+      expect(result.likeCount).toBe('3500000');
+      expect(result.isEmbeddable).toBe(true);
+      expect(result.licensedContent).toBe(true);
+    });
+  });
+
+  /**
+   * TC-BE-10: Ghost Track Prevention (Transactional Delete-Then-Insert)
+   * Verifies that cache storage uses $transaction and purges old page results before inserting fresh ones.
+   */
+  describe('Search Cache Transactional Synchronization', () => {
+    test('TC-BE-10: Should atomically purge existing page results and query rank slices in a transaction', async () => {
+      const mockTracks = [
+        {
+          videoId: 'fresh_vid_1',
+          title: 'Fresh Song 1',
+          thumbNail: 'http://example.com/thumb1.jpg',
+          channelTitle: 'Artist 1',
+          channelId: 'ch_1',
+        },
+      ];
+
+      await service['cacheSearchResultsInPostgres'](
+        'fresh query',
+        'fresh query',
+        mockTracks,
+        null,
+        null,
+        undefined,
+        0,
+      );
+
+      // Verify transaction was called
+      expect(mockPrismaService.$transaction).toHaveBeenCalled();
+
+      // Verify deleteMany was called to prevent ghost tracks
+      expect(mockPrismaService.searchQueryPageResult.deleteMany).toHaveBeenCalledWith({
+        where: { pageId: 'page_mock' },
+      });
+      expect(mockPrismaService.queryTrackResult.deleteMany).toHaveBeenCalledWith({
+        where: {
+          queryId: 'sq_mock',
+          rankPosition: { gte: 1, lte: 1 },
+        },
+      });
+
+      // Verify fresh records were created
+      expect(mockPrismaService.searchQueryPageResult.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            trackId: 'fresh_vid_1',
+            rankPosition: 1,
+          }),
+        }),
+      );
+      expect(mockPrismaService.queryTrackResult.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            trackId: 'fresh_vid_1',
+            rankPosition: 1,
+          }),
+        }),
+      );
+    });
+  });
+
+  /**
+   * TC-BE-11: Search Cache Garbage Collection
+   * Verifies that gcSearchCache purges expired search queries and stale orphan tracks.
+   */
+  describe('Search Cache Garbage Collection', () => {
+    test('TC-BE-11: Should purge expired search queries and sweep orphan tracks', async () => {
+      mockPrismaService.searchQuery.deleteMany.mockResolvedValueOnce({ count: 12 });
+      mockPrismaService.$executeRaw.mockResolvedValueOnce(35);
+
+      const result = await service.gcSearchCache(3, 30, 1000);
+
+      expect(result.deletedQueries).toBe(12);
+      expect(result.deletedOrphanTracks).toBe(35);
+      expect(mockPrismaService.searchQuery.deleteMany).toHaveBeenCalledWith({
+        where: {
+          expiresAt: { lt: expect.any(Date) },
+        },
+      });
+      expect(mockPrismaService.$executeRaw).toHaveBeenCalled();
+    });
+  });
+});

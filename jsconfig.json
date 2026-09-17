@@ -1,11 +1,11 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
+    "ignoreDeprecations": "6.0",
     "paths": {
-      "@/*": ["./*"],
-      "@/components/*": ["utils/components/*"],
-      "@/utils/*": ["utils/*"]
-    },
-    
+      "@/assets/*": ["frontend/assets/*"],
+      "@/*": ["frontend/src/*"],
+      "@root/*": ["*"]
+    }
   }
 }

@@ -12,12 +12,22 @@ node_modules
 dist
 dist-ssr
 *.local
+DOCKER_PACKAGE_GUIDE.md
+.devcontainer
+!.github/
+!.github/workflows/
+audioscape_backup.sql
+*.sql
+!backend/prisma/migrations/**/*.sql
+
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
 .DS_Store
+plan/
+plan/*
 *.suo
 *.ntvs*
 *.njsproj
