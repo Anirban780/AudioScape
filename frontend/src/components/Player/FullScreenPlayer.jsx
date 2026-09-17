@@ -3,7 +3,7 @@ import Sidebar from "@/components/Home/Sidebar";
 import ProgressBar from "./ProgressBar";
 import PlayerControls from "./PlayerControls";
 import VolumeBar from "./VolumeBar";
-import { Minimize2, X, ListMusic, Sun, Moon, Laptop } from "lucide-react";
+import { Minimize2, X, ListMusic, Sun, Moon } from "lucide-react";
 import placeholder from "@/assets/placeholder.jpg";
 import usePlayerStore from "@/store/usePlayerStore";
 import useSidebarStore from "@/store/useSidebarStore";
@@ -120,7 +120,7 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose, onCloseTrack 
   } = usePlayerStore();
 
   const { isSidebarCollapsed, toggleSidebarCollapsed } = useSidebarStore();
-  const { themePreference, resolvedTheme, currentLabel, cycleTheme } = useTheme();
+  const { resolvedTheme, cycleTheme } = useTheme();
 
   const progressRef = useRef(null);
   const volumeRef = useRef(null);
@@ -219,19 +219,14 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose, onCloseTrack 
             <X size={18} className="group-hover:scale-110 transition-transform" />
           </button>
 
-          {/* Consistent Light/Dark/System Theme Toggle Button */}
+          {/* Consistent Light/Dark Binary Theme Toggle Button */}
           <button
             onClick={cycleTheme}
             className="px-3.5 py-2 sm:px-4 sm:py-2.5 rounded-full bg-[var(--color-surface-overlay)]/80 border border-[var(--color-border-strong)] backdrop-blur-md text-xs sm:text-sm font-bold text-[var(--color-on-surface)] flex items-center gap-2 hover:bg-[var(--color-state-hover)] hover:border-[var(--color-primary)]/40 hover:scale-105 active:scale-95 transition-all cursor-pointer shadow-md"
-            aria-label={`Current theme: ${currentLabel}. Click to cycle.`}
-            title={`Theme: ${currentLabel} (Click to cycle)`}
+            aria-label={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`}
+            title={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`}
           >
-            {themePreference === "system" ? (
-              <>
-                <Laptop size={16} className="text-cyan-400" />
-                <span className="hidden sm:inline">System</span>
-              </>
-            ) : resolvedTheme === "dark" ? (
+            {resolvedTheme === "dark" ? (
               <>
                 <Moon size={16} className="text-indigo-400" />
                 <span className="hidden sm:inline">Dark</span>

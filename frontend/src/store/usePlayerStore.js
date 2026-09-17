@@ -48,26 +48,34 @@ const usePlayerStore = create((set, get) => ({
     // TRACK ACTIONS
     // ------------------------------------------------------------------------
 
-    setTrack: async (track, source = null) => {
-        const user = useAuthStore.getState().user;
-        let liked = false;
-
-        if (user && track?.id) {
-            liked = await fetchLikedStatus(user.id, track.id);
-        }
-
+    setTrack: (track, source = null) => {
         const effectiveSource = source || track?.source || get().playbackSource || 'SEARCH';
         const taggedTrack = track ? { ...track, source: effectiveSource } : null;
 
         // When launching a new track, honor user's default player mode ('full' opens FullScreenPlayer)
         const shouldBeFullScreen = track ? get().defaultPlayerMode === 'full' : get().isFullScreen;
 
+        // Instantly dispatch active track, playing state, and fullscreen viewport (<1ms)
         set({ 
             track: taggedTrack, 
-            isLiked: liked, 
+            isLiked: false, 
+            isPlaying: Boolean(taggedTrack),
             playbackSource: effectiveSource,
             isFullScreen: shouldBeFullScreen,
         });
+
+        // Asynchronously check liked status in background without blocking player UI or audio start
+        const user = useAuthStore.getState().user;
+        if (user && track?.id) {
+            fetchLikedStatus(user.id, track.id)
+                .then((liked) => {
+                    // Guard: only apply liked state if this track remains active
+                    if (get().track?.id === track.id) {
+                        set({ isLiked: liked });
+                    }
+                })
+                .catch(() => {});
+        }
     },
     
     setPlaybackSource: (playbackSource) => set({ playbackSource }),

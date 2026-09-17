@@ -1,10 +1,10 @@
 import { Controller, Get, Post, Query, Param, Req, Res, UseGuards } from '@nestjs/common';
 import { Request, Response } from 'express';
-import * as jwt from 'jsonwebtoken';
 import { TracksService } from './tracks.service';
 import { SearchTracksDto } from './dto/search-tracks.dto';
 import { CronAuthGuard } from '../auth/cron-auth.guard';
 import { IsCron } from '../auth/decorators/is-cron.decorator';
+import { extractClientIdentifier } from './search-rate-limiter.service';
 
 /**
  * ============================================================================
@@ -33,29 +33,7 @@ export class TracksController {
    * Helper extracting authenticated user ID or remote client IP as a rate-limiting key.
    */
   private extractClientId(req: Request): string {
-    const authHeader = req.headers.authorization;
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split('Bearer ')[1]?.trim();
-      if (token) {
-        try {
-          const decoded = jwt.decode(token) as any;
-          if (decoded && decoded.sub) {
-            return `user:${decoded.sub}`;
-          }
-        } catch {
-          // Fall through to IP extraction
-        }
-      }
-    }
-
-    const forwarded = req.headers['x-forwarded-for'];
-    const rawIp = typeof forwarded === 'string'
-      ? forwarded.split(',')[0].trim()
-      : Array.isArray(forwarded)
-      ? forwarded[0]
-      : req.ip || req.socket.remoteAddress || '127.0.0.1';
-
-    return `ip:${rawIp}`;
+    return extractClientIdentifier(req);
   }
 
   /**

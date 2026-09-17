@@ -4,9 +4,11 @@ import { Input } from "@/components/ui/input";
 import axios from "axios";
 import placeholder from "@/assets/placeholder.jpg";
 import { getBackendURL } from "@/utils/api";
-import { getValidThumbnailUrl, handleThumbnailLoad, handleThumbnailError } from "@/utils/youtubeUtils";
+import { getValidThumbnailUrl, handleThumbnailLoad, handleThumbnailError, decodeHtmlEntities, getHighResThumbnailUrl } from "@/utils/youtubeUtils";
 import useAuthStore from "@/store/useAuthStore";
+import usePlayerStore from "@/store/usePlayerStore";
 import { notify } from "@/utils/notify";
+import { useQuotaDashboard } from "@/hooks/useQuotaDashboard";
 
 /**
  * Normalizes a search query string (lowercase, trim, collapse whitespace, strip punctuation)
@@ -57,6 +59,14 @@ const SearchBar = ({ onSelectTrack }) => {
   const [recentSearches, setRecentSearches] = useState([]);
   const [searchStatusMsg, setSearchStatusMsg] = useState("");
   const [searchSource, setSearchSource] = useState(null);
+
+  // Quota Telemetry & Live Search Budget State
+  const {
+    userSearchesLeft,
+    canSearch,
+    isGlobalCapReached,
+    refresh: refreshQuota,
+  } = useQuotaDashboard({ enabled: true });
 
   const observer = useRef(null);
   const dropdownRef = useRef(null);
@@ -196,21 +206,44 @@ const SearchBar = ({ onSelectTrack }) => {
     inFlightRef.current = true;
     setLoading(true);
 
-    if (forceFullSearch) {
+    // If live YouTube search was requested (Enter/Button) but user has 0 searches left or global cap reached:
+    const liveSearchBlocked = !canSearch || userSearchesLeft <= 0 || isGlobalCapReached;
+    const effectiveForceFull = forceFullSearch && !liveSearchBlocked;
+
+    if (forceFullSearch && liveSearchBlocked) {
+      notify.warning(
+        isGlobalCapReached
+          ? "Global platform search limit reached for today. Showing local database results."
+          : "Daily live YouTube search limit reached (5/5). Showing local database results.",
+        { id: "quota-limit-toast" }
+      );
+      setSearchStatusMsg("Live search limit reached. Searching cached library.");
+    } else if (effectiveForceFull) {
       notify.info("Searching YouTube API for live tracks...", { id: "search-toast" });
     }
 
     try {
       const BASE_URL = await getBackendURL();
       const signal = abortControllerRef.current ? abortControllerRef.current.signal : undefined;
-      const isDbOnly = !forceFullSearch;
+      const isDbOnly = !effectiveForceFull;
       const url = `${BASE_URL}/youtube/search?query=${encodeURIComponent(rawTrimmed)}&dbOnly=${isDbOnly}${
-        forceFullSearch ? "&forceYouTube=true" : ""
+        effectiveForceFull ? "&forceYouTube=true" : ""
       }${nextPage ? `&pageToken=${nextPage}` : ""}`;
 
       const token = useAuthStore.getState().idToken;
-      const headers = token ? { Authorization: `Bearer ${token}` } : {};
+      const clientTz = typeof Intl !== "undefined" && Intl.DateTimeFormat
+        ? Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+        : "UTC";
+      const headers = {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        "x-timezone": clientTz,
+      };
       const response = await axios.get(url, { signal, headers });
+
+      // Automatically refresh quota telemetry on search API responses
+      if (!nextPage) {
+        refreshQuota?.();
+      }
 
       // Discard response if a newer query has superseded this one
       if (currentSeq !== requestSeqRef.current) return;
@@ -231,7 +264,7 @@ const SearchBar = ({ onSelectTrack }) => {
 
       // When a full search succeeds on page 0, also overwrite the db typeahead cache
       // so subsequent typing for this query immediately renders the 50 full results
-      if (forceFullSearch && !nextPage) {
+      if (effectiveForceFull && !nextPage) {
         searchCacheRef.current.set(`${normalized}_db_page0`, cachePayload);
       }
 
@@ -255,9 +288,16 @@ const SearchBar = ({ onSelectTrack }) => {
       if (currentSeq !== requestSeqRef.current) return;
 
       if (error.response?.status === 429) {
-        const errorMsg = error.response.data?.message || "Search rate limit reached (max 3/min, 20/day). Cached tracks remain available.";
+        const errorData = error.response.data;
+        const errorMsg =
+          errorData?.message ||
+          "Live search limit reached (max 5 searches/day). Cached tracks remain available.";
         notify.rateLimit(60, errorMsg);
-        setSearchStatusMsg("Rate limit reached. Try searching local cached tracks.");
+        setSearchStatusMsg("Search limit reached. Showing local cached tracks.");
+        // Instantly refresh telemetry state so navbar pill and modal reflect 0 left
+        refreshQuota?.();
+        // Automatically query local database so user still gets available cached songs
+        fetchSearchResults(rawTrimmed, "", false);
         return;
       }
       console.error("Error fetching search results:", error);
@@ -328,19 +368,45 @@ const SearchBar = ({ onSelectTrack }) => {
       return;
     }
 
-    saveSafeRecentSearch(query.trim() || track.title);
+    const cleanTitle = decodeHtmlEntities(track.title || "Unknown Track");
+    const cleanArtist = decodeHtmlEntities(track.channelTitle || "Unknown Artist");
+    const cleanThumb =
+      getHighResThumbnailUrl(track.thumbNail || track.thumbnail, track.videoId) ||
+      getValidThumbnailUrl(track.thumbNail || track.thumbnail) ||
+      placeholder;
+
+    saveSafeRecentSearch(query.trim() || cleanTitle);
+
+    const selectedTrack = {
+      id: track.videoId,
+      name: cleanTitle,
+      artist: cleanArtist,
+      thumbnail: cleanThumb,
+      source: "SEARCH",
+    };
+
+    // Synchronize queue with active search results so queue drawer & next/prev stay populated
+    if (results && results.length > 0) {
+      const formattedResults = results.map((r) => ({
+        id: r.videoId,
+        name: decodeHtmlEntities(r.title || "Unknown Track"),
+        artist: decodeHtmlEntities(r.channelTitle || "Unknown Artist"),
+        thumbnail:
+          getHighResThumbnailUrl(r.thumbNail || r.thumbnail, r.videoId) ||
+          getValidThumbnailUrl(r.thumbNail || r.thumbnail) ||
+          placeholder,
+        source: "SEARCH",
+      }));
+      const idx = formattedResults.findIndex((r) => r.id === track.videoId);
+      usePlayerStore.getState().setQueue(formattedResults, "SEARCH");
+      usePlayerStore.getState().setCurrentIndex(idx >= 0 ? idx : 0);
+    }
 
     // 1. Instant UI & audio playback feedback (<50ms)
-    onSelectTrack({
-      id: track.videoId,
-      name: track.title,
-      artist: track.channelTitle || "Unknown Artist",
-      thumbnail: getValidThumbnailUrl(track.thumbNail) || placeholder,
-      source: "SEARCH",
-    });
+    onSelectTrack(selectedTrack);
 
     setIsFocused(false);
-    notify.success("Track selected successfully");
+    notify.trackPlaying(cleanTitle, cleanArtist);
 
     // 2. Fetch full metadata (duration, tags) asynchronously in background without blocking UI
     getBackendURL?.()
@@ -489,7 +555,7 @@ const SearchBar = ({ onSelectTrack }) => {
                     className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full cursor-pointer transition-all duration-200 bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] hover:border-[var(--color-primary)] text-[var(--color-on-surface)]"
                   >
                     <Clock size={11} className="text-[var(--color-on-surface-variant)] flex-shrink-0" />
-                    <span className="font-medium max-w-[140px] truncate">{term}</span>
+                    <span className="font-medium max-w-[140px] truncate">{decodeHtmlEntities(term)}</span>
                     <button
                       type="button"
                       onMouseDown={(e) => removeRecentSearch(e, term)}
@@ -564,8 +630,12 @@ const SearchBar = ({ onSelectTrack }) => {
                   onMouseDown={() => handleTrackSelect(track)}
                 >
                   <img
-                    src={getValidThumbnailUrl(track.thumbNail || track.thumbnail) || placeholder}
-                    alt="Thumbnail"
+                    src={
+                      getHighResThumbnailUrl(track.thumbNail || track.thumbnail, track.videoId || track.id) ||
+                      getValidThumbnailUrl(track.thumbNail || track.thumbnail) ||
+                      placeholder
+                    }
+                    alt={decodeHtmlEntities(track.title || "Thumbnail")}
                     onLoad={handleThumbnailLoad}
                     onError={(e) => handleThumbnailError(e, track.videoId || track.id)}
                     className="w-12 h-12 rounded-xl object-cover mr-3 flex-shrink-0 shadow-sm"
@@ -573,16 +643,16 @@ const SearchBar = ({ onSelectTrack }) => {
                   <div className="flex flex-col min-w-0 flex-1">
                     <p
                       className="font-semibold text-sm line-clamp-1 text-[var(--color-on-surface)] group-hover:text-[var(--color-primary)] transition-colors"
-                      title={track.title}
+                      title={decodeHtmlEntities(track.title)}
                     >
-                      {track.title}
+                      {decodeHtmlEntities(track.title)}
                     </p>
                     <p
                       className="text-xs text-[var(--color-on-surface-variant)] line-clamp-1 mt-0.5 flex items-center gap-1.5"
-                      title={track.channelTitle}
+                      title={decodeHtmlEntities(track.channelTitle)}
                     >
                       <Music size={11} className="text-[var(--color-primary)]/70 flex-shrink-0" />
-                      <span className="truncate">{track.channelTitle}</span>
+                      <span className="truncate">{decodeHtmlEntities(track.channelTitle)}</span>
                     </p>
                   </div>
                 </div>
@@ -606,15 +676,21 @@ const SearchBar = ({ onSelectTrack }) => {
           {query.trim() && !loading && results.length === 0 && (
             <div className="p-4 text-center">
               <p className="text-sm text-[var(--color-on-surface-variant)] mb-2.5">
-                No local database tracks found for "{query}"
+                No local database tracks found for "{decodeHtmlEntities(query)}"
               </p>
-              <button
-                type="button"
-                onMouseDown={() => fetchSearchResults(query, "", true)}
-                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[var(--color-primary)] hover:opacity-90 text-[var(--color-on-primary)] transition-all shadow-md cursor-pointer"
-              >
-                <Globe size={13} /> Search YouTube API (Press Enter)
-              </button>
+              {canSearch && userSearchesLeft > 0 && !isGlobalCapReached ? (
+                <button
+                  type="button"
+                  onMouseDown={() => fetchSearchResults(query, "", true)}
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-[var(--color-primary)] hover:opacity-90 text-[var(--color-on-primary)] transition-all shadow-md cursor-pointer"
+                >
+                  <Globe size={13} /> Search YouTube API ({userSearchesLeft} left)
+                </button>
+              ) : (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-[var(--color-surface-raised)] text-[var(--color-on-surface-variant)] border border-[var(--color-border-default)]">
+                  Live search limit reached for today (5/5). Cached tracks remain available.
+                </div>
+              )}
             </div>
           )}
 

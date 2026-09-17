@@ -226,6 +226,18 @@ model ApiQuotaUsage {
   @@map("api_quota_usage")
 }
 
+model UserDailySearch {
+  id          String   @id @default(uuid())
+  identifier  String   @map("identifier") // user email (e.g. user@example.com) or client IP
+  date        DateTime @db.Date
+  searchCount Int      @default(0) @map("search_count")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@unique([identifier, date])
+  @@index([date])
+  @@map("user_daily_searches")
+}
+
 // ════════════════════════════════════════════════════════════
 // ENUMS
 // ════════════════════════════════════════════════════════════

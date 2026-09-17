@@ -6,7 +6,6 @@ import {
   Music, 
   Sun, 
   Moon, 
-  Laptop,
   ShieldCheck, 
   Sparkles, 
   CheckCircle2, 
@@ -134,7 +133,7 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const user = useAuthStore((s) => s.user);
   const isLoading = useAuthStore((s) => s.isLoading);
-  const { themePreference, resolvedTheme, currentLabel, cycleTheme } = useTheme();
+  const { resolvedTheme, cycleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState(0);
 
   // Auto-slide dashboard preview every 5 seconds
@@ -183,16 +182,14 @@ const LandingPage = () => {
 
           {/* Header Controls */}
           <div className="flex items-center gap-3">
-            {/* Theme Toggle */}
+            {/* Theme Toggle (Light / Dark Binary Switch) */}
             <button
               onClick={cycleTheme}
-              className="p-2.5 rounded-full bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] hover:border-[var(--color-primary)]/60 transition-all shadow-sm hover:scale-105 cursor-pointer text-[var(--color-on-surface)]"
-              title={`Theme: ${currentLabel} (Click to cycle)`}
-              aria-label={`Current theme: ${currentLabel}. Click to cycle.`}
+              className="p-2.5 rounded-full bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] hover:border-[var(--color-primary)]/60 transition-all shadow-sm hover:scale-105 active:scale-95 cursor-pointer text-[var(--color-on-surface)]"
+              title={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`}
+              aria-label={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`}
             >
-              {themePreference === "system" ? (
-                <Laptop size={16} className="text-cyan-400" />
-              ) : resolvedTheme === "dark" ? (
+              {resolvedTheme === "dark" ? (
                 <Moon size={16} className="text-indigo-400" />
               ) : (
                 <Sun size={16} className="text-yellow-500" />

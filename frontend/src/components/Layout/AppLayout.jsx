@@ -3,10 +3,11 @@ import Sidebar from "@/components/Home/Sidebar";
 import SearchBar from "@/components/Home/SearchBar";
 import UserMenu from "@/components/Auth/UserMenu";
 import { useTheme } from "@/ThemeProvider";
-import { Sun, Moon, Laptop, Menu } from "lucide-react";
+import { Sun, Moon, Menu } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
 import useSidebarStore from "@/store/useSidebarStore";
 import Footer from "@/components/Home/Footer";
+import QuotaStatusPill from "@/components/Admin/QuotaStatusPill";
 import { cn } from "@/lib/utils";
 
 /**
@@ -32,7 +33,7 @@ import { cn } from "@/lib/utils";
  */
 
 const AppLayout = ({ children }) => {
-  const { themePreference, resolvedTheme, currentLabel, cycleTheme } = useTheme();
+  const { resolvedTheme, cycleTheme } = useTheme();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { isSidebarCollapsed, toggleSidebarCollapsed } = useSidebarStore();
   const { setTrack } = usePlayerStore();
@@ -91,17 +92,17 @@ const AppLayout = ({ children }) => {
               <SearchBar onSelectTrack={setTrack} />
             </div>
 
-            {/* Right Header Actions: Theme Toggle & User Menu */}
+            {/* Right Header Actions: Quota Status, Theme Toggle & User Menu */}
             <div className="flex items-center justify-end gap-3 md:min-w-[96px] shrink-0">
+              <QuotaStatusPill />
+
               <button
                 onClick={cycleTheme}
-                className="p-2.5 rounded-full bg-[var(--color-surface-base)] hover:bg-[var(--color-state-hover)] border border-[var(--color-border-default)] transition-all cursor-pointer text-[var(--color-on-surface)] shadow-xs"
-                aria-label={`Current theme: ${currentLabel}. Click to cycle.`}
-                title={`Theme: ${currentLabel} (Click to cycle)`}
+                className="p-2.5 rounded-full bg-[var(--color-surface-base)] hover:bg-[var(--color-state-hover)] border border-[var(--color-border-default)] transition-all cursor-pointer text-[var(--color-on-surface)] shadow-xs hover:scale-105 active:scale-95"
+                aria-label={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`}
+                title={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`}
               >
-                {themePreference === "system" ? (
-                  <Laptop size={18} className="text-cyan-400" />
-                ) : resolvedTheme === "dark" ? (
+                {resolvedTheme === "dark" ? (
                   <Moon size={18} className="text-indigo-400" />
                 ) : (
                   <Sun size={18} className="text-yellow-500" />

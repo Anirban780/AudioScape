@@ -20,6 +20,43 @@ import { ApiEndpoint } from '@prisma/client';
  * 5. Telemetry logs usage per (date, endpoint, apiKeyId) into PostgreSQL table `ApiQuotaUsage`.
  * ============================================================================
  */
+/**
+ * Helper returning today's date formatted to Pacific Time (America/Los_Angeles),
+ * which aligns strictly with YouTube Data API v3's 00:00 PT daily quota window.
+ */
+export function getPacificDate(): Date {
+  const now = new Date();
+  const ptDateString = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now); // Produces "YYYY-MM-DD"
+  return new Date(`${ptDateString}T00:00:00.000Z`);
+}
+
+/**
+ * Helper returning today's calendar date for a specified client timezone (default: UTC).
+ * Ensures local midnight resets work accurately across local docker, cloud production,
+ * and different international user timezones.
+ */
+export function getCalendarDate(timeZone: string = 'UTC'): Date {
+  let validTz = timeZone;
+  try {
+    Intl.DateTimeFormat(undefined, { timeZone });
+  } catch {
+    validTz = 'UTC';
+  }
+  const now = new Date();
+  const dateString = new Intl.DateTimeFormat('en-CA', {
+    timeZone: validTz,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now); // Produces "YYYY-MM-DD"
+  return new Date(`${dateString}T00:00:00.000Z`);
+}
+
 @Injectable()
 export class YouTubeKeyManager {
   private readonly logger = new Logger(YouTubeKeyManager.name);
@@ -43,13 +80,12 @@ export class YouTubeKeyManager {
    * @returns Active key string and key identifier ('A' | 'B')
    */
   async getActiveApiKey(): Promise<{ key: string; keyId: 'A' | 'B' }> {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = getPacificDate();
 
     const { A: keyA, B: keyB } = this.keys;
 
-    // Default primary key alternates based on odd/even day of month
-    const defaultPrimary: 'A' | 'B' = today.getDate() % 2 === 1 ? 'A' : 'B';
+    // Default primary key alternates based on odd/even day of month in Pacific Time
+    const defaultPrimary: 'A' | 'B' = today.getUTCDate() % 2 === 1 ? 'A' : 'B';
     const defaultSecondary: 'A' | 'B' = defaultPrimary === 'A' ? 'B' : 'A';
 
     try {
@@ -112,8 +148,7 @@ export class YouTubeKeyManager {
    */
   async recordQuotaUsage(endpoint: ApiEndpoint, units: number, keyId: 'A' | 'B' = 'A'): Promise<void> {
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const today = getPacificDate();
 
       await this.prisma.apiQuotaUsage.upsert({
         where: {

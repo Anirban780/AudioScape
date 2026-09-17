@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ApiEndpoint, QueryType } from '@prisma/client';
 import { YouTubeKeyManager } from './youtube-key-manager';
 import { SearchRateLimiterService } from './search-rate-limiter.service';
-import { getValidThumbnailUrl } from '../utils/youtubeUtils';
+import { getValidThumbnailUrl, decodeHtmlEntities } from '../utils/youtubeUtils';
 import { parseTrackTitle } from './utils/title-parser.util';
 import { CURATED_GENRES } from '../recommendations/curated-genres';
 
@@ -273,8 +273,8 @@ export class TracksService {
     // STEP 3: Cache MISS — Query YouTube Data API `/v3/search` Proxy
     if (res) res.setHeader('X-Cache', 'MISS');
 
-    // Enforce multi-tier sliding-window rate limiting (3 live searches/min, 20 live searches/day)
-    this.rateLimiter.checkAndConsume(clientId, res);
+    // Enforce multi-tier sliding-window rate limiting & persistent 50% threshold budget (3/min, 5/day, 150 global)
+    await this.rateLimiter.checkAndConsume(clientId, res);
 
     this.logger.log(`Cache MISS for search query: "${query}" [pageToken: ${pageToken || 'initial'}]. Calling YouTube API...`);
     const musicCategoryId = await this.getMusicCategoryId();
@@ -297,11 +297,12 @@ export class TracksService {
           seenVideoIds.add(item.id.videoId);
           return {
             videoId: item.id.videoId as string,
-            title: item.snippet.title as string,
-            thumbNail: (item.snippet.thumbnails?.default?.url ||
-              item.snippet.thumbnails?.high?.url ||
+            title: decodeHtmlEntities(item.snippet.title as string),
+            thumbNail: (item.snippet.thumbnails?.high?.url ||
+              item.snippet.thumbnails?.medium?.url ||
+              item.snippet.thumbnails?.default?.url ||
               '') as string,
-            channelTitle: (item.snippet.channelTitle || 'Unknown Artist') as string,
+            channelTitle: decodeHtmlEntities((item.snippet.channelTitle || 'Unknown Artist') as string),
             channelId: (item.snippet.channelId || '') as string,
             publishedAt: item.snippet.publishedAt ? new Date(item.snippet.publishedAt) : null,
             description: (item.snippet.description || null) as string | null,

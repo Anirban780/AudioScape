@@ -35,6 +35,8 @@ export class AppController {
         playlistTracks: 'POST|DELETE /api/playlists/:id/tracks',
         recommendations: 'POST /api/music/recommend',
         cacheRelatedTracks: 'POST /api/music/cache-related-tracks',
+        quotaToday: 'GET /api/admin/quota/today',
+        quotaHistory: 'GET /api/admin/quota/history?days=7',
       },
       timestamp: new Date().toISOString(),
     };
