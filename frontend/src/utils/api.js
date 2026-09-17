@@ -1032,4 +1032,48 @@ export async function fetchQuotaHistory(days = 7) {
     }
 }
 
+/**
+ * Submits user feedback, bug report, or feature request to the AudioScape backend.
+ *
+ * @param {object} feedbackData - Feedback payload
+ * @param {string} feedbackData.category - Category ('bug', 'feature', 'audio', 'quota', 'general')
+ * @param {string} feedbackData.subject - Subject line
+ * @param {string} feedbackData.message - Message body
+ * @param {string} feedbackData.email - User contact email
+ * @param {string} [feedbackData.name] - User name
+ * @param {number} [feedbackData.rating] - Optional star rating (1-5)
+ * @param {string} [feedbackData.deviceInfo] - Optional client environment details
+ * @returns {Promise<object>} Submission confirmation with { success, message, id }
+ */
+export async function submitUserFeedback(feedbackData) {
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
+
+        const response = await fetch(`${API_URL}/api/feedback`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...headers,
+            },
+            credentials: "include",
+            body: JSON.stringify(feedbackData),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            const errorMessage = Array.isArray(data?.message)
+                ? data.message.join(", ")
+                : (data?.message || `Submission failed with status ${response.status}`);
+            throw new Error(errorMessage);
+        }
+
+        return data;
+    } catch (err) {
+        console.error("submitUserFeedback error:", err);
+        throw err;
+    }
+}
+
 

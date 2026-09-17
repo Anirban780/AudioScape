@@ -24,6 +24,7 @@ model User {
 
   listenHistory ListenHistory[]
   playlists     Playlist[]
+  feedbacks     Feedback[]
 
   @@map("users")
 }
@@ -236,6 +237,28 @@ model UserDailySearch {
   @@unique([identifier, date])
   @@index([date])
   @@map("user_daily_searches")
+}
+
+model Feedback {
+  id         String   @id @default(uuid())
+  userId     String?  @map("user_id")
+  userEmail  String   @map("user_email")
+  userName   String?  @map("user_name")
+  category   String   @default("general")
+  rating     Int?
+  subject    String
+  message    String   @db.Text
+  deviceInfo String?  @map("device_info") @db.Text
+  status     String   @default("PENDING")
+  emailSent  Boolean  @default(false) @map("email_sent")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([createdAt(sort: Desc)])
+  @@index([category])
+  @@map("feedbacks")
 }
 
 // ════════════════════════════════════════════════════════════

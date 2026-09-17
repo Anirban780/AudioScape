@@ -6,6 +6,7 @@ import { ListenHistoryModule } from './history/history.module';
 import { PlaylistsModule } from './playlists/playlists.module';
 import { RecommendationsModule } from './recommendations/recommendations.module';
 import { HealthModule } from './health/health.module';
+import { FeedbackModule } from './feedback/feedback.module';
 import { AppController } from './app.controller';
 
 /**
@@ -25,6 +26,7 @@ import { AppController } from './app.controller';
  * - PlaylistsModule: Custom playlist CRUD operations, track additions/removals, & position reordering
  * - RecommendationsModule: TF-IDF vector similarity recommendation engine
  * - HealthModule: Uptime monitoring, database pinging, and health check endpoints
+ * - FeedbackModule: In-app user feedback storage & formatted email delivery
  * ============================================================================
  */
 @Module({
@@ -36,6 +38,7 @@ import { AppController } from './app.controller';
     PlaylistsModule,
     RecommendationsModule,
     HealthModule,
+    FeedbackModule,
   ],
   controllers: [AppController],
   providers: [],
