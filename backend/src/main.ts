@@ -71,6 +71,7 @@ async function bootstrap() {
   const defaultAllowedOrigins = [
     'http://localhost:5173',
     'http://localhost:5000',
+    'https://audio-scape.vercel.app',
     'https://audioscape-staging.vercel.app',
     'https://audioscape.app',
     'https://audio-scape-pi.vercel.app',
@@ -89,8 +90,7 @@ async function bootstrap() {
       // Strict origin matching: whitelisted production domains and official project preview branches
       const isAllowed =
         defaultAllowedOrigins.includes(normalizedOrigin) ||
-        /^https:\/\/audioscape(-[a-zA-Z0-9]+)*\.vercel\.app$/.test(normalizedOrigin) ||
-        /^https:\/\/audio-scape-pi(-[a-zA-Z0-9]+)*\.vercel\.app$/.test(normalizedOrigin);
+        /^https:\/\/(audio-scape|audioscape)(-[a-zA-Z0-9]+)*\.vercel\.app$/.test(normalizedOrigin);
 
       if (isAllowed) {
         return callback(null, true);
