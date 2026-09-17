@@ -87,6 +87,13 @@ const MiniPlayer = ({ track, player, isPlayerReady, onClose }) => {
   const progressBarRef = useRef(null);
   const menuRef = useRef(null);
 
+  // Reset visibility whenever a new track is selected, ensuring the player reliably renders
+  useEffect(() => {
+    if (track?.id) {
+      setIsVisible(true);
+    }
+  }, [track?.id]);
+
   // Reusable 1s YouTube iFrame time/duration polling hook
   usePlayerProgress(player, isPlayerReady);
 

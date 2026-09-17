@@ -6,7 +6,7 @@ import Home from "@/pages/Home";
 import LandingPage from "@/pages/LandingPage";
 import NotFound from "@/pages/NotFound";
 import { ThemeProvider } from "@/ThemeProvider";
-import { Toaster } from "react-hot-toast";
+import { Toaster } from "@/components/ui/sonner";
 import FavoritesPage from "@/pages/FavoritesPage";
 import PlayerContainer from "@/components/Player/PlayerContainer";
 import usePlayerStore from "@/store/usePlayerStore";
@@ -105,18 +105,8 @@ function AppContent() {
 
   return (
     <div className="relative min-h-screen bg-[var(--color-surface-base)] text-[var(--color-on-surface)]">
-      {/* Toast Notification Container */}
-      <Toaster 
-        position="top-right" 
-        reverseOrder={false}
-        toastOptions={{
-          style: {
-            background: 'var(--color-surface-raised)',
-            color: 'var(--color-on-surface)',
-            border: '1px solid var(--color-border-default)',
-          },
-        }}
-      />
+      {/* Sonner Toast Notification Container (Theme-aware & physics-based) */}
+      <Toaster />
 
       {/* Persistent Audio Player (Preserved across route changes) */}
       {user && track && <PlayerContainer uid={user.id} />}

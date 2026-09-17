@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import usePlayerStore from "@/store/usePlayerStore";
 import { decodeHtmlEntities } from "@/utils/youtubeUtils";
 
-const DEFAULT_TITLE = "AudioScape - Next-Gen Music Streaming";
+const DEFAULT_TITLE = "AudioScape : Next-Gen Music Streaming";
 
 /**
  * ============================================================================
@@ -13,7 +13,7 @@ const DEFAULT_TITLE = "AudioScape - Next-Gen Music Streaming";
  * Reactively updates document.title in the browser tab based on current playback state:
  * - Playing: "▶ Song Title • Artist | AudioScape"
  * - Paused:  "⏸ Song Title • Artist | AudioScape"
- * - Idle:    "AudioScape - Next-Gen Music Streaming"
+ * - Idle:    "AudioScape : Next-Gen Music Streaming"
  * 
  * WHY IT WAS DESIGNED THIS WAY:
  * Provides instant situational awareness when users switch to other tabs or windows,

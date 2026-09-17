@@ -4,7 +4,7 @@ import useAuthStore from "@/store/useAuthStore";
 import { fetchYoutubeMusic } from "@/utils/youtube";
 import { fetchExploreFeed } from "@/utils/api";
 import Loader from "@/components/Home/Loader";
-import toast from "react-hot-toast";
+import { notify } from "@/utils/notify";
 import { Compass } from "lucide-react";
 
 import ExploreTrendingBanner from "./ExploreTrendingBanner";
@@ -145,14 +145,14 @@ const ExplorePage = () => {
 
     if (existingIndex !== -1) return;
 
-    toast.loading(`Loading ${categoryQuery}...`, { id: "explore-genre" });
+    notify.loading(`Loading ${categoryQuery}...`, { id: "explore-genre" });
     try {
       const tracks = await fetchYoutubeMusic(categoryQuery, 15);
       setExploreFeed((prev) => [{ title: categoryQuery, tracks }, ...prev]);
       setVisibleTracks((prev) => ({ ...prev, [categoryQuery]: 5 }));
-      toast.success(`Loaded ${categoryQuery}`, { id: "explore-genre" });
+      notify.success(`Loaded ${categoryQuery}`, { id: "explore-genre" });
     } catch (e) {
-      toast.error(`Failed to load ${categoryQuery}`, { id: "explore-genre" });
+      notify.error(`Failed to load ${categoryQuery}`, { id: "explore-genre" });
     }
   };
 

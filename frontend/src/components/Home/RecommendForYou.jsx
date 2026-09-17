@@ -10,7 +10,7 @@ import { getRecommendations, fetchExploreFeed } from "@/utils/api";
 import { getHighResThumbnailUrl, handleThumbnailLoad, handleThumbnailError, decodeHtmlEntities, getValidThumbnailUrl } from "@/utils/youtubeUtils";
 import MediaGrid from "@/components/Layout/MediaGrid";
 import SectionHeader from "@/components/Home/SectionHeader";
-import toast from "react-hot-toast";
+import { notify } from "@/utils/notify";
 import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
@@ -189,7 +189,7 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
       source: "RECOMMENDATION",
     });
     usePlayerStore.getState().setIsPlaying(true);
-    toast.success(`Playing: ${cleanTitle}`);
+    notify.trackPlaying(cleanTitle, cleanArtist);
   };
 
   const handleAddToQueue = (song) => {
@@ -202,7 +202,7 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
       thumbnail: song.thumbnail || song.thumbNail,
       source: "RECOMMENDATION",
     });
-    toast.success(`Added "${cleanName}" to queue`);
+    notify.queueAdded(cleanName);
   };
 
   if (loading) {
@@ -355,7 +355,7 @@ const RecommendForYou = ({ userId, sharedRecommendations = null, enablePanAnimat
                   <ListPlus size={18} />
                 </button>
                 <button
-                  onClick={() => toast.success("Added to your favorites!")}
+                  onClick={() => notify.success("Added to your favorites!")}
                   className="w-10 h-10 rounded-full bg-black/40 backdrop-blur-md border border-white/20 flex items-center justify-center text-white hover:text-pink-400 hover:border-pink-400/50 transition-colors shadow-md cursor-pointer"
                   title="Add to Favorites"
                 >

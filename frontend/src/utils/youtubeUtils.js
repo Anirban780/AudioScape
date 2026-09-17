@@ -54,21 +54,23 @@ export function extractYouTubeId(url) {
 }
 
 /**
- * Converts any YouTube thumbnail URL into its HIGHEST available Ultra HD resolution tier (maxresdefault.jpg).
+ * Converts any YouTube thumbnail URL into its highest universally available High Def resolution tier (hqdefault.jpg, 480x360).
+ * Unlike maxresdefault.jpg or sddefault.jpg (which frequently 404 for music videos and non-1080p uploads),
+ * hqdefault.jpg is guaranteed by YouTube CDN to exist for 100% of processed videos with 0 network 404 errors.
  * 
  * @param {string} url - Original thumbnail URL
  * @param {string} videoId - YouTube Video ID fallback
- * @returns {string|null} Ultra HD YouTube thumbnail URL with sanitized domain, or null
+ * @returns {string|null} High Def YouTube thumbnail URL with sanitized domain, or null
  */
 export function getHighResThumbnailUrl(url, videoId) {
   let target = url;
   const id = videoId || extractYouTubeId(url);
   
   if (id && isValidYouTubeId(id)) {
-    target = `https://${TARGET_YOUTUBE_THUMBNAIL_DOMAIN}/vi/${id}/maxresdefault.jpg`;
+    target = `https://${TARGET_YOUTUBE_THUMBNAIL_DOMAIN}/vi/${id}/hqdefault.jpg`;
   } else if (typeof target === "string" && (target.includes("ytimg.com") || target.includes("youtube.com"))) {
     target = target
-      .replace(/\/default\.jpg|\/mqdefault\.jpg|\/hqdefault\.jpg|\/sddefault\.jpg/, "/maxresdefault.jpg");
+      .replace(/\/default\.jpg|\/mqdefault\.jpg|\/sddefault\.jpg/, "/hqdefault.jpg");
   } else if (!target) {
     return null;
   }
@@ -104,15 +106,23 @@ export function decodeHtmlEntities(text) {
   return text
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#x27;/g, "'")
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
+    .replace(/&gt;/g, ">")
+    .replace(/&#x2F;/g, "/")
+    .replace(/&#47;/g, "/");
 }
 
 export function handleThumbnailLoad(e) {
   if (!e || !e.target) return;
-  if (e.target.naturalWidth === 120 && e.target.naturalHeight === 90 && !e.target.src.includes("placeholder")) {
-    const current = e.target.src;
+  const current = e.target.src || "";
+  // YouTube CDN returns a 120x90 grey camera dummy image when maxresdefault / sddefault does not exist.
+  // We only step down if the request was for a higher-res tier (maxresdefault, sddefault, hqdefault).
+  // A native default.jpg has 120x90 dimensions legitimately, so never treat default.jpg as an error.
+  const isHigherTier = current.includes("maxresdefault") || current.includes("sddefault") || current.includes("hqdefault");
+  if (e.target.naturalWidth === 120 && e.target.naturalHeight === 90 && !current.includes("placeholder") && isHigherTier) {
     const videoId = extractYouTubeId(current);
     const nextSrc = getNextFallbackThumbnailUrl(current, videoId, placeholder);
     e.target.src = nextSrc;

@@ -32,6 +32,44 @@ import { AudioScapeMark } from '@/components/common/AudioScapeLogo';
  * - Applies smooth `.sidebar-transition` utility for fluid layout pacing.
  */
 
+const MenuItem = React.memo(({ icon: Icon, text, to, isCollapsed, isActive }) => {
+  return (
+    <li className="w-full">
+      <Link
+        to={to}
+        title={isCollapsed ? text : undefined}
+        className={cn(
+          'group relative flex items-center cursor-pointer transition-colors duration-150 select-none my-1.5 outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/40',
+          isCollapsed
+            ? 'w-12 h-12 mx-auto justify-center rounded-2xl'
+            : 'w-full py-3.5 px-4 gap-3.5 rounded-2xl',
+          isActive 
+            ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)] font-extrabold border border-[var(--color-primary)]/25 shadow-xs' 
+            : 'hover:bg-[var(--color-primary)]/10 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] font-medium'
+        )}
+      >
+        {/* Active Left Accent Bar (Expanded Mode) */}
+        {isActive && !isCollapsed && (
+          <span className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full bg-[var(--color-primary)] shadow-xs" />
+        )}
+
+        <Icon
+          size={22}
+          className={cn(
+            'shrink-0 transition-transform duration-150 group-hover:scale-110',
+            isActive ? 'text-[var(--color-primary)] drop-shadow-xs' : 'text-[var(--color-on-surface-variant)] group-hover:text-[var(--color-primary)]'
+          )}
+        />
+
+        {!isCollapsed && (
+          <span className="truncate text-sm tracking-wide">{text}</span>
+        )}
+      </Link>
+    </li>
+  );
+});
+MenuItem.displayName = "SidebarMenuItem";
+
 const Sidebar = ({
   isCollapsed: externalCollapsed,
   onToggleCollapse,
@@ -39,8 +77,10 @@ const Sidebar = ({
   onToggle,
   isMobile = false,
 }) => {
-  const { isSidebarCollapsed: storeCollapsed, toggleSidebarCollapsed } = useSidebarStore();
-  const { defaultPlayerMode, toggleDefaultPlayerMode } = usePlayerStore();
+  const storeCollapsed = useSidebarStore((s) => s.isSidebarCollapsed);
+  const toggleSidebarCollapsed = useSidebarStore((s) => s.toggleSidebarCollapsed);
+  const defaultPlayerMode = usePlayerStore((s) => s.defaultPlayerMode);
+  const toggleDefaultPlayerMode = usePlayerStore((s) => s.toggleDefaultPlayerMode);
 
   const isCollapsed = isMobile
     ? false
@@ -59,45 +99,6 @@ const Sidebar = ({
   };
 
   const location = useLocation();
-
-  const MenuItem = ({ icon: Icon, text, to }) => {
-    const isActive = location.pathname === to;
-
-    return (
-      <li className="w-full">
-        <Link
-          to={to}
-          title={isCollapsed ? text : undefined}
-          className={cn(
-            'group relative flex items-center cursor-pointer transition-all duration-200 select-none my-1.5',
-            isCollapsed
-              ? 'w-12 h-12 mx-auto justify-center rounded-2xl'
-              : 'w-full py-3.5 px-4 gap-3.5 rounded-2xl',
-            isActive 
-              ? 'bg-[var(--color-primary)]/15 text-[var(--color-primary)] font-extrabold border border-[var(--color-primary)]/25 shadow-xs' 
-              : 'hover:bg-[var(--color-primary)]/10 text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] font-medium'
-          )}
-        >
-          {/* Active Left Accent Bar (Expanded Mode) */}
-          {isActive && !isCollapsed && (
-            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 w-1 h-5 rounded-full bg-[var(--color-primary)] shadow-xs" />
-          )}
-
-          <Icon
-            size={22}
-            className={cn(
-              'shrink-0 transition-transform duration-200 group-hover:scale-110',
-              isActive ? 'text-[var(--color-primary)] drop-shadow-xs' : 'text-[var(--color-on-surface-variant)] group-hover:text-[var(--color-primary)]'
-            )}
-          />
-
-          {!isCollapsed && (
-            <span className="truncate text-sm tracking-wide">{text}</span>
-          )}
-        </Link>
-      </li>
-    );
-  };
 
   return (
     <div
@@ -136,11 +137,11 @@ const Sidebar = ({
 
       {/* Navigation Links List */}
       <ul className={cn('space-y-1 flex-1', isCollapsed && 'flex flex-col items-center')}>
-        <MenuItem icon={Home} text="Home" to="/home" />
-        <MenuItem icon={Sparkles} text="Discover" to="/recommendations" />
-        <MenuItem icon={Heart} text="Favourites" to="/favourites" />
-        <MenuItem icon={Library} text="Playlists" to="/playlists" />
-        <MenuItem icon={History} text="History" to="/history" />
+        <MenuItem icon={Home} text="Home" to="/home" isCollapsed={isCollapsed} isActive={location.pathname === "/home"} />
+        <MenuItem icon={Sparkles} text="Discover" to="/recommendations" isCollapsed={isCollapsed} isActive={location.pathname === "/recommendations"} />
+        <MenuItem icon={Heart} text="Favourites" to="/favourites" isCollapsed={isCollapsed} isActive={location.pathname === "/favourites"} />
+        <MenuItem icon={Library} text="Playlists" to="/playlists" isCollapsed={isCollapsed} isActive={location.pathname === "/playlists"} />
+        <MenuItem icon={History} text="History" to="/history" isCollapsed={isCollapsed} isActive={location.pathname === "/history"} />
       </ul>
 
       {/* Sidebar Footer: Player Mode Setting & Collapse Toggle */}
@@ -150,14 +151,14 @@ const Sidebar = ({
           <button
             type="button"
             onClick={toggleDefaultPlayerMode}
-            className="w-12 h-12 flex items-center justify-center rounded-2xl cursor-pointer text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-all border border-transparent hover:border-[var(--color-primary)]/30"
+            className="group w-12 h-12 flex items-center justify-center rounded-2xl cursor-pointer text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 transition-colors duration-150 border border-transparent hover:border-[var(--color-primary)]/30 outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/40"
             title={`Default Player: ${defaultPlayerMode === 'full' ? 'Full Screen' : 'Mini Player'} (Click to switch)`}
             aria-label={`Default Player: ${defaultPlayerMode === 'full' ? 'Full Screen' : 'Mini Player'}`}
           >
             {defaultPlayerMode === 'full' ? (
-              <Maximize2 size={20} className="text-[var(--color-primary)] transition-transform hover:scale-110" />
+              <Maximize2 size={20} className="text-[var(--color-primary)] transition-transform duration-150 group-hover:scale-110" />
             ) : (
-              <Minimize2 size={20} className="text-[var(--color-on-surface-variant)] transition-transform hover:scale-110" />
+              <Minimize2 size={20} className="text-[var(--color-on-surface-variant)] transition-transform duration-150 group-hover:scale-110" />
             )}
           </button>
         ) : (
@@ -173,12 +174,12 @@ const Sidebar = ({
             <button
               type="button"
               onClick={toggleDefaultPlayerMode}
-              className="inline-flex items-center p-0.5 rounded-xl bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] cursor-pointer transition-all hover:border-[var(--color-primary)]/40"
+              className="inline-flex items-center p-0.5 rounded-xl bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] cursor-pointer transition-colors duration-150 hover:border-[var(--color-primary)]/40 outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/40"
               title={`Default player mode: ${defaultPlayerMode === 'full' ? 'Full Screen' : 'Mini Player'} (Click to toggle)`}
             >
               <span
                 className={cn(
-                  'px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all',
+                  'px-2.5 py-1 rounded-lg font-bold text-[11px] transition-colors duration-150',
                   defaultPlayerMode === 'full'
                     ? 'bg-[var(--color-primary)] text-[var(--color-text-on-primary)] shadow-xs'
                     : 'text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)]'
@@ -188,7 +189,7 @@ const Sidebar = ({
               </span>
               <span
                 className={cn(
-                  'px-2.5 py-1 rounded-lg font-bold text-[11px] transition-all',
+                  'px-2.5 py-1 rounded-lg font-bold text-[11px] transition-colors duration-150',
                   defaultPlayerMode === 'mini'
                     ? 'bg-[var(--color-primary)] text-[var(--color-text-on-primary)] shadow-xs'
                     : 'text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)]'
@@ -202,9 +203,10 @@ const Sidebar = ({
 
         {/* Sidebar Collapse Toggle Button */}
         <button
+          type="button"
           onClick={handleToggle}
           className={cn(
-            'flex items-center transition-all duration-200 cursor-pointer text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10',
+            'group flex items-center transition-colors duration-150 cursor-pointer text-[var(--color-on-surface-variant)] hover:text-[var(--color-primary)] hover:bg-[var(--color-primary)]/10 outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/40',
             isCollapsed 
               ? 'w-12 h-12 justify-center rounded-2xl' 
               : 'w-full py-2.5 px-3.5 gap-3 rounded-2xl'
@@ -213,10 +215,10 @@ const Sidebar = ({
           title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
           {isCollapsed ? (
-            <PanelLeftOpen size={20} className="shrink-0 transition-transform hover:scale-110" />
+            <PanelLeftOpen size={20} className="shrink-0 transition-transform duration-150 group-hover:scale-110" />
           ) : (
             <>
-              <PanelLeftClose size={20} className="shrink-0 transition-transform hover:scale-110" />
+              <PanelLeftClose size={20} className="shrink-0 transition-transform duration-150 group-hover:scale-110" />
               <span className="truncate text-xs font-semibold tracking-wider uppercase text-[var(--color-on-surface-variant)]">
                 Collapse
               </span>

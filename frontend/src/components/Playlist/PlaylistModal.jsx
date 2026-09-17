@@ -9,7 +9,7 @@ import {
 import { X, Plus, Check, ListMusic, Music, Loader2, AlertCircle } from "lucide-react";
 import usePlaylistStore from "@/store/usePlaylistStore";
 import useAuthStore from "@/store/useAuthStore";
-import toast from "react-hot-toast";
+import { notify } from "@/utils/notify";
 import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
@@ -105,12 +105,12 @@ const PlaylistModal = ({ userId }) => {
     const handleCreateLocal = async () => {
         const name = newName.trim();
         if (!name) {
-            toast.error("Playlist name cannot be empty");
+            notify.error("Playlist name cannot be empty");
             return;
         }
 
         if (!effectiveUserId) {
-            toast.error("User authentication required");
+            notify.error("User authentication required");
             return;
         }
 
@@ -128,9 +128,9 @@ const PlaylistModal = ({ userId }) => {
             }));
 
             setNewName("");
-            toast.success(`Created "${name}" & selected`);
+            notify.success(`Created "${name}" & selected`);
         } catch (err) {
-            toast.error(err.message || "Failed to create playlist");
+            notify.error(err.message || "Failed to create playlist");
         } finally {
             setCreating(false);
         }
@@ -161,13 +161,13 @@ const PlaylistModal = ({ userId }) => {
                 }
             }
 
-            if (addedCount > 0) toast.success(`Saved to ${addedCount} playlist(s)!`);
-            if (removedCount > 0) toast.success(`Removed from ${removedCount} playlist(s)`);
+            if (addedCount > 0) notify.success(`Saved to ${addedCount} playlist(s)!`);
+            if (removedCount > 0) notify.success(`Removed from ${removedCount} playlist(s)`);
 
             closeModal();
         } catch (err) {
             console.error("Playlist save error:", err);
-            toast.error(err.message || "Failed to save changes");
+            notify.error(err.message || "Failed to save changes");
         } finally {
             setSaving(false);
         }

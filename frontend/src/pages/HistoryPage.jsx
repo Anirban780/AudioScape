@@ -14,7 +14,7 @@ import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 import { getHighResThumbnailUrl } from "@/utils/youtubeUtils";
 import { Clock, History, Music, ListPlus, Heart, ChevronLeft, ChevronRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
+import { notify } from "@/utils/notify";
 
 /**
  * ============================================================================
@@ -101,7 +101,7 @@ const HistoryPage = () => {
       }
     } catch (err) {
       console.error("Error loading listen history:", err);
-      if (showLoader) toast.error("Failed to load listening history");
+      if (showLoader) notify.error("Failed to load listening history");
     } finally {
       if (showLoader) setLoading(false);
     }
@@ -145,7 +145,7 @@ const HistoryPage = () => {
       handleGoToPage(target);
       setJumpInput("");
     } else {
-      toast.error(`Please enter a page number between 1 and ${maxPage}`);
+      notify.error(`Please enter a page number between 1 and ${maxPage}`);
     }
   };
 
@@ -192,7 +192,7 @@ const HistoryPage = () => {
     if (!track) return;
     setTrack(track, "SEARCH");
     setIsPlaying(true);
-    toast.success(`Playing: ${track.name || track.title}`);
+    notify.trackPlaying(track.name || track.title);
   };
 
   // Play All Tracks
@@ -201,7 +201,7 @@ const HistoryPage = () => {
     setQueue(processedTracks, "SEARCH");
     setTrack(processedTracks[0], "SEARCH");
     setIsPlaying(true);
-    toast.success(`Playing history queue (${processedTracks.length} tracks)`);
+    notify.success(`Playing history queue (${processedTracks.length} tracks)`);
   };
 
   // Shuffle Play Tracks
@@ -211,7 +211,7 @@ const HistoryPage = () => {
     setQueue(shuffled, "SEARCH");
     setTrack(shuffled[0], "SEARCH");
     setIsPlaying(true);
-    toast.success(`Shuffling history queue (${shuffled.length} tracks)`);
+    notify.success(`Shuffling history queue (${shuffled.length} tracks)`);
   };
 
   // Add to Playlist
@@ -220,7 +220,7 @@ const HistoryPage = () => {
     openModal(track);
   };
 
-  // Toggle Track Like Status
+  // Toggle Track Like Status with interactive Undo on unlike
   const handleToggleLike = async (track) => {
     if (!track || !userId) return;
     const trackId = track.id || track.videoId;
@@ -237,9 +237,23 @@ const HistoryPage = () => {
     try {
       const success = await saveLikeSong(userId, track, newLiked);
       if (success !== false) {
-        toast.success(newLiked ? "Added to favourites" : "Removed from favourites", {
-          icon: newLiked ? "💖" : "💔",
-        });
+        if (newLiked) {
+          notify.success("Added to favourites", { icon: "💖" });
+        } else {
+          notify.undo("Removed from favourites", async () => {
+            setHistoryTracks((prev) =>
+              prev.map((t) =>
+                (t.id || t.videoId) === trackId ? { ...t, liked: true } : t
+              )
+            );
+            try {
+              await saveLikeSong(userId, track, true);
+              notify.success("Restored to favourites");
+            } catch {
+              notify.error("Failed to restore favourite");
+            }
+          }, { icon: "💔" });
+        }
       } else {
         throw new Error("Mutation rejected");
       }
@@ -250,7 +264,7 @@ const HistoryPage = () => {
           (t.id || t.videoId) === trackId ? { ...t, liked: currentLiked } : t
         )
       );
-      toast.error("Failed to update favourite status");
+      notify.error("Failed to update favourite status");
     }
   };
 

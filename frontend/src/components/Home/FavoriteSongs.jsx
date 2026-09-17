@@ -9,7 +9,7 @@ import { useRefreshOn } from "@/store/useDataRefreshStore";
 import { Skeleton } from "@/components/ui/skeleton";
 import SectionHeader from "@/components/Home/SectionHeader";
 import { getValidThumbnailUrl, getHighResThumbnailUrl, decodeHtmlEntities } from "@/utils/youtubeUtils";
-import toast from "react-hot-toast";
+import { notify } from "@/utils/notify";
 import useThumbnailFailsafe from "@/hooks/useThumbnailFailsafe";
 
 /**
@@ -100,7 +100,7 @@ const FavoriteSongs = ({ userId }) => {
       thumbnail: song.thumbnail || placeholder,
     });
     usePlayerStore.getState().setIsPlaying(true);
-    toast.success(`Playing: ${song.name || song.title}`);
+    notify.trackPlaying(song.name || song.title, song.artist);
   };
 
   return (

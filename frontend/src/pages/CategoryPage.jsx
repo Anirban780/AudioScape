@@ -32,7 +32,7 @@ import {
   Volume2,
   X,
 } from "lucide-react";
-import toast from "react-hot-toast";
+import { notify } from "@/utils/notify";
 
 /**
  * ============================================================================
@@ -121,7 +121,7 @@ const CategoryPage = () => {
       })
       .catch((err) => {
         console.error("Failed to load category detail:", err);
-        toast.error("Failed to load category tracks");
+        notify.error("Failed to load category tracks");
       })
       .finally(() => {
         if (isMounted) setLoading(false);
@@ -151,7 +151,7 @@ const CategoryPage = () => {
       }
     } catch (err) {
       console.error("Failed to load more tracks:", err);
-      toast.error("Could not load additional tracks");
+      notify.error("Could not load additional tracks");
     } finally {
       setLoadingMore(false);
     }
@@ -185,7 +185,7 @@ const CategoryPage = () => {
     setTrack(track, "EXPLORE");
     setIsPlaying(true);
     saveSongListen(trackId, "EXPLORE", track);
-    toast.success(`Playing: ${decodeHtmlEntities(track.title || track.name)}`);
+    notify.trackPlaying(decodeHtmlEntities(track.title || track.name));
   };
 
   const handlePlayAll = () => {
@@ -195,7 +195,7 @@ const CategoryPage = () => {
     setTrack(tracks[0], "EXPLORE");
     setIsPlaying(true);
     saveSongListen(tracks[0].id || tracks[0].videoId, "EXPLORE", tracks[0]);
-    toast.success(`Playing ${category?.name || "Category"} (${tracks.length} tracks)`);
+    notify.success(`Playing ${category?.name || "Category"} (${tracks.length} tracks)`);
   };
 
   const handleShuffle = () => {
@@ -206,7 +206,7 @@ const CategoryPage = () => {
     setTrack(shuffled[0], "EXPLORE");
     setIsPlaying(true);
     saveSongListen(shuffled[0].id || shuffled[0].videoId, "EXPLORE", shuffled[0]);
-    toast.success(`Shuffled ${category?.name || "Category"} (${shuffled.length} tracks)`);
+    notify.success(`Shuffled ${category?.name || "Category"} (${shuffled.length} tracks)`);
   };
 
   // Top 5 tracks for the banner carousel

@@ -6,7 +6,7 @@ import usePlayerStore from "@/store/usePlayerStore";
 import usePlaylistStore from '@/store/usePlaylistStore';
 import { useRefreshOn } from "@/store/useDataRefreshStore";
 import Loader from '@/components/Home/Loader';
-import toast from 'react-hot-toast';
+import { notify } from '@/utils/notify';
 import { Heart, HeartOff, ListPlus, Loader2, X, Music, ChevronLeft, ChevronRight } from 'lucide-react';
 import MediaGrid from '@/components/Layout/MediaGrid';
 import FavoritesHeroBanner from '@/components/Favorites/FavoritesHeroBanner';
@@ -66,14 +66,14 @@ const FavoritesPage = () => {
 
             const favorites = await fetchUserLikedSongs(userId);
             if (!favorites) {
-                if (showLoader) toast.error('Failed to fetch liked songs.');
+                if (showLoader) notify.error('Failed to fetch liked songs.');
                 return;
             }
 
             setLikedSongs(favorites);
 
         } catch (error) {
-            if (showLoader) toast.error('Failed to fetch liked songs.');
+            if (showLoader) notify.error('Failed to fetch liked songs.');
         } finally {
             if (showLoader) setLoading(false);
         }
@@ -90,7 +90,7 @@ const FavoritesPage = () => {
     // Automatically refetch favorites 5 seconds after any like/unlike mutation
     useRefreshOn("favorites", () => fetchLikedSongs(false), 5000);
 
-    // Handle Remove from Favorites
+    // Handle Remove from Favorites with interactive Undo capability
     const handleRemoveFavorite = async (song) => {
         if (!song) return;
         const previousSongs = [...likedSongs];
@@ -100,7 +100,15 @@ const FavoritesPage = () => {
         try {
             const success = await saveLikeSong(userId, song, false);
             if (success !== false) {
-                toast.success('Removed from favourites', {
+                notify.undo('Removed from favourites', async () => {
+                    setLikedSongs(previousSongs);
+                    try {
+                        await saveLikeSong(userId, song, true);
+                        notify.success('Restored to favourites');
+                    } catch {
+                        notify.error('Failed to restore favourite');
+                    }
+                }, {
                     icon: '💔',
                 });
             } else {
@@ -109,7 +117,7 @@ const FavoritesPage = () => {
         } catch (error) {
             // Revert on failure
             setLikedSongs(previousSongs);
-            toast.error('Failed to remove from favourites');
+            notify.error('Failed to remove from favourites');
         }
     };
 
@@ -238,7 +246,7 @@ const FavoritesPage = () => {
             handleGoToPage(target);
             setJumpInput("");
         } else {
-            toast.error(`Please enter a page number between 1 and ${maxPage}`);
+            notify.error(`Please enter a page number between 1 and ${maxPage}`);
         }
     };
 

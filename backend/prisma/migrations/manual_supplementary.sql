@@ -11,9 +11,11 @@ CREATE OR REPLACE FUNCTION tracks_search_vector_trigger() RETURNS trigger AS $$
 begin
   new.search_vector :=
     setweight(to_tsvector('english', coalesce(new.title, '')), 'A') ||
-    setweight(to_tsvector('english', coalesce(array_to_string(new.tags, ' '), '')), 'B') ||
-    setweight(to_tsvector('english', coalesce(array_to_string(new.genre, ' '), '')), 'B') ||
-    setweight(to_tsvector('english', coalesce(new.description, '')), 'C');
+    setweight(to_tsvector('english', coalesce(new.artist, '')), 'B') ||
+    setweight(to_tsvector('english', coalesce(new.artist_name, '')), 'B') ||
+    setweight(to_tsvector('english', coalesce(array_to_string(new.tags, ' '), '')), 'C') ||
+    setweight(to_tsvector('english', coalesce(array_to_string(new.genre, ' '), '')), 'C') ||
+    setweight(to_tsvector('english', coalesce(new.description, '')), 'D');
   return new;
 end
 $$ LANGUAGE plpgsql;

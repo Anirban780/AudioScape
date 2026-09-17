@@ -3,10 +3,11 @@ import Sidebar from "@/components/Home/Sidebar";
 import SearchBar from "@/components/Home/SearchBar";
 import UserMenu from "@/components/Auth/UserMenu";
 import { useTheme } from "@/ThemeProvider";
-import { Sun, Moon, Laptop, Menu } from "lucide-react";
+import { Sun, Moon, Menu } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
 import useSidebarStore from "@/store/useSidebarStore";
 import Footer from "@/components/Home/Footer";
+import QuotaStatusPill from "@/components/Admin/QuotaStatusPill";
 import { cn } from "@/lib/utils";
 
 /**
@@ -32,7 +33,7 @@ import { cn } from "@/lib/utils";
  */
 
 const AppLayout = ({ children }) => {
-  const { themePreference, resolvedTheme, currentLabel, cycleTheme } = useTheme();
+  const { resolvedTheme, cycleTheme } = useTheme();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { isSidebarCollapsed, toggleSidebarCollapsed } = useSidebarStore();
   const { setTrack } = usePlayerStore();
@@ -72,34 +73,36 @@ const AppLayout = ({ children }) => {
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-y-auto sidebar-transition">
         
         {/* Top Navigation & App Bar */}
-        <header className="sticky top-0 h-16 flex-shrink-0 flex items-center justify-between px-4 sm:px-6 border-b border-[var(--color-border-default)] bg-[var(--color-surface-base)]/85 backdrop-blur-md z-30 transition-colors">
-          <div className="flex items-center gap-3 w-full">
+        <header className="sticky top-0 h-16 sm:h-20 flex-shrink-0 border-b border-[var(--color-border-default)] bg-[var(--color-surface-base)]/85 backdrop-blur-md z-30 transition-colors flex items-center">
+          <div className="w-full max-w-[1400px] mx-auto px-6 sm:px-10 md:px-14 lg:px-16 flex items-center justify-between gap-4">
             
-            {/* Mobile Hamburger Drawer Trigger */}
-            <button
-              onClick={() => setIsSidebarOpen(true)}
-              className="p-2 rounded-xl text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)] hover:bg-[var(--color-state-hover)] md:hidden transition-colors cursor-pointer"
-              aria-label="Open sidebar drawer"
-            >
-              <Menu size={22} />
-            </button>
+            {/* Left Area: Mobile Hamburger Drawer Trigger (and desktop balance placeholder) */}
+            <div className="flex items-center md:min-w-[96px] shrink-0">
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-2 rounded-xl text-[var(--color-on-surface-variant)] hover:text-[var(--color-on-surface)] hover:bg-[var(--color-state-hover)] md:hidden transition-colors cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-primary)]/40"
+                aria-label="Open sidebar drawer"
+              >
+                <Menu size={22} />
+              </button>
+            </div>
 
-            {/* Central Search Bar Container */}
-            <div className="flex-1 max-w-xl mx-auto">
+            {/* Central Search Bar Container: Centered */}
+            <div className="flex-1 max-w-xl mx-auto px-2">
               <SearchBar onSelectTrack={setTrack} />
             </div>
 
-            {/* Right Header Actions: Theme Toggle & User Menu */}
-            <div className="flex items-center gap-3">
+            {/* Right Header Actions: Quota Status, Theme Toggle & User Menu */}
+            <div className="flex items-center justify-end gap-3 md:min-w-[96px] shrink-0">
+              <QuotaStatusPill />
+
               <button
                 onClick={cycleTheme}
-                className="p-2.5 rounded-full bg-[var(--color-surface-base)] hover:bg-[var(--color-state-hover)] border border-[var(--color-border-default)] transition-all cursor-pointer text-[var(--color-on-surface)] shadow-xs"
-                aria-label={`Current theme: ${currentLabel}. Click to cycle.`}
-                title={`Theme: ${currentLabel} (Click to cycle)`}
+                className="p-2.5 rounded-full bg-[var(--color-surface-base)] hover:bg-[var(--color-state-hover)] border border-[var(--color-border-default)] transition-all cursor-pointer text-[var(--color-on-surface)] shadow-xs hover:scale-105 active:scale-95"
+                aria-label={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`}
+                title={`Switch to ${resolvedTheme === "dark" ? "light" : "dark"} theme`}
               >
-                {themePreference === "system" ? (
-                  <Laptop size={18} className="text-cyan-400" />
-                ) : resolvedTheme === "dark" ? (
+                {resolvedTheme === "dark" ? (
                   <Moon size={18} className="text-indigo-400" />
                 ) : (
                   <Sun size={18} className="text-yellow-500" />

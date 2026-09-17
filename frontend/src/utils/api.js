@@ -960,4 +960,120 @@ async function fetchFreshCategoryDetail(slug, limit, offset, cacheKey) {
     }
 }
 
+/**
+ * ============================================================================
+ * YOUTUBE API QUOTA & KEY ROTATION TELEMETRY CLIENT METHODS
+ * ============================================================================
+ */
+
+/**
+ * Fetches today's aggregate YouTube API quota telemetry, dual-key rotation status,
+ * and Pacific Time reset countdown from NestJS backend.
+ *
+ * @returns {Promise<object>} Today's quota usage summary object
+ */
+export async function fetchQuotaSummary() {
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
+        const clientTz = typeof Intl !== "undefined" && Intl.DateTimeFormat
+            ? Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC"
+            : "UTC";
+
+        const response = await fetch(`${API_URL}/api/admin/quota/today?tz=${encodeURIComponent(clientTz)}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                "x-timezone": clientTz,
+                ...headers,
+            },
+            credentials: "include",
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch quota summary: ${response.status} ${response.statusText}`);
+        }
+
+        return await response.json();
+    } catch (err) {
+        console.error("fetchQuotaSummary error:", err);
+        throw err;
+    }
+}
+
+/**
+ * Fetches daily aggregated quota usage history for past N days from NestJS backend.
+ *
+ * @param {number} days - Number of past days to query (default: 7)
+ * @returns {Promise<object>} Historical quota records object
+ */
+export async function fetchQuotaHistory(days = 7) {
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
+
+        const response = await fetch(`${API_URL}/api/admin/quota/history?days=${days}`, {
+            method: "GET",
+            headers: {
+                "Content-Type": "application/json",
+                ...headers,
+            },
+            credentials: "include",
+        });
+
+        if (!response.ok) {
+            throw new Error(`Failed to fetch quota history: ${response.status} ${response.statusText}`);
+        }
+
+        return await response.json();
+    } catch (err) {
+        console.error("fetchQuotaHistory error:", err);
+        throw err;
+    }
+}
+
+/**
+ * Submits user feedback, bug report, or feature request to the AudioScape backend.
+ *
+ * @param {object} feedbackData - Feedback payload
+ * @param {string} feedbackData.category - Category ('bug', 'feature', 'audio', 'quota', 'general')
+ * @param {string} feedbackData.subject - Subject line
+ * @param {string} feedbackData.message - Message body
+ * @param {string} feedbackData.email - User contact email
+ * @param {string} [feedbackData.name] - User name
+ * @param {number} [feedbackData.rating] - Optional star rating (1-5)
+ * @param {string} [feedbackData.deviceInfo] - Optional client environment details
+ * @returns {Promise<object>} Submission confirmation with { success, message, id }
+ */
+export async function submitUserFeedback(feedbackData) {
+    try {
+        const headers = await getAuthHeader();
+        const API_URL = await getBackendURL();
+
+        const response = await fetch(`${API_URL}/api/feedback`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                ...headers,
+            },
+            credentials: "include",
+            body: JSON.stringify(feedbackData),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            const errorMessage = Array.isArray(data?.message)
+                ? data.message.join(", ")
+                : (data?.message || `Submission failed with status ${response.status}`);
+            throw new Error(errorMessage);
+        }
+
+        return data;
+    } catch (err) {
+        console.error("submitUserFeedback error:", err);
+        throw err;
+    }
+}
+
 

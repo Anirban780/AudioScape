@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { saveLikeSong, fetchLikedStatus } from '@/utils/api';
 import useAuthStore from "@/store/useAuthStore";
-import toast from 'react-hot-toast';
+import { notify } from '@/utils/notify';
 
 /**
  * ============================================================================
@@ -48,26 +48,34 @@ const usePlayerStore = create((set, get) => ({
     // TRACK ACTIONS
     // ------------------------------------------------------------------------
 
-    setTrack: async (track, source = null) => {
-        const user = useAuthStore.getState().user;
-        let liked = false;
-
-        if (user && track?.id) {
-            liked = await fetchLikedStatus(user.id, track.id);
-        }
-
+    setTrack: (track, source = null) => {
         const effectiveSource = source || track?.source || get().playbackSource || 'SEARCH';
         const taggedTrack = track ? { ...track, source: effectiveSource } : null;
 
         // When launching a new track, honor user's default player mode ('full' opens FullScreenPlayer)
         const shouldBeFullScreen = track ? get().defaultPlayerMode === 'full' : get().isFullScreen;
 
+        // Instantly dispatch active track, playing state, and fullscreen viewport (<1ms)
         set({ 
             track: taggedTrack, 
-            isLiked: liked, 
+            isLiked: false, 
+            isPlaying: Boolean(taggedTrack),
             playbackSource: effectiveSource,
             isFullScreen: shouldBeFullScreen,
         });
+
+        // Asynchronously check liked status in background without blocking player UI or audio start
+        const user = useAuthStore.getState().user;
+        if (user && track?.id) {
+            fetchLikedStatus(user.id, track.id)
+                .then((liked) => {
+                    // Guard: only apply liked state if this track remains active
+                    if (get().track?.id === track.id) {
+                        set({ isLiked: liked });
+                    }
+                })
+                .catch(() => {});
+        }
     },
     
     setPlaybackSource: (playbackSource) => set({ playbackSource }),
@@ -146,7 +154,7 @@ const usePlayerStore = create((set, get) => ({
             console.warn('Failed to save default player mode to localStorage:', e);
         }
         set({ defaultPlayerMode: newMode });
-        toast.success(newMode === 'full' ? 'Default player: Full Screen' : 'Default player: Mini Player');
+        notify.info(newMode === 'full' ? 'Default player: Full Screen' : 'Default player: Mini Player');
     },
 
     /**
@@ -176,7 +184,7 @@ const usePlayerStore = create((set, get) => ({
 
         const newLiked = !isLiked;
         await saveLikeSong(user.id, track, newLiked);
-        toast.success(newLiked ? "Added to favourites" : "Removed from favourites");
+        notify.success(newLiked ? "Added to favourites" : "Removed from favourites");
 
         set({
             isLiked: newLiked,
@@ -225,7 +233,7 @@ const usePlayerStore = create((set, get) => ({
 
         const existingIdx = queue.findIndex((t) => (t.id || t.videoId) === normalizedTrack.id);
         if (existingIdx !== -1) {
-            toast.success("Track is already in queue");
+            notify.info("Track is already in queue");
             return;
         }
 
@@ -239,10 +247,10 @@ const usePlayerStore = create((set, get) => ({
                 isPlaying: true,
                 isFullScreen: get().defaultPlayerMode === 'full',
             });
-            toast.success(`Playing: ${normalizedTrack.name}`);
+            notify.trackPlaying(normalizedTrack.name);
         } else {
             set({ queue: newQueue });
-            toast.success(`Added to queue: ${normalizedTrack.name}`);
+            notify.queueAdded(normalizedTrack.name);
         }
     },
 
@@ -303,18 +311,29 @@ const usePlayerStore = create((set, get) => ({
     },
 
     clearQueue: () => {
-        const { queue, currentIndex, track } = get();
+        const { queue, currentIndex, track, playbackHistory } = get();
         if (!track || queue.length === 0) {
             set({ queue: [], currentIndex: 0 });
             return;
         }
+
+        const previousQueue = [...queue];
+        const previousIndex = currentIndex;
+        const previousHistory = [...playbackHistory];
 
         set({
             queue: [track],
             currentIndex: 0,
             playbackHistory: [],
         });
-        toast.success("Cleared upcoming queue");
+
+        notify.undo("Cleared upcoming queue", () => {
+            set({
+                queue: previousQueue,
+                currentIndex: previousIndex,
+                playbackHistory: previousHistory,
+            });
+        });
     },
 
     nextTrack: () => set((state) => {

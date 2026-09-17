@@ -5,7 +5,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ApiEndpoint, QueryType } from '@prisma/client';
 import { YouTubeKeyManager } from './youtube-key-manager';
 import { SearchRateLimiterService } from './search-rate-limiter.service';
-import { getValidThumbnailUrl } from '../utils/youtubeUtils';
+import { getValidThumbnailUrl, decodeHtmlEntities } from '../utils/youtubeUtils';
 import { parseTrackTitle } from './utils/title-parser.util';
 import { CURATED_GENRES } from '../recommendations/curated-genres';
 
@@ -92,11 +92,17 @@ export class TracksService {
 
   /**
    * Ensures parent Channel row exists in PostgreSQL to maintain Foreign Key integrity.
+   * Accepts an optional transaction client (`tx`) to participate in atomic transaction blocks.
    */
-  private async ensureChannelExists(channelId: string | null, channelTitle: string): Promise<string | null> {
+  private async ensureChannelExists(
+    channelId: string | null,
+    channelTitle: string,
+    tx?: any,
+  ): Promise<string | null> {
     if (!channelId || channelId === 'Unknown') return null;
+    const client = tx || this.prisma;
     try {
-      const channel = await this.prisma.channel.upsert({
+      const channel = await client.channel.upsert({
         where: { id: channelId },
         update: { title: channelTitle },
         create: { id: channelId, title: channelTitle },
@@ -137,6 +143,7 @@ export class TracksService {
     dbOnly: boolean = false,
     clientId: string = 'unknown',
     res?: Response,
+    forceYouTube: boolean = false,
   ) {
     if (!query || !query.trim()) {
       throw new HttpException('Search query parameter is required', HttpStatus.BAD_REQUEST);
@@ -144,70 +151,74 @@ export class TracksService {
 
     const normalizedQuery = this.normalizeQuery(query);
     const targetPageToken = pageToken.trim() || null;
-    const FTS_MATCH_THRESHOLD = 3; // Lowered from 8 to 3 to maximize local PostgreSQL FTS cache hits & save YouTube API quota
+    const FTS_MATCH_THRESHOLD = 8; // Require at least 8 high-confidence local matches to skip YouTube when not forcing YouTube
 
     // STEP 1: Check Relational SearchQueryPage Database Cache (Exempt from rate limits)
-    try {
-      const pageTokenFilter = targetPageToken
-        ? { pageToken: targetPageToken }
-        : { OR: [{ pageToken: '' }, { pageToken: null }] };
+    // Skipped if user explicitly requested live YouTube search (forceYouTube=true) on initial page
+    if (!forceYouTube || targetPageToken) {
+      try {
+        const pageTokenFilter = targetPageToken
+          ? { pageToken: targetPageToken }
+          : { OR: [{ pageToken: '' }, { pageToken: null }] };
 
-      const cachedQuery = await this.prisma.searchQuery.findUnique({
-        where: { normalizedQuery },
-        include: {
-          pages: {
-            where: pageTokenFilter,
-            include: {
-              results: {
-                orderBy: { rankPosition: 'asc' },
-                include: { track: true },
+        const cachedQuery = await this.prisma.searchQuery.findUnique({
+          where: { normalizedQuery },
+          include: {
+            pages: {
+              where: pageTokenFilter,
+              include: {
+                results: {
+                  orderBy: { rankPosition: 'asc' },
+                  include: { track: true },
+                },
               },
             },
           },
-        },
-      });
-
-      if (
-        cachedQuery &&
-        cachedQuery.expiresAt &&
-        cachedQuery.expiresAt > new Date() &&
-        cachedQuery.pages.length > 0 &&
-        cachedQuery.pages[0].results.length > 0
-      ) {
-        if (res) res.setHeader('X-Cache', 'HIT');
-        const cachedPage = cachedQuery.pages[0];
-        this.logger.log(`Cache HIT (Relational Page Cache) for query: "${query}" [pageToken: ${pageToken || 'initial'}]`);
-
-        // Asynchronously increment hit counter
-        await this.prisma.searchQuery.update({
-          where: { id: cachedQuery.id },
-          data: {
-            hitCount: { increment: 1 },
-            lastSearchedAt: new Date(),
-          },
         });
 
-        const tracks = cachedPage.results.map((res) => ({
-          videoId: res.track.youtubeVideoId,
-          title: res.track.title,
-          thumbNail: getValidThumbnailUrl(res.track.thumbnailUrl || '') || '',
-          channelTitle: res.track.artist || 'Unknown Artist',
-        }));
+        if (
+          cachedQuery &&
+          cachedQuery.expiresAt &&
+          cachedQuery.expiresAt > new Date() &&
+          cachedQuery.pages.length > 0 &&
+          cachedQuery.pages[0].results.length > 0
+        ) {
+          if (res) res.setHeader('X-Cache', 'HIT');
+          const cachedPage = cachedQuery.pages[0];
+          this.logger.log(`Cache HIT (Relational Page Cache) for query: "${query}" [pageToken: ${pageToken || 'initial'}]`);
 
-        return {
-          tracks,
-          nextPageToken: cachedPage.nextPageToken,
-          cached: true,
-          source: 'page_cache',
-          message: 'Loaded from search page cache',
-        };
+          // Asynchronously increment hit counter
+          await this.prisma.searchQuery.update({
+            where: { id: cachedQuery.id },
+            data: {
+              hitCount: { increment: 1 },
+              lastSearchedAt: new Date(),
+            },
+          });
+
+          const tracks = cachedPage.results.map((res) => ({
+            videoId: res.track.youtubeVideoId,
+            title: res.track.title,
+            thumbNail: getValidThumbnailUrl(res.track.thumbnailUrl || '') || '',
+            channelTitle: res.track.artist || 'Unknown Artist',
+          }));
+
+          return {
+            tracks,
+            nextPageToken: cachedPage.nextPageToken,
+            cached: true,
+            source: 'page_cache',
+            message: 'Loaded from search page cache',
+          };
+        }
+      } catch (dbError: any) {
+        this.logger.warn(`Relational page cache lookup error: ${dbError.message}. Proceeding to next search tier.`);
       }
-    } catch (dbError: any) {
-      this.logger.warn(`Relational page cache lookup error: ${dbError.message}. Proceeding to next search tier.`);
     }
 
     // STEP 2: Page 0 Local PostgreSQL Full-Text Search (FTS) Lookup (Exempt from rate limits)
-    if (!targetPageToken && normalizedQuery) {
+    // Runs when dbOnly is true (live user typing) OR when !forceYouTube and localMatches >= FTS_MATCH_THRESHOLD
+    if (!targetPageToken && normalizedQuery && !forceYouTube) {
       try {
         const localMatches = await this.prisma.$queryRaw<Array<any>>`
           SELECT youtube_video_id AS "videoId",
@@ -234,21 +245,12 @@ export class TracksService {
             channelTitle: t.channelTitle || 'Unknown Artist',
           }));
 
-          if (tracks.length > 0) {
-            // Asynchronously store search query and page mapping in Postgres
-            this.cacheSearchResultsInPostgres(query, normalizedQuery, tracks, null, null).catch((err) =>
-              this.logger.error(`Failed to store FTS results in Postgres cache: ${err.message}`),
-            );
-          }
-
           return {
             tracks,
             nextPageToken: null,
             cached: true,
             source: 'postgres_fts',
-            message: dbOnly
-              ? 'Showing local database matches. Press Enter for full YouTube search.'
-              : 'Loaded from local database index',
+            message: 'Showing local database matches. Press Enter for full YouTube search.',
           };
         }
       } catch (ftsErr: any) {
@@ -271,8 +273,8 @@ export class TracksService {
     // STEP 3: Cache MISS — Query YouTube Data API `/v3/search` Proxy
     if (res) res.setHeader('X-Cache', 'MISS');
 
-    // Enforce multi-tier sliding-window rate limiting (3 live searches/min, 20 live searches/day)
-    this.rateLimiter.checkAndConsume(clientId, res);
+    // Enforce multi-tier sliding-window rate limiting & persistent 50% threshold budget (3/min, 5/day, 150 global)
+    await this.rateLimiter.checkAndConsume(clientId, res);
 
     this.logger.log(`Cache MISS for search query: "${query}" [pageToken: ${pageToken || 'initial'}]. Calling YouTube API...`);
     const musicCategoryId = await this.getMusicCategoryId();
@@ -280,7 +282,7 @@ export class TracksService {
 
     const searchUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&q=${encodeURIComponent(
       query,
-    )}&maxResults=50&videoCategoryId=${musicCategoryId}&key=${key}&pageToken=${pageToken}`;
+    )}&maxResults=50&videoCategoryId=${musicCategoryId}&key=${key}${pageToken ? `&pageToken=${pageToken}` : ''}`;
 
     try {
       const response = await axios.get(searchUrl);
@@ -295,11 +297,12 @@ export class TracksService {
           seenVideoIds.add(item.id.videoId);
           return {
             videoId: item.id.videoId as string,
-            title: item.snippet.title as string,
-            thumbNail: (item.snippet.thumbnails?.default?.url ||
-              item.snippet.thumbnails?.high?.url ||
+            title: decodeHtmlEntities(item.snippet.title as string),
+            thumbNail: (item.snippet.thumbnails?.high?.url ||
+              item.snippet.thumbnails?.medium?.url ||
+              item.snippet.thumbnails?.default?.url ||
               '') as string,
-            channelTitle: (item.snippet.channelTitle || 'Unknown Artist') as string,
+            channelTitle: decodeHtmlEntities((item.snippet.channelTitle || 'Unknown Artist') as string),
             channelId: (item.snippet.channelId || '') as string,
             publishedAt: item.snippet.publishedAt ? new Date(item.snippet.publishedAt) : null,
             description: (item.snippet.description || null) as string | null,
@@ -455,7 +458,13 @@ export class TracksService {
 
   /**
    * Helper saving search query, track results, rank positions, and page tokens into PostgreSQL database.
-   * Supports differentiated TTL: 24 hours for USER_SEARCH vs 21 days for CURATED_KEYWORD.
+   * Supports differentiated TTL: 24 hours for USER_SEARCH vs 15 days for CURATED_KEYWORD.
+   *
+   * TRANSACTIONAL PURGE-AND-REPLACE (Ghost Tracks Resolution):
+   * Wrapped in an atomic database transaction ($transaction). Before writing fresh results,
+   * any existing records for this specific page (in SearchQueryPageResult) and rank slice
+   * (in QueryTrackResult) are deleted. This prevents old/stale tracks from previous 24h cache
+   * runs from accumulating into swollen pages with conflicting rank positions.
    */
   private async cacheSearchResultsInPostgres(
     rawQuery: string,
@@ -474,119 +483,125 @@ export class TracksService {
     queryType: QueryType = QueryType.USER_SEARCH,
     pageIndex: number = 0,
   ) {
-    // Configurable TTL for CURATED_KEYWORD (default: 7 days) vs 24-hour TTL for USER_SEARCH
+    // Configurable TTL for CURATED_KEYWORD (default: 15 days) vs 24-hour TTL for USER_SEARCH
     const ttlHours = queryType === QueryType.CURATED_KEYWORD ? CURATED_CATEGORY_CACHE_TTL_DAYS * 24 : 24;
     const expiresAt = new Date(Date.now() + ttlHours * 60 * 60 * 1000);
 
-    // 1. Upsert SearchQuery root record
-    const searchQuery = await this.prisma.searchQuery.upsert({
-      where: { normalizedQuery },
-      update: {
-        rawQuery,
-        queryType,
-        lastYoutubeFetchAt: new Date(),
-        lastSearchedAt: new Date(),
-        expiresAt,
-        resultCount: tracks.length,
-      },
-      create: {
-        normalizedQuery,
-        rawQuery,
-        queryType,
-        lastYoutubeFetchAt: new Date(),
-        expiresAt,
-        resultCount: tracks.length,
-      },
-    });
-
-    // 2. Upsert SearchQueryPage relational page record
-    const safePageToken = pageToken || '';
-    const searchQueryPage = await this.prisma.searchQueryPage.upsert({
-      where: {
-        queryId_pageToken: {
-          queryId: searchQuery.id,
-          pageToken: safePageToken,
-        },
-      },
-      update: {
-        nextPageToken,
-        pageIndex,
-      },
-      create: {
-        queryId: searchQuery.id,
-        pageToken: safePageToken,
-        nextPageToken,
-        pageIndex,
-      },
-    });
-
-    // 3. Upsert individual Tracks rows, SearchQueryPageResult junction records, and QueryTrackResult records
-    for (let index = 0; index < tracks.length; index++) {
-      const t = tracks[index];
-      const validChannelId = await this.ensureChannelExists(t.channelId || null, t.channelTitle);
-      const overallRank = pageIndex * 50 + index + 1;
-      const parsed = parseTrackTitle(t.title, t.channelTitle);
-
-      await this.prisma.tracks.upsert({
-        where: { youtubeVideoId: t.videoId },
-        update: {
-          title: parsed.cleanTitle || t.title,
-          artist: t.channelTitle,
-          artistName: parsed.artistName,
-          rawTitle: parsed.rawTitle,
-          thumbnailUrl: t.thumbNail,
-          channelId: validChannelId,
-          lastFetchedAt: new Date(),
-          ...(t.publishedAt ? { publishedAt: t.publishedAt } : {}),
-          ...(t.description !== undefined && t.description !== null ? { description: t.description } : {}),
-        },
-        create: {
-          youtubeVideoId: t.videoId,
-          title: parsed.cleanTitle || t.title,
-          artist: t.channelTitle,
-          artistName: parsed.artistName,
-          rawTitle: parsed.rawTitle,
-          thumbnailUrl: t.thumbNail,
-          channelId: validChannelId,
-          publishedAt: t.publishedAt || null,
-          description: t.description || null,
-        },
-      });
-
-      await this.prisma.searchQueryPageResult.upsert({
-        where: {
-          pageId_trackId: {
-            pageId: searchQueryPage.id,
-            trackId: t.videoId,
+    await this.prisma.$transaction(
+      async (tx) => {
+        // 1. Upsert SearchQuery root record
+        const searchQuery = await tx.searchQuery.upsert({
+          where: { normalizedQuery },
+          update: {
+            rawQuery,
+            queryType,
+            lastYoutubeFetchAt: new Date(),
+            lastSearchedAt: new Date(),
+            expiresAt,
+            resultCount: tracks.length,
           },
-        },
-        update: {
-          rankPosition: index + 1,
-        },
-        create: {
-          pageId: searchQueryPage.id,
-          trackId: t.videoId,
-          rankPosition: index + 1,
-        },
-      });
+          create: {
+            normalizedQuery,
+            rawQuery,
+            queryType,
+            lastYoutubeFetchAt: new Date(),
+            expiresAt,
+            resultCount: tracks.length,
+          },
+        });
 
-      await this.prisma.queryTrackResult.upsert({
-        where: {
-          queryId_trackId: {
+        // 2. Upsert SearchQueryPage relational page record
+        const safePageToken = pageToken || '';
+        const searchQueryPage = await tx.searchQueryPage.upsert({
+          where: {
+            queryId_pageToken: {
+              queryId: searchQuery.id,
+              pageToken: safePageToken,
+            },
+          },
+          update: {
+            nextPageToken,
+            pageIndex,
+          },
+          create: {
             queryId: searchQuery.id,
-            trackId: t.videoId,
+            pageToken: safePageToken,
+            nextPageToken,
+            pageIndex,
           },
-        },
-        update: {
-          rankPosition: overallRank,
-        },
-        create: {
-          queryId: searchQuery.id,
-          trackId: t.videoId,
-          rankPosition: overallRank,
-        },
-      });
-    }
+        });
+
+        // 3. ATOMIC PURGE (Ghost Tracks Fix):
+        // Wipe stale track associations for THIS page before writing fresh rankings.
+        await tx.searchQueryPageResult.deleteMany({
+          where: { pageId: searchQueryPage.id },
+        });
+
+        // Wipe stale overall query rank slice owned by this page (e.g., ranks 1..50, 51..100)
+        const rankStart = pageIndex * 50 + 1;
+        const rankEnd = rankStart + tracks.length - 1;
+        await tx.queryTrackResult.deleteMany({
+          where: {
+            queryId: searchQuery.id,
+            rankPosition: { gte: rankStart, lte: rankEnd },
+          },
+        });
+
+        // 4. Upsert tracks and insert fresh junction records in exact rank order
+        for (let index = 0; index < tracks.length; index++) {
+          const t = tracks[index];
+          const validChannelId = await this.ensureChannelExists(t.channelId || null, t.channelTitle, tx);
+          const overallRank = pageIndex * 50 + index + 1;
+          const parsed = parseTrackTitle(t.title, t.channelTitle);
+
+          // Maintain track metadata for Foreign Key integrity and rich playback
+          await tx.tracks.upsert({
+            where: { youtubeVideoId: t.videoId },
+            update: {
+              title: parsed.cleanTitle || t.title,
+              artist: t.channelTitle,
+              artistName: parsed.artistName,
+              rawTitle: parsed.rawTitle,
+              thumbnailUrl: t.thumbNail,
+              channelId: validChannelId,
+              lastFetchedAt: new Date(),
+              ...(t.publishedAt ? { publishedAt: t.publishedAt } : {}),
+              ...(t.description !== undefined && t.description !== null ? { description: t.description } : {}),
+            },
+            create: {
+              youtubeVideoId: t.videoId,
+              title: parsed.cleanTitle || t.title,
+              artist: t.channelTitle,
+              artistName: parsed.artistName,
+              rawTitle: parsed.rawTitle,
+              thumbnailUrl: t.thumbNail,
+              channelId: validChannelId,
+              publishedAt: t.publishedAt || null,
+              description: t.description || null,
+            },
+          });
+
+          // Insert fresh page result record (exact rank on page 1..50)
+          await tx.searchQueryPageResult.create({
+            data: {
+              pageId: searchQueryPage.id,
+              trackId: t.videoId,
+              rankPosition: index + 1,
+            },
+          });
+
+          // Insert fresh overall query track result record (exact overall rank)
+          await tx.queryTrackResult.create({
+            data: {
+              queryId: searchQuery.id,
+              trackId: t.videoId,
+              rankPosition: overallRank,
+            },
+          });
+        }
+      },
+      { timeout: 15000, maxWait: 5000 },
+    );
   }
 
   /**
@@ -1018,5 +1033,79 @@ export class TracksService {
       this.logger.error(`YouTube ToS Stale Track Refresh failed: ${err.message}`);
       throw new HttpException('Failed to refresh stale tracks batch from YouTube API', HttpStatus.INTERNAL_SERVER_ERROR);
     }
+  }
+
+  /**
+   * Cleans up expired search queries and stale unreferenced tracks.
+   * Executed on a schedule via GitHub Actions / external cron to prevent database bloat.
+   *
+   * 1. Purges `SearchQuery` records where `expiresAt < NOW() - graceDays`.
+   *    (Database cascade automatically deletes corresponding `SearchQueryPage`,
+   *    `SearchQueryPageResult`, and `QueryTrackResult` records).
+   * 2. Purges unreferenced orphan tracks from `Tracks` table:
+   *    - Fetched older than `orphanDays` (default: 30 days)
+   *    - Not referenced in `playlist_tracks`
+   *    - Not referenced in `listen_history`
+   *    - Not referenced in active `search_query_page_results`
+   *    - Not referenced in active `query_track_results`
+   *
+   * @param graceDays - Days past expiration before search query records are deleted (default: 3)
+   * @param orphanDays - Days of staleness before orphan tracks are deleted (default: 30)
+   * @param batchLimit - Maximum orphan tracks to delete per invocation (default: 1000)
+   * @returns Telemetry summary of deleted query and orphan track counts
+   */
+  async gcSearchCache(
+    graceDays: number = 3,
+    orphanDays: number = 30,
+    batchLimit: number = 1000,
+  ): Promise<{
+    deletedQueries: number;
+    deletedOrphanTracks: number;
+    timestamp: string;
+  }> {
+    const expiredCutoff = new Date(Date.now() - graceDays * 24 * 60 * 60 * 1000);
+    const orphanCutoff = new Date(Date.now() - orphanDays * 24 * 60 * 60 * 1000);
+
+    this.logger.log(
+      `Starting Search Cache GC: query cutoff=${expiredCutoff.toISOString()} (graceDays=${graceDays}), orphan cutoff=${orphanCutoff.toISOString()} (orphanDays=${orphanDays})`,
+    );
+
+    // 1. Delete expired SearchQueries (onDelete: Cascade cleans up pages & page results)
+    const deletedQueriesResult = await this.prisma.searchQuery.deleteMany({
+      where: {
+        expiresAt: { lt: expiredCutoff },
+      },
+    });
+
+    // 2. Batch-delete stale orphan tracks that are not referenced in playlists, history, or active search results
+    // Executed with subquery and limit to avoid holding heavy locks on PostgreSQL
+    let deletedOrphanTracks = 0;
+    try {
+      deletedOrphanTracks = await this.prisma.$executeRaw`
+        DELETE FROM tracks
+        WHERE youtube_video_id IN (
+          SELECT t.youtube_video_id
+          FROM tracks t
+          WHERE t.last_fetched_at < ${orphanCutoff}
+            AND NOT EXISTS (SELECT 1 FROM playlist_tracks pt WHERE pt.track_id = t.youtube_video_id)
+            AND NOT EXISTS (SELECT 1 FROM listen_history lh WHERE lh.track_id = t.youtube_video_id)
+            AND NOT EXISTS (SELECT 1 FROM search_query_page_results sqpr WHERE sqpr.track_id = t.youtube_video_id)
+            AND NOT EXISTS (SELECT 1 FROM query_track_results qtr WHERE qtr.track_id = t.youtube_video_id)
+          LIMIT ${batchLimit}
+        )
+      `;
+    } catch (orphanErr: any) {
+      this.logger.warn(`Orphan tracks GC cleanup encountered an error: ${orphanErr.message}`);
+    }
+
+    this.logger.log(
+      `Search Cache GC completed: Purged ${deletedQueriesResult.count} expired search queries and ${deletedOrphanTracks} orphan tracks.`,
+    );
+
+    return {
+      deletedQueries: deletedQueriesResult.count,
+      deletedOrphanTracks,
+      timestamp: new Date().toISOString(),
+    };
   }
 }

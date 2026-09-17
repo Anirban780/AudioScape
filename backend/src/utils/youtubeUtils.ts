@@ -83,3 +83,20 @@ export function getHighResThumbnailUrl(originalUrl?: string | null, videoId?: st
 
   return getValidThumbnailUrl(target);
 }
+
+/**
+ * Decodes common HTML entities returned by the YouTube Data API.
+ */
+export function decodeHtmlEntities(text?: string | null): string {
+  if (!text || typeof text !== 'string') return text || '';
+  return text
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&#x2F;/g, '/')
+    .replace(/&#47;/g, '/');
+}

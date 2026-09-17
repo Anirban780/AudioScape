@@ -56,7 +56,7 @@ AudioScape started as a simple YouTube-backed music player and has evolved into 
 | **Zustand** | Latest | Lightweight global state management |
 | **React Router DOM** | v7 | SPA routing with protected route guards |
 | **Lucide React** | Latest | Icon library (consistent visual language) |
-| **react-hot-toast** | Latest | Toast notification system |
+| **Sonner** | Latest | Toast notification system with physics animations & action undo |
 | **YouTube IFrame API** | — | Embedded YouTube player for audio streaming |
 | **Google Identity Services** | — | Google One-Tap OAuth sign-in |
 
@@ -428,7 +428,7 @@ This project is licensed under the **MIT License**.
 
 <div align="center">
 
-**AudioScape v2.0.0** — Built with ❤️ using React, NestJS, and PostgreSQL
+**AudioScape v2.0.0** — Built with passion using React, NestJS, and PostgreSQL
 
 *Stream boldly. Discover deeply.*
 

@@ -4,8 +4,8 @@ import AppLayout from "@/components/Layout/AppLayout";
 import useAuthStore from "@/store/useAuthStore";
 import usePlaylistStore from "@/store/usePlaylistStore";
 import usePlayerStore from "@/store/usePlayerStore";
-import { getPlaylistById, updatePlaylist, reorderPlaylistTracks, removeSongFromPlaylist } from "@/utils/playlists";
-import toast from "react-hot-toast";
+import { getPlaylistById, updatePlaylist, reorderPlaylistTracks, removeSongFromPlaylist, addSongToPlaylist } from "@/utils/playlists";
+import { notify } from "@/utils/notify";
 import { ChevronLeft, Loader2, X, Disc3 } from "lucide-react";
 
 // Drag and Drop
@@ -71,14 +71,14 @@ const PlaylistDetailPage = () => {
         try {
             const data = await getPlaylistById(user.id, id);
             if (!data) {
-                toast.error("Playlist not found");
+                notify.error("Playlist not found");
                 navigate("/playlists");
                 return;
             }
             setActivePlaylist(data);
             setLocalTracks(data.songs || []);
         } catch (error) {
-            toast.error("Failed to load playlist details");
+            notify.error("Failed to load playlist details");
             navigate("/playlists");
         } finally {
             if (showLoader) setLoading(false);
@@ -103,7 +103,7 @@ const PlaylistDetailPage = () => {
 
     const handleSaveEdit = async () => {
         const trimmedName = editModal.name.trim();
-        if (!trimmedName) return toast.error("Name is required");
+        if (!trimmedName) return notify.error("Name is required");
 
         setEditModal(prev => ({ ...prev, loading: true }));
         try {
@@ -111,11 +111,11 @@ const PlaylistDetailPage = () => {
                 name: trimmedName,
                 description: editModal.description.trim()
             });
-            toast.success("Playlist updated");
+            notify.success("Playlist updated");
             await loadPlaylist(false);
             setEditModal({ open: false, name: "", description: "", loading: false });
         } catch (error) {
-            toast.error(error.message || "Failed to update playlist");
+            notify.error(error.message || "Failed to update playlist");
             setEditModal(prev => ({ ...prev, loading: false }));
         }
     };
@@ -149,11 +149,20 @@ const PlaylistDetailPage = () => {
 
         try {
             await removeSongFromPlaylist(user.id, activePlaylist.id, track.id);
-            toast.success("Track removed");
+            notify.undo("Track removed", async () => {
+                setLocalTracks(previousTracks);
+                try {
+                    await addSongToPlaylist(user.id, activePlaylist.id, track);
+                    notify.success("Track restored to playlist");
+                    loadPlaylist(false);
+                } catch {
+                    notify.error("Failed to restore track");
+                }
+            });
             loadPlaylist(false);
         } catch (error) {
             setLocalTracks(previousTracks);
-            toast.error("Failed to remove track");
+            notify.error("Failed to remove track");
         }
     };
 
@@ -219,7 +228,7 @@ const PlaylistDetailPage = () => {
             try {
                 await reorderPlaylistTracks(user.id, activePlaylist.id, newTracks);
             } catch (error) {
-                toast.error("Failed to save track order");
+                notify.error("Failed to save track order");
                 setLocalTracks(localTracks);
             }
         }

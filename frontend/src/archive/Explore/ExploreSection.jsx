@@ -3,7 +3,7 @@ import MusicCard from "@/components/Cards/MusicCard";
 import MediaGrid from "@/components/Layout/MediaGrid";
 import { RefreshCcw } from "lucide-react";
 import usePlayerStore from "@/store/usePlayerStore";
-import toast from "react-hot-toast";
+import { notify } from "@/utils/notify";
 
 /**
  * ============================================================================
@@ -31,7 +31,7 @@ const ExploreSection = ({ section, visibleCount = 5, onLoadMore }) => {
       source: "EXPLORE",
     }, "EXPLORE");
     usePlayerStore.getState().setIsPlaying(true);
-    toast.success(`Playing: ${track.name || track.title}`);
+    notify.trackPlaying(track.name || track.title, track.artist || track.channelTitle);
   };
 
   return (

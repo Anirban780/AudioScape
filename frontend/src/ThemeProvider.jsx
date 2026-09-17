@@ -1,11 +1,12 @@
 import { createContext, useContext, useEffect, useState, useMemo, useCallback } from "react";
 
 const ThemeProviderContext = createContext({
-  theme: "system",
-  themePreference: "system",
+  theme: "dark",
+  themePreference: "dark",
   resolvedTheme: "dark",
-  currentLabel: "System",
+  currentLabel: "Dark",
   setTheme: () => null,
+  toggleTheme: () => null,
   cycleTheme: () => null,
 });
 
@@ -15,34 +16,57 @@ const ThemeProviderContext = createContext({
  * ============================================================================
  * 
  * WHAT THIS FILE DOES:
- * Manages theme selection across three states:
- * - 'system': Dynamically matches OS preference (prefers-color-scheme).
- * - 'dark': Forces dark mode.
- * - 'light': Forces light mode.
+ * Automatically identifies the OS system theme preference upon website launch,
+ * while providing a clean binary toggle (Light <-> Dark) on the theme changer button.
  * 
- * WHY IT WAS DESIGNED THIS WAY:
- * 1. Explicit Distinction: Decouples `themePreference` (user's setting in localStorage)
- *    from `resolvedTheme` (actual CSS class applied to root document).
- * 2. Reactive OS Listener: Live updates when user changes OS dark/light setting
- *    without requiring page refresh.
- * 3. cycleTheme() Action: Cycles cleanly: System ──► Dark ──► Light ──► System.
- * 4. currentLabel: Returns informative labels: "System (Dark)", "System (Light)", "Light", "Dark".
+ * DESIGN SPECIFICATIONS:
+ * 1. Automatic System Theme Identification:
+ *    - When the website is opened, detects the browser's OS theme setting
+ *      via `window.matchMedia('(prefers-color-scheme: dark)')`.
+ *    - If OS is light, the site initializes in Light mode with the button toggled to light.
+ *    - If OS is dark, the site initializes in Dark mode with the button toggled to dark.
+ * 2. Binary Light / Dark Toggle:
+ *    - The theme changer button strictly toggles between 'light' and 'dark'.
+ *    - No 'system' state, option, or laptop icon on the button.
+ * 3. Reactive OS Listener:
+ *    - Listens for live OS theme changes (`prefers-color-scheme`).
+ *    - When the user changes their OS theme in system settings, the website
+ *      and toggle button adapt in real time.
+ * 4. Backward Compatibility:
+ *    - Preserves `theme`, `resolvedTheme`, `themePreference`, `currentLabel`,
+ *      `setTheme`, `toggleTheme`, and `cycleTheme` (alias to toggleTheme).
  */
 export function ThemeProvider({
   children,
   defaultTheme = "system",
   storageKey = "vite-ui-theme",
 }) {
-  const [themePreference, setThemePreference] = useState(() => {
-    return localStorage.getItem(storageKey) || defaultTheme;
-  });
-
   const getSystemTheme = useCallback(() => {
     if (typeof window === "undefined" || !window.matchMedia) return "dark";
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   }, []);
 
-  const [systemTheme, setSystemTheme] = useState(getSystemTheme);
+  const [theme, setThemeState] = useState(() => {
+    if (typeof window === "undefined") return "dark";
+    try {
+      const manual = localStorage.getItem("audioscape_theme_manual");
+      const saved = localStorage.getItem(storageKey);
+
+      // Clean up legacy 'system' value if stored from previous implementation
+      if (saved === "system") {
+        localStorage.removeItem(storageKey);
+        localStorage.removeItem("audioscape_theme_manual");
+      } else if (manual === "true" && (saved === "light" || saved === "dark")) {
+        // User explicitly clicked toggle button previously
+        return saved;
+      }
+    } catch {
+      // Ignore localStorage access errors (e.g. incognito restriction)
+    }
+
+    // Default to OS system theme on open
+    return getSystemTheme();
+  });
 
   // Reactive OS prefers-color-scheme listener
   useEffect(() => {
@@ -50,10 +74,15 @@ export function ThemeProvider({
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
 
     const handleChange = (e) => {
-      setSystemTheme(e.matches ? "dark" : "light");
+      const newSystemTheme = e.matches ? "dark" : "light";
+      setThemeState(newSystemTheme);
+      try {
+        localStorage.setItem(storageKey, newSystemTheme);
+        // Reset manual override so the site tracks the newly selected OS theme
+        localStorage.removeItem("audioscape_theme_manual");
+      } catch {}
     };
 
-    // Modern addEventListener with backward compatibility check
     if (mediaQuery.addEventListener) {
       mediaQuery.addEventListener("change", handleChange);
     } else if (mediaQuery.addListener) {
@@ -67,55 +96,50 @@ export function ThemeProvider({
         mediaQuery.removeListener(handleChange);
       }
     };
-  }, []);
+  }, [storageKey]);
 
-  // Compute resolved theme
-  const resolvedTheme = useMemo(() => {
-    if (themePreference === "system") {
-      return systemTheme;
-    }
-    return themePreference;
-  }, [themePreference, systemTheme]);
-
-  // Synchronize root DOM class
+  // Synchronize root DOM class ('light' or 'dark')
   useEffect(() => {
     const root = document.documentElement;
     root.classList.remove("light", "dark");
-    root.classList.add(resolvedTheme);
-  }, [resolvedTheme]);
+    root.classList.add(theme);
+  }, [theme]);
 
+  // Explicit setter
   const setTheme = useCallback((newTheme) => {
-    localStorage.setItem(storageKey, newTheme);
-    setThemePreference(newTheme);
+    const validTheme = newTheme === "light" ? "light" : "dark";
+    try {
+      localStorage.setItem(storageKey, validTheme);
+      localStorage.setItem("audioscape_theme_manual", "true");
+    } catch {}
+    setThemeState(validTheme);
   }, [storageKey]);
 
-  // Clean cycle: system -> dark -> light -> system
-  const cycleTheme = useCallback(() => {
-    if (themePreference === "system") {
-      setTheme("dark");
-    } else if (themePreference === "dark") {
-      setTheme("light");
-    } else {
-      setTheme("system");
-    }
-  }, [themePreference, setTheme]);
+  // Binary toggle: Light <-> Dark only
+  const toggleTheme = useCallback(() => {
+    setThemeState((prevTheme) => {
+      const nextTheme = prevTheme === "dark" ? "light" : "dark";
+      try {
+        localStorage.setItem(storageKey, nextTheme);
+        localStorage.setItem("audioscape_theme_manual", "true");
+      } catch {}
+      return nextTheme;
+    });
+  }, [storageKey]);
 
-  // Descriptive label helper
   const currentLabel = useMemo(() => {
-    if (themePreference === "system") {
-      return `System (${systemTheme === "dark" ? "Dark" : "Light"})`;
-    }
-    return themePreference === "dark" ? "Dark" : "Light";
-  }, [themePreference, systemTheme]);
+    return theme === "dark" ? "Dark" : "Light";
+  }, [theme]);
 
   const value = useMemo(() => ({
-    theme: themePreference,
-    themePreference,
-    resolvedTheme,
+    theme,
+    themePreference: theme,
+    resolvedTheme: theme,
     currentLabel,
     setTheme,
-    cycleTheme,
-  }), [themePreference, resolvedTheme, currentLabel, setTheme, cycleTheme]);
+    toggleTheme,
+    cycleTheme: toggleTheme,
+  }), [theme, currentLabel, setTheme, toggleTheme]);
 
   return (
     <ThemeProviderContext.Provider value={value}>
@@ -131,4 +155,5 @@ export const useTheme = () => {
   }
   return context;
 };
+
 

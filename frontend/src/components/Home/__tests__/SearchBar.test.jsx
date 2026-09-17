@@ -54,12 +54,33 @@ vi.mock('axios', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. react-hot-toast — no-op stubs
+// 4. notify & sonner — no-op stubs
 // ---------------------------------------------------------------------------
-vi.mock('react-hot-toast', () => ({
-  default: { success: vi.fn(), error: vi.fn() },
-  success: vi.fn(),
-  error: vi.fn(),
+vi.mock('@/utils/notify', () => ({
+  default: {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    rateLimit: vi.fn(),
+    trackPlaying: vi.fn(),
+    queueAdded: vi.fn(),
+  },
+  notify: {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+    rateLimit: vi.fn(),
+    trackPlaying: vi.fn(),
+    queueAdded: vi.fn(),
+  },
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    warning: vi.fn(),
+  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -101,6 +122,7 @@ vi.stubGlobal('IntersectionObserver', MockIntersectionObserver);
 import SearchBar from '../SearchBar';
 import axios from 'axios';
 import { getBackendURL } from '../../../utils/api';
+import { notify } from '@/utils/notify';
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -311,5 +333,85 @@ describe('SearchBar Component — QA Test Suite', () => {
 
     expect(() => fireEvent.mouseDown(item)).not.toThrow();
     expect(mockOnSelectTrack).toHaveBeenCalled();
+  });
+
+  /**
+   * TC-FE-07: Fast Input Bursts and Request Sequencing
+   */
+  test('TC-FE-07: fast input burst resolves final query without dropping requests', async () => {
+    axios.get.mockResolvedValueOnce({
+      data: { tracks: TRACKS_PAGE_1, nextPageToken: null },
+    });
+
+    render(<SearchBar onSelectTrack={mockOnSelectTrack} />);
+    const input = screen.getByPlaceholderText(/Search songs, artists/i);
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'first' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(200);
+    });
+    fireEvent.change(input, { target: { value: 'second' } });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    expect(axios.get).toHaveBeenCalledWith(
+      expect.stringContaining('query=second'),
+      expect.any(Object),
+    );
+  });
+
+  /**
+   * TC-FE-08: Unicode and Non-Latin Query Normalization
+   */
+  test('TC-FE-08: preserves Unicode/non-Latin characters during search normalization', async () => {
+    axios.get.mockResolvedValueOnce({
+      data: { tracks: [{ videoId: 'jp1', title: '深愛', channelTitle: '水樹奈々', thumbNail: 'jp.jpg' }], nextPageToken: null },
+    });
+
+    render(<SearchBar onSelectTrack={mockOnSelectTrack} />);
+    const input = screen.getByPlaceholderText(/Search songs, artists/i);
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: '水樹奈々' } });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    expect(axios.get).toHaveBeenCalledWith(
+      expect.stringContaining(encodeURIComponent('水樹奈々')),
+      expect.any(Object),
+    );
+  });
+
+  /**
+   * TC-FE-09: Enter Key Full Search with notify.info
+   */
+  test('TC-FE-09: pressing Enter on query triggers full search with notify.info without ReferenceError', async () => {
+    axios.get.mockResolvedValueOnce({
+      data: { tracks: TRACKS_PAGE_1, nextPageToken: null, source: 'youtube_api' },
+    });
+
+    render(<SearchBar onSelectTrack={mockOnSelectTrack} />);
+    const input = screen.getByPlaceholderText(/Search songs, artists/i);
+
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: 'cyberpunk' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(500);
+    });
+
+    expect(notify.info).toHaveBeenCalledWith(
+      expect.stringContaining('Searching YouTube API'),
+      expect.any(Object),
+    );
+    expect(axios.get).toHaveBeenCalledWith(
+      expect.stringContaining('dbOnly=false'),
+      expect.any(Object),
+    );
   });
 });

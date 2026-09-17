@@ -93,6 +93,11 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
+                <Link to="/help" className="hover:text-[var(--color-primary)] transition-colors inline-flex items-center gap-1">
+                  Help & Feedback
+                </Link>
+              </li>
+              <li>
                 <a href="#recommendations-section" className="hover:text-[var(--color-primary)] transition-colors inline-flex items-center gap-1">
                   AI Taste Engine <Sparkles size={12} className="text-amber-400" />
                 </a>

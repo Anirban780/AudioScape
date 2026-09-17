@@ -70,31 +70,47 @@ const PlayerContainer = ({ onClose, uid }) => {
 
   const isExtendingRef = useRef(false);
 
-  // STEP 1: Initial Queue Generation from NestJS Backend
+  // STEP 1: Queue Synchronization & Recommendations for newly selected track
   useEffect(() => {
-    if (track?.id && queue.length === 0) {
-      const keyword = getRandomGenre(track.genre);
-      console.debug("Generating backend queue for track:", track.id, "keyword:", keyword);
+    if (!track?.id) return;
 
-      const fetchQueue = async () => {
-        try {
-          const generatedQueue = await generateQueueFromBackend(track.id, keyword);
-          if (Array.isArray(generatedQueue) && generatedQueue.length > 0) {
-            const queueWithSource = generatedQueue.map((t, idx) => ({
-              ...t,
-              source: idx === 0 ? (track.source || "SEARCH") : "RELATED_QUEUE",
-            }));
-            setQueue(queueWithSource);
-            setCurrentIndex(0);
-          }
-        } catch (err) {
-          console.error("Backend queue generation failed:", err);
-        }
-      };
+    const existingIdx = queue.findIndex((t) => (t.id || t.videoId) === track.id);
 
-      fetchQueue();
+    // If track is already present in the active queue, align currentIndex
+    if (existingIdx !== -1) {
+      if (currentIndex !== existingIdx) {
+        setCurrentIndex(existingIdx);
+      }
+      return;
     }
-  }, [track?.id, track?.source, queue.length, setQueue, setCurrentIndex]);
+
+    // If track is not in current queue, fetch fresh backend queue recommendations centered around it
+    const keyword = getRandomGenre(track.genre);
+    console.debug("Generating backend queue for track:", track.id, "keyword:", keyword);
+
+    const fetchQueue = async () => {
+      try {
+        const generatedQueue = await generateQueueFromBackend(track.id, keyword);
+        if (Array.isArray(generatedQueue) && generatedQueue.length > 0) {
+          const queueWithSource = generatedQueue.map((t, idx) => ({
+            ...t,
+            source: idx === 0 ? (track.source || "SEARCH") : "RELATED_QUEUE",
+          }));
+          setQueue(queueWithSource);
+          setCurrentIndex(0);
+        } else {
+          setQueue([track]);
+          setCurrentIndex(0);
+        }
+      } catch (err) {
+        console.error("Backend queue generation failed:", err);
+        setQueue([track]);
+        setCurrentIndex(0);
+      }
+    };
+
+    fetchQueue();
+  }, [track?.id, track?.source, setQueue, setCurrentIndex]);
 
   // STEP 2: Continuous Radio Auto-Refill near Queue End
   useEffect(() => {
@@ -178,6 +194,7 @@ const PlayerContainer = ({ onClose, uid }) => {
       }
     }
 
+    setIsFullScreen(false);
     setTrack(null);
     setQueue([]);
 
@@ -197,6 +214,7 @@ const PlayerContainer = ({ onClose, uid }) => {
           player={player}
           isPlayerReady={isPlayerReady}
           onClose={toggleFullScreen}
+          onCloseTrack={handleClose}
         />
       ) : (
         <MiniPlayer

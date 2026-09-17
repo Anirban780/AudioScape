@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback } from "react";
 import YouTube from "react-youtube";
 import { saveSongListen } from "@/utils/api";
 import usePlayerStore from "@/store/usePlayerStore";
-import toast from "react-hot-toast";
+import { notify } from "@/utils/notify";
 
 /**
  * ============================================================================
@@ -43,12 +43,9 @@ const YouTubePlayer = ({ trackId, onReady, onTrackEnd }) => {
 
   const triggerSkipFallback = useCallback((reasonMessage) => {
     clearWatchdog();
-    toast.error(reasonMessage, { id: "playback-error-watchdog" });
-    if (typeof onTrackEnd === "function") {
-      onTrackEnd();
-    } else {
-      nextTrack();
-    }
+    const handleSkip = typeof onTrackEnd === "function" ? onTrackEnd : nextTrack;
+    notify.playbackError(reasonMessage);
+    handleSkip();
   }, [clearWatchdog, onTrackEnd, nextTrack]);
 
   const startWatchdog = useCallback(() => {
