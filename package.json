@@ -57,6 +57,10 @@
   },
   "optionalDependencies": {
     "@rollup/rollup-linux-x64-gnu": "*",
-    "@swc/core-linux-x64-gnu": "*"
+    "@swc/core-linux-x64-gnu": "*",
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.0.0",
+    "@tailwindcss/oxide-linux-x64-musl": "^4.0.0",
+    "lightningcss-linux-x64-gnu": "*",
+    "lightningcss-linux-x64-musl": "*"
   }
 }

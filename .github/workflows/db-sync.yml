@@ -1,0 +1,51 @@
+name: Neon Database Migration & Schema Synchronization
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Target Neon Environment to Migrate'
+        required: true
+        default: 'both'
+        type: choice
+        options:
+          - both
+          - staging
+          - prod
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/prisma/**'
+
+jobs:
+  db-sync:
+    name: Execute Neon Database Migrations
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install Dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Run Schema Migration & Synchronization
+        working-directory: backend
+        env:
+          NEON_STAGING_DIRECT_URL: ${{ secrets.NEON_STAGING_DIRECT_URL }}
+          NEON_PROD_DIRECT_URL: ${{ secrets.NEON_PROD_DIRECT_URL }}
+          NEON_STAGING_POOLED_URL: ${{ secrets.NEON_STAGING_POOLED_URL }}
+          NEON_PROD_POOLED_URL: ${{ secrets.NEON_PROD_POOLED_URL }}
+        run: |
+          TARGET="${{ inputs.target || 'both' }}"
+          echo "Running Neon Database Migration for Target: ${TARGET}"
+          node scripts/db-sync.js "${TARGET}"

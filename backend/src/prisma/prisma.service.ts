@@ -60,7 +60,13 @@ export function resolveDatabaseUrl(): { connectionString: string; isNeon: boolea
   let connectionString = '';
 
   if (isCloud) {
-    if (isValidCloudPostgresUrl(process.env.DATABASE_URL)) {
+    const targetNeonEnv = process.env.TARGET_NEON_ENV || (process.env.NODE_ENV === 'staging' ? 'staging' : (process.env.NODE_ENV === 'production' ? 'production' : ''));
+
+    if (targetNeonEnv === 'staging' && isValidCloudPostgresUrl(process.env.NEON_STAGING_POOLED_URL)) {
+      connectionString = process.env.NEON_STAGING_POOLED_URL!;
+    } else if (targetNeonEnv === 'production' && isValidCloudPostgresUrl(process.env.NEON_PROD_POOLED_URL)) {
+      connectionString = process.env.NEON_PROD_POOLED_URL!;
+    } else if (isValidCloudPostgresUrl(process.env.DATABASE_URL)) {
       connectionString = process.env.DATABASE_URL!;
     } else if (isValidCloudPostgresUrl(process.env.NEON_DATABASE_URL)) {
       connectionString = process.env.NEON_DATABASE_URL!;
@@ -111,8 +117,9 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
     });
 
     const maskedHost = connectionString.split('@')[1] || 'configured-host';
+    const targetBranch = connectionString.includes('ep-raspy-cake') ? 'staging' : (connectionString.includes('ep-orange-fog') ? 'production' : 'custom');
     this.logger.log(
-      `Prisma initialized target: ${isNeon ? 'Neon Cloud Serverless' : 'PostgreSQL'} (${maskedHost.split('/')[0]}) [cloud=${isCloud}]`,
+      `Prisma initialized target: ${isNeon ? `Neon Cloud Serverless [${targetBranch}]` : 'PostgreSQL'} (${maskedHost.split('/')[0]}) [cloud=${isCloud}]`,
     );
   }
 
