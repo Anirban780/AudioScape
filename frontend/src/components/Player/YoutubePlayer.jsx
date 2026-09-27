@@ -69,9 +69,11 @@ const YouTubePlayer = ({ trackId, onReady, onTrackEnd }) => {
     };
   }, [trackId, startWatchdog, clearWatchdog]);
 
+  const origin = typeof window !== "undefined" ? window.location.origin : undefined;
+
   const opts = {
-    height: "0",
-    width: "0",
+    height: "100%",
+    width: "100%",
     playerVars: {
       autoplay: 1,
       controls: 0,
@@ -82,7 +84,7 @@ const YouTubePlayer = ({ trackId, onReady, onTrackEnd }) => {
       iv_load_policy: 3,
       fs: 0,
       disablekb: 1,
-      origin: window.location.origin,
+      ...(origin ? { origin } : {}),
     },
   };
 
@@ -153,8 +155,23 @@ const YouTubePlayer = ({ trackId, onReady, onTrackEnd }) => {
     triggerSkipFallback(errorMsg);
   };
 
+  if (!trackId) return null;
+
   return (
-    <div className="hidden">
+    <div
+      aria-hidden="true"
+      style={{
+        position: "fixed",
+        top: "-9999px",
+        left: "-9999px",
+        width: "200px",
+        height: "200px",
+        opacity: 0,
+        pointerEvents: "none",
+        zIndex: -9999,
+        visibility: "visible",
+      }}
+    >
       <YouTube
         videoId={trackId}
         opts={opts}

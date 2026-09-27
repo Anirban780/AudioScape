@@ -63,6 +63,7 @@ const PlayerContainer = ({ onClose, uid }) => {
     setCurrentIndex,
     isLooping,
     isFullScreen,
+    setIsFullScreen,
     toggleFullScreen,
     nextTrack,
     isAutoRefillEnabled,
