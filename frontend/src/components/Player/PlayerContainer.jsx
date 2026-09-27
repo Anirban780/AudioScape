@@ -156,16 +156,24 @@ const PlayerContainer = ({ onClose, uid }) => {
 
   const onPlayerReady = useCallback((event) => {
     const ytPlayer = event.target;
-
     if (!ytPlayer) return;
 
     setPlayer(ytPlayer);
     setIsPlayerReady(true);
 
-    const currentTrack = usePlayerStore.getState().track;
-    if (currentTrack?.id && ytPlayer.getVideoData()?.video_id !== currentTrack.id) {
-      ytPlayer.loadVideoById({ videoId: currentTrack.id });
-      ytPlayer.playVideo();
+    try {
+      const { volume, isMuted } = usePlayerStore.getState();
+      if (typeof ytPlayer.setVolume === "function") {
+        ytPlayer.setVolume(volume ?? 80);
+      }
+      if (isMuted && typeof ytPlayer.mute === "function") {
+        ytPlayer.mute();
+      } else if (typeof ytPlayer.unMute === "function") {
+        ytPlayer.unMute();
+      }
+      ytPlayer.playVideo?.();
+    } catch (err) {
+      console.warn("[PlayerContainer] Error starting video on player ready:", err);
     }
   }, [setPlayer, setIsPlayerReady]);
 

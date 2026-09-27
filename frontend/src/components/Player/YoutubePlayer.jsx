@@ -50,11 +50,11 @@ const YouTubePlayer = ({ trackId, onReady, onTrackEnd }) => {
 
   const startWatchdog = useCallback(() => {
     clearWatchdog();
-    // 9-second timeout for stream resolution
+    // 12-second timeout for stream resolution on diverse platforms/networks
     watchdogTimerRef.current = setTimeout(() => {
       console.warn(`[YoutubePlayer] Watchdog timed out waiting for track ${trackId} to play.`);
       triggerSkipFallback("Playback error: This track took too long to load. Skipping to next track...");
-    }, 9000);
+    }, 12000);
   }, [clearWatchdog, trackId, triggerSkipFallback]);
 
   useEffect(() => {
@@ -69,24 +69,25 @@ const YouTubePlayer = ({ trackId, onReady, onTrackEnd }) => {
     };
   }, [trackId, startWatchdog, clearWatchdog]);
 
-  const origin = typeof window !== "undefined" ? window.location.origin : undefined;
-
-  const opts = {
-    height: "100%",
-    width: "100%",
-    playerVars: {
-      autoplay: 1,
-      controls: 0,
-      modestbranding: 1,
-      rel: 0,
-      enablejsapi: 1,
-      playsinline: 1,
-      iv_load_policy: 3,
-      fs: 0,
-      disablekb: 1,
-      ...(origin ? { origin } : {}),
-    },
-  };
+  const opts = React.useMemo(() => {
+    const origin = typeof window !== "undefined" ? window.location.origin : undefined;
+    return {
+      height: "100%",
+      width: "100%",
+      playerVars: {
+        autoplay: 1,
+        controls: 0,
+        modestbranding: 1,
+        rel: 0,
+        enablejsapi: 1,
+        playsinline: 1,
+        iv_load_policy: 3,
+        fs: 0,
+        disablekb: 1,
+        ...(origin ? { origin, widget_referrer: origin } : {}),
+      },
+    };
+  }, []);
 
   const handleStateChange = (event) => {
     const player = event.target;
@@ -162,14 +163,14 @@ const YouTubePlayer = ({ trackId, onReady, onTrackEnd }) => {
       aria-hidden="true"
       style={{
         position: "fixed",
-        top: "-9999px",
-        left: "-9999px",
-        width: "200px",
-        height: "200px",
-        opacity: 0,
+        bottom: 0,
+        right: 0,
+        width: "2px",
+        height: "2px",
+        opacity: 0.001,
         pointerEvents: "none",
         zIndex: -9999,
-        visibility: "visible",
+        overflow: "hidden",
       }}
     >
       <YouTube
