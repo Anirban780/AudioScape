@@ -13,6 +13,8 @@ export default function QuotaDashboardModal({ isOpen, onClose, anchorRef }) {
     lastRefreshed,
     formattedCountdown,
     formattedResetTime,
+    userSearchesLeft,
+    globalSearchesLeft,
     refresh,
   } = useQuotaDashboard({ enabled: isOpen });
 
@@ -87,8 +89,6 @@ export default function QuotaDashboardModal({ isOpen, onClose, anchorRef }) {
 
   if (!isOpen) return null;
 
-  const userSearchesLeft = data?.userSearchesLeft ?? 0;
-  const globalSearchesLeft = data?.globalSearchesLeft ?? 150;
   
   const getProgressColorClass = (searchesLeft) => {
     if (searchesLeft === 0) return "bg-[var(--color-destructive)]";

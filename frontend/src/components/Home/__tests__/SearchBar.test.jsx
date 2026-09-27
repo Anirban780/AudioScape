@@ -387,11 +387,12 @@ describe('SearchBar Component — QA Test Suite', () => {
   });
 
   /**
-   * TC-FE-09: Enter Key Full Search with notify.info
+   * TC-FE-09: Enter Key Full Search triggers single telemetry update notification
    */
-  test('TC-FE-09: pressing Enter on query triggers full search with notify.info without ReferenceError', async () => {
+  test('TC-FE-09: pressing Enter on query triggers full search and updates quota telemetry without ReferenceError', async () => {
     axios.get.mockResolvedValueOnce({
       data: { tracks: TRACKS_PAGE_1, nextPageToken: null, source: 'youtube_api' },
+      headers: { 'ratelimit-daily-remaining': '4' },
     });
 
     render(<SearchBar onSelectTrack={mockOnSelectTrack} />);
@@ -405,7 +406,7 @@ describe('SearchBar Component — QA Test Suite', () => {
       await vi.advanceTimersByTimeAsync(500);
     });
 
-    expect(notify.info).toHaveBeenCalledWith(
+    expect(notify.info).not.toHaveBeenCalledWith(
       expect.stringContaining('Searching YouTube API'),
       expect.any(Object),
     );
