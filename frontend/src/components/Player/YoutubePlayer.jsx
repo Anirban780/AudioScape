@@ -33,6 +33,16 @@ const YouTubePlayer = ({ trackId, onReady, onTrackEnd }) => {
   const { setIsPlaying, setDuration, track, playbackSource, nextTrack } = usePlayerStore();
   const recordedTrackRef = useRef(null);
   const watchdogTimerRef = useRef(null);
+  const playerStateRef = useRef(null);
+
+  const onTrackEndRef = useRef(onTrackEnd);
+  onTrackEndRef.current = onTrackEnd;
+
+  const nextTrackRef = useRef(nextTrack);
+  nextTrackRef.current = nextTrack;
+
+  const trackIdRef = useRef(trackId);
+  trackIdRef.current = trackId;
 
   const clearWatchdog = useCallback(() => {
     if (watchdogTimerRef.current) {
@@ -43,23 +53,29 @@ const YouTubePlayer = ({ trackId, onReady, onTrackEnd }) => {
 
   const triggerSkipFallback = useCallback((reasonMessage) => {
     clearWatchdog();
-    const handleSkip = typeof onTrackEnd === "function" ? onTrackEnd : nextTrack;
+    const handleSkip = typeof onTrackEndRef.current === "function" ? onTrackEndRef.current : nextTrackRef.current;
     notify.playbackError(reasonMessage);
-    handleSkip();
-  }, [clearWatchdog, onTrackEnd, nextTrack]);
+    if (typeof handleSkip === "function") {
+      handleSkip();
+    }
+  }, [clearWatchdog]);
 
   const startWatchdog = useCallback(() => {
     clearWatchdog();
+    // Do not arm watchdog if video is already actively playing
+    if (playerStateRef.current === 1) return;
+
     // 12-second timeout for stream resolution on diverse platforms/networks
     watchdogTimerRef.current = setTimeout(() => {
-      console.warn(`[YoutubePlayer] Watchdog timed out waiting for track ${trackId} to play.`);
+      console.warn(`[YoutubePlayer] Watchdog timed out waiting for track ${trackIdRef.current} to play.`);
       triggerSkipFallback("Playback error: This track took too long to load. Skipping to next track...");
     }, 12000);
-  }, [clearWatchdog, trackId, triggerSkipFallback]);
+  }, [clearWatchdog, triggerSkipFallback]);
 
   useEffect(() => {
     // Reset recorded track and arm watchdog whenever video ID changes
     recordedTrackRef.current = null;
+    playerStateRef.current = null;
     if (trackId) {
       startWatchdog();
     }
@@ -98,6 +114,7 @@ const YouTubePlayer = ({ trackId, onReady, onTrackEnd }) => {
     }
 
     const state = event.data;
+    playerStateRef.current = state;
 
     if (state === 1) {
       // PLAYING — Disarm watchdog timer
@@ -122,8 +139,8 @@ const YouTubePlayer = ({ trackId, onReady, onTrackEnd }) => {
       setIsPlaying(false);
     }
     else if (state === 3) {
-      // BUFFERING — Ensure watchdog is active
-      if (!watchdogTimerRef.current) {
+      // BUFFERING — Ensure watchdog is active if not already playing
+      if (!watchdogTimerRef.current && playerStateRef.current !== 1) {
         startWatchdog();
       }
     }
@@ -131,8 +148,8 @@ const YouTubePlayer = ({ trackId, onReady, onTrackEnd }) => {
       // ENDED
       clearWatchdog();
       setIsPlaying(false);
-      if (typeof onTrackEnd === "function") {
-        onTrackEnd();
+      if (typeof onTrackEndRef.current === "function") {
+        onTrackEndRef.current();
       }
     }
     else if (state === 5) {
@@ -146,7 +163,7 @@ const YouTubePlayer = ({ trackId, onReady, onTrackEnd }) => {
   const handlePlayerError = (event) => {
     clearWatchdog();
     const errorCode = event?.data;
-    console.warn(`[YoutubePlayer] YouTube API error emitted for track ${trackId}:`, errorCode);
+    console.warn(`[YoutubePlayer] YouTube API error emitted for track ${trackIdRef.current}:`, errorCode);
 
     const isRestricted = errorCode === 101 || errorCode === 150;
     const errorMsg = isRestricted

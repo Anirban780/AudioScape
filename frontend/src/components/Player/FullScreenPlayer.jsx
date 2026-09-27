@@ -342,6 +342,7 @@ const FullScreenPlayer = ({ track, player, isPlayerReady, onClose, onCloseTrack 
                 isLooping={isLooping}
                 toggleLooping={toggleLooping}
                 isShuffling={isShuffling}
+                toggleShuffling={toggleShuffling}
                 toggleLike={toggleLike}
               />
             </div>

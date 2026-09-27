@@ -61,7 +61,6 @@ const PlayerContainer = ({ onClose, uid }) => {
     setQueue,
     currentIndex,
     setCurrentIndex,
-    isLooping,
     isFullScreen,
     setIsFullScreen,
     toggleFullScreen,
@@ -144,15 +143,17 @@ const PlayerContainer = ({ onClose, uid }) => {
 
   // STEP 3: Single Event-Driven Track Completion Handler
   const handleTrackEnd = useCallback(() => {
+    const { isLooping, player: ytPlayer, nextTrack: skipNext, setIsPlaying: updateIsPlaying } = usePlayerStore.getState();
     if (isLooping) {
-      if (player && typeof player.seekTo === "function") {
-        player.seekTo(0);
-        player.playVideo?.();
+      if (ytPlayer && typeof ytPlayer.seekTo === "function") {
+        ytPlayer.seekTo(0, true);
+        ytPlayer.playVideo?.();
+        updateIsPlaying(true);
       }
     } else {
-      nextTrack();
+      skipNext();
     }
-  }, [isLooping, nextTrack, player]);
+  }, []);
 
   const onPlayerReady = useCallback((event) => {
     const ytPlayer = event.target;
