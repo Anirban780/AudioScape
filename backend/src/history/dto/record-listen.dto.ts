@@ -11,7 +11,7 @@ import { PlaybackSource } from '@prisma/client';
  * Defines and validates the payload sent when a user plays a music track (`POST /api/music/history`).
  *
  * WHY THIS IS NEEDED FOR PRODUCTION:
- * - Play Attribution: Captures playback `source` (`SEARCH`, `EXPLORE`, `RECOMMENDATION`, `PLAYLIST`, `RELATED_QUEUE`)
+ * - Play Attribution: Captures playback `source` (`SEARCH`, `EXPLORE`, `RECOMMENDATION`, `PLAYLIST`, `RELATED_QUEUE`, `FAVORITES`, `HISTORY`)
  *   for analytical insights and TF-IDF recommendation engine scoring.
  * - Auto-Healing Track Cache: Optional title, artist, thumbnail params allow instant track row creation if missing.
  * ============================================================================

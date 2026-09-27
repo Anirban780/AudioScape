@@ -190,7 +190,7 @@ const HistoryPage = () => {
   // Play Single Track
   const handlePlayTrack = (track) => {
     if (!track) return;
-    setTrack(track, "SEARCH");
+    setTrack(track, "HISTORY");
     setIsPlaying(true);
     notify.trackPlaying(track.name || track.title);
   };
@@ -198,8 +198,8 @@ const HistoryPage = () => {
   // Play All Tracks
   const handlePlayAll = () => {
     if (!processedTracks || processedTracks.length === 0) return;
-    setQueue(processedTracks, "SEARCH");
-    setTrack(processedTracks[0], "SEARCH");
+    setQueue(processedTracks, "HISTORY");
+    setTrack(processedTracks[0], "HISTORY");
     setIsPlaying(true);
     notify.success(`Playing history queue (${processedTracks.length} tracks)`);
   };
@@ -208,8 +208,8 @@ const HistoryPage = () => {
   const handleShuffle = () => {
     if (!processedTracks || processedTracks.length === 0) return;
     const shuffled = [...processedTracks].sort(() => 0.5 - Math.random());
-    setQueue(shuffled, "SEARCH");
-    setTrack(shuffled[0], "SEARCH");
+    setQueue(shuffled, "HISTORY");
+    setTrack(shuffled[0], "HISTORY");
     setIsPlaying(true);
     notify.success(`Shuffling history queue (${shuffled.length} tracks)`);
   };

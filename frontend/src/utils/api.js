@@ -58,7 +58,7 @@ async function getAuthHeader() {
  * Saves a song listen event to NestJS backend database with full playback attribution context.
  *
  * @param {string} videoId - The YouTube ID of the song/video.
- * @param {string} source - Playback attribution source ('SEARCH' | 'EXPLORE' | 'RECOMMENDATION' | 'PLAYLIST' | 'RELATED_QUEUE')
+ * @param {string} source - Playback attribution source ('SEARCH' | 'EXPLORE' | 'RECOMMENDATION' | 'PLAYLIST' | 'RELATED_QUEUE' | 'FAVORITES' | 'HISTORY')
  * @param {object} track - Optional track metadata object for automatic PostgreSQL provisioning
  */
 export async function saveSongListen(videoId, source = "SEARCH", track = {}) {
@@ -195,6 +195,7 @@ export async function fetchUserLikedSongs(userId) {
                 liked: true,
                 playCount: item.playCount || track?.playCount || 0,
                 likedAt: item.likedAt || track?.likedAt || null,
+                source: "FAVORITES",
             };
         });
     } catch (error) {

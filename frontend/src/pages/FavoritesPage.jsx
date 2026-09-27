@@ -290,23 +290,23 @@ const FavoritesPage = () => {
 
     // Playback Handlers
     const handlePlayTrack = (track) => {
-        setQueue(processedSongs);
-        setTrack(track);
+        setQueue(processedSongs, "FAVORITES");
+        setTrack(track, "FAVORITES");
         playTrack(track);
     };
 
     const handlePlayAll = () => {
         if (processedSongs.length === 0) return;
-        setQueue(processedSongs);
-        setTrack(processedSongs[0]);
+        setQueue(processedSongs, "FAVORITES");
+        setTrack(processedSongs[0], "FAVORITES");
         playTrack(processedSongs[0]);
     };
 
     const handleShuffle = () => {
         if (processedSongs.length === 0) return;
         const shuffled = [...processedSongs].sort(() => Math.random() - 0.5);
-        setQueue(shuffled);
-        setTrack(shuffled[0]);
+        setQueue(shuffled, "FAVORITES");
+        setTrack(shuffled[0], "FAVORITES");
         playTrack(shuffled[0]);
     };
 

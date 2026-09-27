@@ -98,7 +98,8 @@ const FavoriteSongs = ({ userId }) => {
       name: song.name || song.title,
       artist: song.artist,
       thumbnail: song.thumbnail || placeholder,
-    });
+      source: "FAVORITES",
+    }, "FAVORITES");
     usePlayerStore.getState().setIsPlaying(true);
     notify.trackPlaying(song.name || song.title, song.artist);
   };
