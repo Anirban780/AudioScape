@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback, useRef } from "react";
-import { fetchQuotaSummary, fetchQuotaHistory } from "@/utils/api";
-import { notify } from "@/utils/notify";
+import { useState, useEffect, useCallback } from "react";
+import useQuotaStore from "@/store/useQuotaStore";
 
 /**
  * ============================================================================
@@ -8,21 +7,16 @@ import { notify } from "@/utils/notify";
  * ============================================================================
  * 
  * WHAT THIS FILE DOES:
- * Orchestrates real-time state management, data polling, and countdown calculations
- * for the YouTube API Quota Dashboard:
- * 1. Data Fetching: Fetches today's quota summary and past 7-day history from NestJS backend.
- * 2. 30-Minute Auto-Refresh: Automatically polls fresh telemetry every 30 minutes.
- * 3. Manual Refresh: Provides manual trigger with loading state and debouncing.
- * 4. Live Reset Countdown: Ticks every second counting down to midnight Pacific Time (00:00 PT).
- * 5. Quota Health Helpers: Pre-calculates spend percentages and color grading (green, amber, red).
+ * Connects UI components (QuotaStatusPill, QuotaDashboardModal, SearchBar)
+ * to the centralized `useQuotaStore`:
+ * 1. Synchronized State: All components share the exact same live telemetry.
+ * 2. Dynamic Update: Updates "5 left" badge dynamically when searches occur.
+ * 3. Selective Notifications: Only manual refresh in the modal triggers toasts;
+ *    background and typing syncs remain completely silent.
+ * 4. Countdown Ticker: Ticks every second towards local midnight reset (12:00 AM).
  * ============================================================================
  */
 
-/**
- * Calculates remaining seconds until the next 12:00 AM local midnight in the browser.
- * Guarantees that users immediately see an accurate countdown to the next calendar day (< 12 hours if in afternoon/evening)
- * even before network responses resolve.
- */
 function getSecondsUntilLocalMidnight() {
   const now = new Date();
   const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
@@ -30,78 +24,43 @@ function getSecondsUntilLocalMidnight() {
 }
 
 export function useQuotaDashboard({ enabled = true } = {}) {
-  const [data, setData] = useState(null);
-  const [history, setHistory] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState(null);
-  const [lastRefreshed, setLastRefreshed] = useState(null);
-  const [countdownSeconds, setCountdownSeconds] = useState(getSecondsUntilLocalMidnight);
+  const {
+    data,
+    history,
+    isLoading,
+    isRefreshing,
+    error,
+    lastRefreshed,
+    userSearchesLeft,
+    userSearchesMade,
+    globalSearchesLeft,
+    globalSearchesMade,
+    isThresholdActive,
+    isGlobalCapReached,
+    canSearch,
+    fetchQuota,
+    setUserSearchesLeft,
+  } = useQuotaStore();
 
-  const isMountedRef = useRef(true);
+  const [countdownSeconds, setCountdownSeconds] = useState(() => {
+    return data?.resetTime?.resetsInSeconds != null
+      ? data.resetTime.resetsInSeconds
+      : getSecondsUntilLocalMidnight();
+  });
 
-  /**
-   * Core data fetching function retrieving both today's summary and historical usage.
-   */
-  const loadQuotaData = useCallback(async (isManual = false) => {
-    if (isManual) {
-      setIsRefreshing(true);
+  // Sync countdown whenever backend resetTime arrives
+  useEffect(() => {
+    if (data?.resetTime?.resetsInSeconds != null) {
+      setCountdownSeconds(data.resetTime.resetsInSeconds);
     }
-
-    try {
-      setError(null);
-      const [summaryRes, historyRes] = await Promise.allSettled([
-        fetchQuotaSummary(),
-        fetchQuotaHistory(7),
-      ]);
-
-      if (!isMountedRef.current) return;
-
-      if (summaryRes.status === "fulfilled") {
-        setData(summaryRes.value);
-        if (summaryRes.value.resetTime?.resetsInSeconds != null) {
-          setCountdownSeconds(summaryRes.value.resetTime.resetsInSeconds);
-        }
-      } else {
-        throw summaryRes.reason;
-      }
-
-      if (historyRes.status === "fulfilled") {
-        setHistory(historyRes.value.days || []);
-      }
-
-      setLastRefreshed(new Date());
-
-      if (isManual) {
-        notify.success("YouTube quota telemetry refreshed");
-      }
-    } catch (err) {
-      if (!isMountedRef.current) return;
-      const errMsg = err?.message || "Failed to load quota telemetry";
-      setError(errMsg);
-      if (isManual) {
-        notify.error(`Quota refresh failed: ${errMsg}`);
-      }
-    } finally {
-      if (isMountedRef.current) {
-        setIsLoading(false);
-        setIsRefreshing(false);
-      }
-    }
-  }, []);
+  }, [data?.resetTime?.resetsInSeconds]);
 
   // Initial load when enabled
   useEffect(() => {
-    isMountedRef.current = true;
-
     if (enabled) {
-      loadQuotaData(false);
+      fetchQuota({ silent: true });
     }
-
-    return () => {
-      isMountedRef.current = false;
-    };
-  }, [enabled, loadQuotaData]);
+  }, [enabled, fetchQuota]);
 
   // 1-Second Countdown Ticker towards local midnight (12:00 AM)
   useEffect(() => {
@@ -111,7 +70,7 @@ export function useQuotaDashboard({ enabled = true } = {}) {
       setCountdownSeconds((prev) => {
         if (prev <= 1) {
           // Re-fetch once quota resets at local midnight
-          loadQuotaData(false);
+          fetchQuota({ silent: true });
           return getSecondsUntilLocalMidnight();
         }
         return prev - 1;
@@ -119,15 +78,22 @@ export function useQuotaDashboard({ enabled = true } = {}) {
     }, 1000);
 
     return () => clearInterval(ticker);
-  }, [enabled, loadQuotaData]);
+  }, [enabled, fetchQuota]);
 
   /**
-   * Manual refresh handler exposed to UI buttons.
+   * Manual refresh handler exposed to UI buttons (QuotaDashboardModal).
+   * Passes isManual: true so that ONLY manual clicks show the refreshed notification!
    */
   const handleManualRefresh = useCallback(async () => {
-    if (isRefreshing) return;
-    await loadQuotaData(true);
-  }, [isRefreshing, loadQuotaData]);
+    await fetchQuota({ isManual: true });
+  }, [fetchQuota]);
+
+  /**
+   * Silent/Search refresh handler.
+   */
+  const handleSilentRefresh = useCallback(async (notifySearchSuccess = false) => {
+    await fetchQuota({ silent: true, notifySearchSuccess });
+  }, [fetchQuota]);
 
   // Calculated Metrics
   const totalLimit = data?.totalLimit || 20000;
@@ -142,30 +108,17 @@ export function useQuotaDashboard({ enabled = true } = {}) {
   const keyBConsumed = data?.keyB?.unitsConsumed || 0;
   const keyBPercent = Math.min(100, Math.round((keyBConsumed / keyBLimit) * 100 * 10) / 10);
 
-  // Status color determination
   const getStatusColor = (percent) => {
     if (percent >= 80) return "red";
     if (percent >= 60) return "amber";
     return "emerald";
   };
 
-  // Formatted countdown string (e.g. "8h 54m 12s")
   const hours = Math.floor(countdownSeconds / 3600);
   const minutes = Math.floor((countdownSeconds % 3600) / 60);
   const seconds = countdownSeconds % 60;
   const formattedCountdown = `${hours}h ${minutes.toString().padStart(2, "0")}m ${seconds.toString().padStart(2, "0")}s`;
-
-  // Always 12-hour format reset time e.g. "12:00 AM"
   const formattedResetTime = data?.resetTime?.localResetTime || "12:00 AM";
-
-  // Searches & Threshold Metrics
-  const userSearchesLeft = data?.userSearchesLeft ?? (data?.searchStatus?.userSearchesLeft ?? 5);
-  const userSearchesMade = data?.userSearchesMade ?? (data?.searchStatus?.userSearchesMade ?? 0);
-  const globalSearchesLeft = data?.globalSearchesLeft ?? (data?.searchStatus?.globalSearchesLeft ?? 150);
-  const globalSearchesMade = data?.globalSearchesMade ?? (data?.searchStatus?.globalSearchesMade ?? 0);
-  const isThresholdActive = Boolean(data?.isThresholdActive ?? data?.searchStatus?.isThresholdActive);
-  const isGlobalCapReached = Boolean(data?.searchStatus?.isGlobalCapReached ?? (globalSearchesLeft === 0));
-  const canSearch = Boolean(data?.canSearch ?? (userSearchesLeft > 0 && !isGlobalCapReached));
 
   return {
     data,
@@ -190,6 +143,8 @@ export function useQuotaDashboard({ enabled = true } = {}) {
     isGlobalCapReached,
     canSearch,
     refresh: handleManualRefresh,
+    silentRefresh: handleSilentRefresh,
+    setUserSearchesLeft,
     toggleAutoRefresh: () => {},
   };
 }

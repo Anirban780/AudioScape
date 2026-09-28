@@ -38,7 +38,7 @@ const JumpBackIn = ({ lastPlayedTrack }) => {
   const handleResumePlayback = (e) => {
     e.stopPropagation();
     if (!lastPlayedTrack) return;
-    setTrack(lastPlayedTrack);
+    setTrack(lastPlayedTrack, "HISTORY");
     setIsPlaying(true);
   };
 

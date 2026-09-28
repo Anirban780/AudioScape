@@ -61,8 +61,8 @@ const PlayerContainer = ({ onClose, uid }) => {
     setQueue,
     currentIndex,
     setCurrentIndex,
-    isLooping,
     isFullScreen,
+    setIsFullScreen,
     toggleFullScreen,
     nextTrack,
     isAutoRefillEnabled,
@@ -143,28 +143,38 @@ const PlayerContainer = ({ onClose, uid }) => {
 
   // STEP 3: Single Event-Driven Track Completion Handler
   const handleTrackEnd = useCallback(() => {
+    const { isLooping, player: ytPlayer, nextTrack: skipNext, setIsPlaying: updateIsPlaying } = usePlayerStore.getState();
     if (isLooping) {
-      if (player && typeof player.seekTo === "function") {
-        player.seekTo(0);
-        player.playVideo?.();
+      if (ytPlayer && typeof ytPlayer.seekTo === "function") {
+        ytPlayer.seekTo(0, true);
+        ytPlayer.playVideo?.();
+        updateIsPlaying(true);
       }
     } else {
-      nextTrack();
+      skipNext();
     }
-  }, [isLooping, nextTrack, player]);
+  }, []);
 
   const onPlayerReady = useCallback((event) => {
     const ytPlayer = event.target;
-
     if (!ytPlayer) return;
 
     setPlayer(ytPlayer);
     setIsPlayerReady(true);
 
-    const currentTrack = usePlayerStore.getState().track;
-    if (currentTrack?.id && ytPlayer.getVideoData()?.video_id !== currentTrack.id) {
-      ytPlayer.loadVideoById({ videoId: currentTrack.id });
-      ytPlayer.playVideo();
+    try {
+      const { volume, isMuted } = usePlayerStore.getState();
+      if (typeof ytPlayer.setVolume === "function") {
+        ytPlayer.setVolume(volume ?? 80);
+      }
+      if (isMuted && typeof ytPlayer.mute === "function") {
+        ytPlayer.mute();
+      } else if (typeof ytPlayer.unMute === "function") {
+        ytPlayer.unMute();
+      }
+      ytPlayer.playVideo?.();
+    } catch (err) {
+      console.warn("[PlayerContainer] Error starting video on player ready:", err);
     }
   }, [setPlayer, setIsPlayerReady]);
 

@@ -65,7 +65,8 @@ const SearchBar = ({ onSelectTrack }) => {
     userSearchesLeft,
     canSearch,
     isGlobalCapReached,
-    refresh: refreshQuota,
+    silentRefresh,
+    setUserSearchesLeft,
   } = useQuotaDashboard({ enabled: true });
 
   const observer = useRef(null);
@@ -218,8 +219,6 @@ const SearchBar = ({ onSelectTrack }) => {
         { id: "quota-limit-toast" }
       );
       setSearchStatusMsg("Live search limit reached. Searching cached library.");
-    } else if (effectiveForceFull) {
-      notify.info("Searching YouTube API for live tracks...", { id: "search-toast" });
     }
 
     try {
@@ -240,9 +239,17 @@ const SearchBar = ({ onSelectTrack }) => {
       };
       const response = await axios.get(url, { signal, headers });
 
+      // Check response headers for remaining searches count and update live store
+      const dailyRemainingHeader = response.headers?.['ratelimit-daily-remaining'];
+      if (dailyRemainingHeader !== undefined) {
+        setUserSearchesLeft?.(parseInt(dailyRemainingHeader, 10));
+      }
+
       // Automatically refresh quota telemetry on search API responses
+      // Shows exactly ONE telemetry notification on successful full search
       if (!nextPage) {
-        refreshQuota?.();
+        const shouldNotifyTelemetry = Boolean(effectiveForceFull);
+        silentRefresh?.(shouldNotifyTelemetry);
       }
 
       // Discard response if a newer query has superseded this one
@@ -295,7 +302,8 @@ const SearchBar = ({ onSelectTrack }) => {
         notify.rateLimit(60, errorMsg);
         setSearchStatusMsg("Search limit reached. Showing local cached tracks.");
         // Instantly refresh telemetry state so navbar pill and modal reflect 0 left
-        refreshQuota?.();
+        setUserSearchesLeft?.(0);
+        silentRefresh?.(false);
         // Automatically query local database so user still gets available cached songs
         fetchSearchResults(rawTrimmed, "", false);
         return;

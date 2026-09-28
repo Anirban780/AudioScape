@@ -31,14 +31,23 @@ const PlayerControls = ({
   size,
   handleNext,
   handlePrev,
-  isLooping,
-  toggleLooping,
-  isShuffling,
-  toggleShuffling,
+  isLooping: propIsLooping,
+  toggleLooping: propToggleLooping,
+  isShuffling: propIsShuffling,
+  toggleShuffling: propToggleShuffling,
   toggleLike,
   isMini = false,
 }) => {
-  const { isFullScreen, isMuted, toggleMute } = usePlayerStore();
+  const store = usePlayerStore();
+  const isFullScreen = store.isFullScreen;
+  const isMuted = store.isMuted;
+  const toggleMute = store.toggleMute;
+
+  const isLooping = propIsLooping ?? store.isLooping;
+  const toggleLooping = propToggleLooping || store.toggleLooping;
+  const isShuffling = propIsShuffling ?? store.isShuffling;
+  const toggleShuffling = propToggleShuffling || store.toggleShuffling;
+
   const iconSize = size || (isFullScreen ? 24 : 20);
 
   return (

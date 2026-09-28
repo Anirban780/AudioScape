@@ -1,0 +1,221 @@
+name: AudioScape Production Keep-Alive & Cold-Start Pinger
+
+# ──────────────────────────────────────────────────────────────────────────────
+# SCHEDULE DESIGN (Indian Standard Time — UTC+05:30)
+#
+# Target Active Window : 06:00 AM IST → 12:00 AM IST  (18 hours/day)
+# Equivalent UTC Range : 00:30 UTC   → 18:30 UTC
+#
+# GitHub Actions cron only supports whole-hour fields, so we approximate:
+#   */15 1-18 * * *
+#   └ Start: 01:00 UTC  = 06:30 AM IST  (30 min after target start)
+#   └ End:   18:45 UTC  = 00:15 AM IST  (15 min past target end)
+#
+# This gives ~17.75 active hours/day — within ±30 min of the 18-hour target.
+#
+# Monthly Budget Calculation:
+#   17.75 hours/day × 30 days = 532.5 instance hours consumed
+#   Render Free Tier Limit    = 750 instance hours allowed
+#   Buffer Headroom Remaining = 217.5 instance hours (29% reserve)
+#
+# Synergistic Effect:
+#   /healthcheck executes `SELECT 1` on Neon PostgreSQL, keeping the
+#   serverless DB compute endpoint simultaneously warm!
+# ──────────────────────────────────────────────────────────────────────────────
+
+on:
+  schedule:
+    # Every 15 minutes, hours 01:00–18:59 UTC  (≈ 06:30 AM–12:15 AM IST)
+    - cron: '*/15 1-18 * * *'
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Reason for manual trigger (optional)'
+        required: false
+        default: 'Manual keep-alive ping'
+
+# Prevent overlapping runs — if a previous ping is still running when the
+# next schedule fires, cancel the old one rather than queueing it.
+concurrency:
+  group: render-keepalive
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  keepalive-ping:
+    name: Ping Production Backend (/healthcheck)
+    runs-on: ubuntu-latest
+
+    # Hard timeout: 5 minutes. A healthy Render cold-start takes ≤90s,
+    # so this is a generous upper bound before declaring failure.
+    timeout-minutes: 5
+
+    steps:
+      # ── Step 1: Validate Secrets ─────────────────────────────────────────────
+      - name: Validate Required Configuration
+        run: |
+          echo "================================================================="
+          echo "🔍 AudioScape Production Keep-Alive Pinger"
+          echo "================================================================="
+          echo "⏰ Scheduled At (UTC): $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "⏰ Equivalent IST:     $(TZ='Asia/Kolkata' date '+%Y-%m-%d %H:%M:%S IST')"
+          echo "================================================================="
+
+          if [ -z "${{ secrets.BACKEND_URL }}" ]; then
+            echo "ℹ️  BACKEND_URL secret not set — falling back to default production URL."
+          else
+            echo "✅ BACKEND_URL secret is configured."
+          fi
+
+      # ── Step 2: Ping /healthcheck ──────────────────────────────────────────
+      - name: Ping Production Healthcheck Endpoint
+        id: ping
+        run: |
+          BACKEND_URL="${{ secrets.BACKEND_URL || 'https://audioscape-api.onrender.com' }}"
+          TARGET="${BACKEND_URL}/healthcheck"
+
+          echo "🎯 Target: ${TARGET}"
+          echo ""
+
+          # Perform the GET request:
+          #   --max-time 90  → allow up to 90s for Render cold-start wakeup
+          #   --retry 2      → retry up to 2 times on transient network errors
+          #   --retry-delay 10 → wait 10s between retries
+          HTTP_STATUS=$(curl -s \
+            --max-time 90 \
+            --retry 2 \
+            --retry-delay 10 \
+            --retry-connrefused \
+            -o response.json \
+            -w "%{http_code}" \
+            "${TARGET}" || echo "000")
+
+          echo "HTTP_STATUS=${HTTP_STATUS}" >> $GITHUB_OUTPUT
+
+          echo "📡 HTTP Response Status: ${HTTP_STATUS}"
+          echo ""
+
+          if [ "${HTTP_STATUS}" = "000" ]; then
+            echo "PING_RESULT=unreachable" >> $GITHUB_OUTPUT
+            echo "::error::Render production backend is unreachable (network/DNS failure or curl timeout)."
+            echo "::error::Target was: ${TARGET}"
+            exit 1
+          fi
+
+          if [ "${HTTP_STATUS}" -ne 200 ]; then
+            echo "PING_RESULT=error" >> $GITHUB_OUTPUT
+            echo "::error::Healthcheck returned unexpected HTTP ${HTTP_STATUS} — backend may be misconfigured or returning an error response."
+            cat response.json 2>/dev/null || echo "(no body)"
+            exit 1
+          fi
+
+          # Parse and surface health metrics from the JSON response
+          APP_STATUS=$(jq -r '.status // "unknown"' response.json 2>/dev/null || echo "parse_error")
+          DB_STATUS=$(jq -r '.database.status // "unknown"' response.json 2>/dev/null || echo "parse_error")
+          DB_LATENCY=$(jq -r '.database.latencyMs // "-1"' response.json 2>/dev/null || echo "-1")
+          UPTIME=$(jq -r '.uptimeSeconds // "0"' response.json 2>/dev/null || echo "0")
+          ENVIRONMENT=$(jq -r '.environment // "unknown"' response.json 2>/dev/null || echo "unknown")
+          VERSION=$(jq -r '.version // "unknown"' response.json 2>/dev/null || echo "unknown")
+          RSS_MB=$(jq -r '.memory.rssMb // "N/A"' response.json 2>/dev/null || echo "N/A")
+          HEAP_USED=$(jq -r '.memory.heapUsedMb // "N/A"' response.json 2>/dev/null || echo "N/A")
+          TIMESTAMP=$(jq -r '.timestamp // "N/A"' response.json 2>/dev/null || echo "N/A")
+
+          echo "APP_STATUS=${APP_STATUS}"       >> $GITHUB_OUTPUT
+          echo "DB_STATUS=${DB_STATUS}"         >> $GITHUB_OUTPUT
+          echo "DB_LATENCY=${DB_LATENCY}"       >> $GITHUB_OUTPUT
+          echo "UPTIME=${UPTIME}"               >> $GITHUB_OUTPUT
+          echo "ENVIRONMENT=${ENVIRONMENT}"     >> $GITHUB_OUTPUT
+          echo "VERSION=${VERSION}"             >> $GITHUB_OUTPUT
+          echo "RSS_MB=${RSS_MB}"               >> $GITHUB_OUTPUT
+          echo "HEAP_USED=${HEAP_USED}"         >> $GITHUB_OUTPUT
+          echo "TIMESTAMP=${TIMESTAMP}"         >> $GITHUB_OUTPUT
+
+          echo "--- Response Body ---"
+          cat response.json | jq . 2>/dev/null || cat response.json
+          echo ""
+
+          if [ "${APP_STATUS}" = "ok" ]; then
+            echo "PING_RESULT=healthy" >> $GITHUB_OUTPUT
+            echo "✅ Backend is healthy! DB: ${DB_STATUS} (${DB_LATENCY}ms latency) | Uptime: ${UPTIME}s"
+          elif [ "${APP_STATUS}" = "degraded" ]; then
+            echo "PING_RESULT=degraded" >> $GITHUB_OUTPUT
+            echo "::warning::Backend is responding but in DEGRADED state. DB status: ${DB_STATUS}"
+          else
+            echo "PING_RESULT=unknown" >> $GITHUB_OUTPUT
+            echo "::warning::Backend responded with HTTP 200 but returned unexpected app status: '${APP_STATUS}'"
+          fi
+
+      # ── Step 3: Write Job Summary ──────────────────────────────────────────
+      - name: Write Step Summary
+        if: always()
+        run: |
+          PING_RESULT="${{ steps.ping.outputs.PING_RESULT }}"
+          HTTP_STATUS="${{ steps.ping.outputs.HTTP_STATUS }}"
+          APP_STATUS="${{ steps.ping.outputs.APP_STATUS }}"
+          DB_STATUS="${{ steps.ping.outputs.DB_STATUS }}"
+          DB_LATENCY="${{ steps.ping.outputs.DB_LATENCY }}"
+          UPTIME="${{ steps.ping.outputs.UPTIME }}"
+          ENVIRONMENT="${{ steps.ping.outputs.ENVIRONMENT }}"
+          VERSION="${{ steps.ping.outputs.VERSION }}"
+          RSS_MB="${{ steps.ping.outputs.RSS_MB }}"
+          HEAP_USED="${{ steps.ping.outputs.HEAP_USED }}"
+          TIMESTAMP="${{ steps.ping.outputs.TIMESTAMP }}"
+
+          # Choose status badge based on result
+          case "${PING_RESULT}" in
+            healthy)   STATUS_ICON="✅" ; STATUS_LABEL="Healthy" ;;
+            degraded)  STATUS_ICON="⚠️" ; STATUS_LABEL="Degraded" ;;
+            error)     STATUS_ICON="❌" ; STATUS_LABEL="Error" ;;
+            unreachable) STATUS_ICON="🔴" ; STATUS_LABEL="Unreachable" ;;
+            *)         STATUS_ICON="❓" ; STATUS_LABEL="Unknown" ;;
+          esac
+
+          # Format uptime in a readable way
+          if [ -n "${UPTIME}" ] && [ "${UPTIME}" != "0" ] && [ "${UPTIME}" != "" ]; then
+            UPTIME_H=$((UPTIME / 3600))
+            UPTIME_M=$(( (UPTIME % 3600) / 60 ))
+            UPTIME_S=$((UPTIME % 60))
+            UPTIME_FMT="${UPTIME_H}h ${UPTIME_M}m ${UPTIME_S}s"
+          else
+            UPTIME_FMT="N/A"
+          fi
+
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## ${STATUS_ICON} AudioScape Production Keep-Alive — ${STATUS_LABEL}
+
+          | Field | Value |
+          |---|---|
+          | **Pinged At (UTC)** | $(date -u '+%Y-%m-%d %H:%M:%S UTC') |
+          | **Pinged At (IST)** | $(TZ='Asia/Kolkata' date '+%Y-%m-%d %H:%M:%S IST') |
+          | **Target** | \`https://audioscape-api.onrender.com/healthcheck\` |
+          | **HTTP Status** | \`${HTTP_STATUS}\` |
+          | **App Status** | \`${APP_STATUS}\` |
+          | **Environment** | \`${ENVIRONMENT}\` |
+          | **Version** | \`${VERSION}\` |
+
+          ### 🗄️ Database (Neon PostgreSQL)
+
+          | Metric | Value |
+          |---|---|
+          | **DB Status** | \`${DB_STATUS}\` |
+          | **DB Latency** | \`${DB_LATENCY}ms\` |
+
+          ### 💾 Memory Usage
+
+          | Metric | Value |
+          |---|---|
+          | **RSS Memory** | \`${RSS_MB} MB\` |
+          | **Heap Used** | \`${HEAP_USED} MB\` |
+
+          ### ⏱️ Process Uptime
+
+          | Metric | Value |
+          |---|---|
+          | **Uptime** | \`${UPTIME_FMT}\` |
+          | **Server Timestamp** | \`${TIMESTAMP}\` |
+
+          ---
+
+          > **Schedule:** Every 15 min · Active Window: ~06:30 AM – 12:15 AM IST (01:00–18:59 UTC) · Budget: ~532h/month of 750h free tier
+          EOF

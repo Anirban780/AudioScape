@@ -4,6 +4,7 @@ import '@testing-library/jest-dom';
 import QuotaStatusPill from '../QuotaStatusPill';
 import QuotaDashboardModal from '../QuotaDashboardModal';
 import * as api from '@/utils/api';
+import useQuotaStore from '@/store/useQuotaStore';
 
 // Mock the API calls
 vi.mock('@/utils/api', () => ({
@@ -62,6 +63,7 @@ describe('YouTube Quota Telemetry & Dashboard Tests', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    useQuotaStore.getState().reset();
     api.fetchQuotaSummary.mockResolvedValue(mockSummary);
     api.fetchQuotaHistory.mockResolvedValue({ days: mockHistory });
   });

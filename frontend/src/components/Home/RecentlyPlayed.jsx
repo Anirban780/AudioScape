@@ -136,7 +136,7 @@ const RecentlyPlayed = ({ userId }) => {
   useRefreshOn("history", () => loadRecentlyPlayed(false), 5000);
 
   const handlePlayTrack = (song) => {
-    usePlayerStore.getState().setTrack(song);
+    usePlayerStore.getState().setTrack(song, "HISTORY");
     usePlayerStore.getState().setIsPlaying(true);
     notify.trackPlaying(song.name || song.title, song.artist);
   };

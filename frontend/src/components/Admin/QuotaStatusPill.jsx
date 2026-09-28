@@ -7,11 +7,11 @@ import { cn } from "@/lib/utils";
 export default function QuotaStatusPill({ className }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const buttonRef = useRef(null);
-  const { data } = useQuotaDashboard({ enabled: true });
-
-  const userSearchesLeft = data?.userSearchesLeft ?? (data?.searchStatus?.userSearchesLeft ?? 5);
-  const globalSearchesLeft = data?.globalSearchesLeft ?? (data?.searchStatus?.globalSearchesLeft ?? 150);
-  const isThresholdActive = Boolean(data?.isThresholdActive ?? data?.searchStatus?.isThresholdActive);
+  const {
+    userSearchesLeft,
+    globalSearchesLeft,
+    isThresholdActive,
+  } = useQuotaDashboard({ enabled: true });
   
   const isCritical = userSearchesLeft === 0 || globalSearchesLeft === 0;
   const isWarning = (userSearchesLeft <= 2 && userSearchesLeft > 0) || isThresholdActive;
