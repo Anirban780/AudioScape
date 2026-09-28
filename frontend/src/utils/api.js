@@ -564,6 +564,21 @@ export async function fetchExploreCategories() {
  * @returns {Promise<Array<{ slug: string, name: string, keyword: string, tagline: string, thumbnail: string, trackCount: number }>>}
  * ============================================================================
  */
+/**
+ * Safe URL validation for legacy Unsplash stock photos (CWE-020 compliant).
+ * Avoids partial substring matching by parsing hostname.
+ */
+function isUnsplashThumbnail(urlString) {
+    if (!urlString || typeof urlString !== "string") return false;
+    try {
+        const parsed = new URL(urlString);
+        const host = parsed.hostname.toLowerCase();
+        return host === "unsplash.com" || host.endsWith(".unsplash.com");
+    } catch {
+        return false;
+    }
+}
+
 export async function fetchCategorySummaries() {
     const user = useAuthStore.getState()?.user;
     const userIdKey = user?.id || user?.googleId || "anonymous";
@@ -575,7 +590,7 @@ export async function fetchCategorySummaries() {
         const raw = localStorage.getItem(CACHE_KEY);
         if (raw) {
             const parsed = JSON.parse(raw);
-            const hasUnsplash = Array.isArray(parsed.data) && parsed.data.some((d) => d.thumbnail && d.thumbnail.includes("unsplash.com"));
+            const hasUnsplash = Array.isArray(parsed.data) && parsed.data.some((d) => isUnsplashThumbnail(d.thumbnail));
             if (!hasUnsplash && Date.now() - parsed.timestamp < CACHE_TTL_MS && Array.isArray(parsed.data) && parsed.data.length > 0) {
                 fetchFreshCategorySummaries(CACHE_KEY).catch(() => {});
                 return parsed.data;
@@ -675,7 +690,7 @@ function getFallbackCategorySummaries(cacheKey) {
         if (raw) {
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed.data) && parsed.data.length > 0) {
-                const cleaned = parsed.data.filter((d) => !d.thumbnail || !d.thumbnail.includes("unsplash.com"));
+                const cleaned = parsed.data.filter((d) => !d.thumbnail || !isUnsplashThumbnail(d.thumbnail));
                 if (cleaned.length > 0) return cleaned;
             }
         }
@@ -701,7 +716,7 @@ async function fetchFreshCategorySummaries(cacheKey) {
         const data = await response.json();
         if (Array.isArray(data) && data.length > 0) {
             const formatted = data.map((item) => {
-                const rawThumb = item.thumbnail && !item.thumbnail.includes("unsplash.com") ? item.thumbnail : "";
+                const rawThumb = item.thumbnail && !isUnsplashThumbnail(item.thumbnail) ? item.thumbnail : "";
                 return {
                     slug: item.slug,
                     name: item.name,

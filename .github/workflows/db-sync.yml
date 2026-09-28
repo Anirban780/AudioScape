@@ -18,6 +18,9 @@ on:
     paths:
       - 'backend/prisma/**'
 
+permissions:
+  contents: read
+
 jobs:
   db-sync:
     name: Execute Neon Database Migrations

@@ -17,6 +17,8 @@ on:
           - production
           - staging
 
+permissions: {}
+
 jobs:
   maintenance-cron:
     name: Execute Platform Maintenance & Pre-warming

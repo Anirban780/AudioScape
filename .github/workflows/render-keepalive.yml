@@ -40,6 +40,8 @@ concurrency:
   group: render-keepalive
   cancel-in-progress: true
 
+permissions: {}
+
 jobs:
   keepalive-ping:
     name: Ping Production Backend (/healthcheck)
