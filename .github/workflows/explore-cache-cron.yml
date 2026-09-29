@@ -59,8 +59,8 @@ jobs:
 
             echo "Target Backend API: ${BACKEND_URL}"
 
-            # Pre-flight healthcheck with 15s timeout
-            HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${BACKEND_URL}/healthcheck" || true)
+            # Pre-flight healthcheck with 120s timeout (accommodates Render cold-starts)
+            HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 "${BACKEND_URL}/healthcheck" || true)
             echo "Healthcheck HTTP Status: ${HEALTH_STATUS}"
 
             if [ "$HEALTH_STATUS" != "200" ]; then
@@ -107,7 +107,7 @@ jobs:
               BACKEND_URL="${{ secrets.BACKEND_URL || 'https://audioscape-api.onrender.com' }}"
             fi
 
-            HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${BACKEND_URL}/healthcheck" || true)
+            HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 "${BACKEND_URL}/healthcheck" || true)
             if [ "$HEALTH_STATUS" != "200" ]; then
               if [ "$ENV" = "staging" ]; then
                 echo "::warning::Staging backend is unavailable. Skipping stale track refresh."
@@ -152,7 +152,7 @@ jobs:
               BACKEND_URL="${{ secrets.BACKEND_URL || 'https://audioscape-api.onrender.com' }}"
             fi
 
-            HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "${BACKEND_URL}/healthcheck" || true)
+            HEALTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 120 "${BACKEND_URL}/healthcheck" || true)
             if [ "$HEALTH_STATUS" != "200" ]; then
               if [ "$ENV" = "staging" ]; then
                 echo "::warning::Staging backend is unavailable. Skipping Search Cache GC."
